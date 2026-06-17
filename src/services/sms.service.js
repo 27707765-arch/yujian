@@ -10,17 +10,26 @@ const redis = require('../config/redis');
 const memoryStore = new Map();
 
 /**
+ * 是否处于短信模拟模式
+ * 当 SMS_SIMULATE=true 或 NODE_ENV=development 时，使用固定验证码并直接返回给客户端
+ * 内测期间设置 SMS_SIMULATE=true 即可跳过真实短信服务
+ */
+function isSimulateMode() {
+  return process.env.SMS_SIMULATE === 'true' || process.env.NODE_ENV === 'development';
+}
+
+/**
  * 生成随机验证码
  * @param {number} length - 验证码长度
  * @returns {string} - 验证码字符串
  */
 function generateCode(length = 6) {
-  // 开发环境使用固定验证码方便测试
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('⚠️  开发模式：验证码固定为 123456，生产环境将使用随机验证码');
+  // 模拟模式：使用固定验证码方便测试
+  if (isSimulateMode()) {
+    console.warn('⚠️  短信模拟模式：验证码固定为 123456');
     return '123456';
   }
-  // 生产环境使用随机验证码
+  // 生产环境使用随机验证码（需对接真实短信服务商）
   let code = '';
   const chars = '0123456789';
   for (let i = 0; i < length; i++) {
@@ -73,7 +82,7 @@ async function sendVerificationCode(phone) {
     return {
       success: true,
       message: '验证码发送成功',
-      code: process.env.NODE_ENV === 'development' ? code : undefined // 仅开发环境返回验证码
+      code: isSimulateMode() ? code : undefined // 仅模拟模式返回验证码，生产环境通过真实短信发送
     };
   } catch (err) {
     console.error('发送验证码失败:', err.message);

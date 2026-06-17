@@ -186,30 +186,18 @@ class Checkin {
   }
 
   /**
-   * 更新任务进度（数据库 + 内存双写）
+   * 更新任务进度（使用 UPSERT 避免竞态条件）
    */
   static async updateTaskProgress(userId, taskKey, increment = 1) {
     const today = new Date().toISOString().slice(0, 10);
 
-    // 获取当前进度
-    const progressMap = await this.getTaskProgressMap(userId, today);
-    const current = progressMap[taskKey] || 0;
-    const newProgress = current + increment;
-
-    // 持久化到数据库（UPSERT 模式）
+    // 持久化到数据库（INSERT ... ON DUPLICATE KEY UPDATE 原子操作，消除并发竞态）
     try {
       if (isDbAvailable()) {
-        if (current === 0) {
-          await executeQuery(
-            'INSERT INTO user_tasks (user_id, task_key, task_date, progress) VALUES (?, ?, ?, ?)',
-            [userId, taskKey, today, newProgress]
-          );
-        } else {
-          await executeQuery(
-            'UPDATE user_tasks SET progress = ? WHERE user_id = ? AND task_key = ? AND task_date = ?',
-            [newProgress, userId, taskKey, today]
-          );
-        }
+        await executeQuery(
+          'INSERT INTO user_tasks (user_id, task_key, task_date, progress) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE progress = progress + ?',
+          [userId, taskKey, today, increment, increment]
+        );
       }
     } catch (err) {
       console.error('任务进度持久化失败:', err.message);
@@ -217,11 +205,18 @@ class Checkin {
 
     // 内存 fallback
     const key = `${userId}:${today}:${taskKey}`;
+    const current = taskMemory.get(key) || 0;
+    const newProgress = current + increment;
     taskMemory.set(key, newProgress);
 
-    // 检查任务是否完成，发放奖励
+    // 获取当前实际进度（数据库 + 内存取最大值）
+    const progressMap = await this.getTaskProgressMap(userId, today);
+    const actualProgress = Math.max(progressMap[taskKey] || 0, newProgress);
+
+    // 检查任务是否完成，发放奖励（仅首次达到阈值时发放，避免重复发放）
     const task = DAILY_TASKS.find(t => t.key === taskKey);
-    if (task && newProgress >= task.max && current < task.max) {
+    const previousProgress = actualProgress - increment;
+    if (task && actualProgress >= task.max && previousProgress < task.max) {
       try {
         await Wallet.recharge(userId, task.reward, 'task_reward', null);
         return { completed: true, reward: task.reward, message: `完成任务「${task.name}」，获得${task.reward}金币` };
@@ -229,7 +224,7 @@ class Checkin {
         console.error('发放任务奖励失败:', err.message);
       }
     }
-    return { completed: false, progress: newProgress, max: task ? task.max : 1 };
+    return { completed: false, progress: actualProgress, max: task ? task.max : 1 };
   }
 }
 

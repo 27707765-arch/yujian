@@ -417,5 +417,5 @@ CREATE TABLE IF NOT EXISTS user_tasks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日任务进度表';
 
 -- users 表增加礼物统计字段
-ALTER TABLE users ADD COLUMN IF NOT EXISTS gifts_received_count INT DEFAULT 0 COMMENT '收到礼物数' AFTER like_count;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS gifts_sent_count INT DEFAULT 0 COMMENT '送出礼物数' AFTER gifts_received_count;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gifts_received_count INT DEFAULT 0 COMMENT '收到礼物数';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gifts_sent_count INT DEFAULT 0 COMMENT '送出礼物数';

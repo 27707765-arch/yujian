@@ -3,7 +3,7 @@
  * 运营后台数据看板、用户管理
  */
 
-const { pool } = require('../config/database');
+const { executeQuery } = require('../utils/database');
 const { success, error, serverError } = require('../utils/response');
 
 /**
@@ -14,61 +14,61 @@ async function getDashboard(req, res) {
     const stats = {};
 
     // 用户总数
-    const [userCount] = await pool.execute('SELECT COUNT(*) as total FROM users');
+    const [userCount] = await executeQuery('SELECT COUNT(*) as total FROM users');
     stats.total_users = userCount[0].total;
 
     // 今日新增
-    const [todayUsers] = await pool.execute(
+    const [todayUsers] = await executeQuery(
       'SELECT COUNT(*) as total FROM users WHERE DATE(created_at) = CURDATE()'
     );
     stats.today_new_users = todayUsers[0].total;
 
     // 活跃用户（今日有操作）
-    const [activeUsers] = await pool.execute(
+    const [activeUsers] = await executeQuery(
       'SELECT COUNT(DISTINCT user_id) as total FROM likes WHERE DATE(created_at) = CURDATE()'
     );
     stats.today_active_users = activeUsers[0].total;
 
     // 匹配数
-    const [matchCount] = await pool.execute('SELECT COUNT(*) as total FROM matches WHERE status = 1');
+    const [matchCount] = await executeQuery('SELECT COUNT(*) as total FROM matches WHERE status = 1');
     stats.total_matches = matchCount[0].total;
 
     // 今日匹配
-    const [todayMatches] = await pool.execute(
+    const [todayMatches] = await executeQuery(
       'SELECT COUNT(*) as total FROM matches WHERE DATE(created_at) = CURDATE()'
     );
     stats.today_matches = todayMatches[0].total;
 
     // 消息数
-    const [msgCount] = await pool.execute('SELECT COUNT(*) as total FROM messages');
+    const [msgCount] = await executeQuery('SELECT COUNT(*) as total FROM messages');
     stats.total_messages = msgCount[0].total;
 
     // 今日消息
-    const [todayMsgs] = await pool.execute(
+    const [todayMsgs] = await executeQuery(
       'SELECT COUNT(*) as total FROM messages WHERE DATE(created_at) = CURDATE()'
     );
     stats.today_messages = todayMsgs[0].total;
 
     // 礼物统计
-    const [giftStats] = await pool.execute(
+    const [giftStats] = await executeQuery(
       'SELECT COUNT(*) as total, COALESCE(SUM(total_price), 0) as total_value FROM gift_records WHERE DATE(created_at) = CURDATE()'
     );
     stats.today_gifts = giftStats[0].total;
     stats.today_gift_value = giftStats[0].total_value;
 
     // 付费统计
-    const [revenue] = await pool.execute(
+    const [revenue] = await executeQuery(
       'SELECT COALESCE(SUM(amount), 0) as total FROM orders WHERE status = 1'
     );
     stats.total_revenue = revenue[0].total;
 
-    const [todayRevenue] = await pool.execute(
+    const [todayRevenue] = await executeQuery(
       'SELECT COALESCE(SUM(amount), 0) as total FROM orders WHERE status = 1 AND DATE(created_at) = CURDATE()'
     );
     stats.today_revenue = todayRevenue[0].total;
 
     // 举报待处理
-    const [pendingReports] = await pool.execute(
+    const [pendingReports] = await executeQuery(
       'SELECT COUNT(*) as total FROM reports WHERE status = 0'
     );
     stats.pending_reports = pendingReports[0].total;
@@ -99,7 +99,7 @@ async function getUserList(req, res) {
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
-    const [users] = await pool.execute(query, params);
+    const [users] = await executeQuery(query, params);
 
     // 总数
     let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
@@ -112,7 +112,7 @@ async function getUserList(req, res) {
       countQuery += ' AND (nickname LIKE ? OR phone LIKE ?)';
       countParams.push(`%${keyword}%`, `%${keyword}%`);
     }
-    const [countResult] = await pool.execute(countQuery, countParams);
+    const [countResult] = await executeQuery(countQuery, countParams);
 
     // 脱敏手机号
     users.forEach(u => {
@@ -134,10 +134,10 @@ async function toggleUserStatus(req, res) {
     const { action } = req.body; // 'ban' or 'unban'
 
     if (action === 'ban') {
-      await pool.execute('UPDATE users SET status = 0 WHERE id = ?', [userId]);
+      await executeQuery('UPDATE users SET status = 0 WHERE id = ?', [userId]);
       return success(res, null, '用户已封禁');
     } else if (action === 'unban') {
-      await pool.execute('UPDATE users SET status = 1 WHERE id = ?', [userId]);
+      await executeQuery('UPDATE users SET status = 1 WHERE id = ?', [userId]);
       return success(res, null, '用户已解封');
     }
     error(res, 400, '无效操作');

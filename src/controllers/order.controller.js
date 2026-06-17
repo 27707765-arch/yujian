@@ -12,6 +12,17 @@ const { success, error, serverError } = require('../utils/response');
 const COIN_PACKAGE_ID = 4;
 
 /**
+ * 是否处于支付模拟模式
+ * 当 SIMULATE_PAYMENT=true 或 NODE_ENV 为 development/test 时，自动确认支付
+ * 内测期间设置 SIMULATE_PAYMENT=true 即可跳过真实支付对接
+ */
+function isSimulateMode() {
+  return process.env.SIMULATE_PAYMENT === 'true'
+    || process.env.NODE_ENV === 'development'
+    || process.env.NODE_ENV === 'test';
+}
+
+/**
  * 生成订单号
  * @returns {string} - 唯一订单号
  */
@@ -49,18 +60,18 @@ async function createVipOrder(req, res) {
       [id, package_id, orderNo, pkg.price]
     );
 
-    // 生产环境需对接微信/支付宝，仅开发/测试环境自动确认支付
-    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
-      console.warn('⚠️  开发环境：自动确认支付，生产环境需对接支付网关');
+    // 支付模拟模式：自动确认支付；生产模式：需对接真实支付网关
+    if (isSimulateMode()) {
+      console.warn('⚠️  支付模拟模式：自动确认支付，生产环境需对接支付网关');
       await pool.execute('UPDATE orders SET status = 1 WHERE order_no = ?', [orderNo]);
 
       // 计算VIP过期时间
       const expireTime = new Date(Date.now() + pkg.duration * 86400000);
       await User.updateVipStatus(id, true, expireTime);
 
-      success(res, { order_no: orderNo, amount: pkg.price, expire_time: expireTime, payment_required: false }, '开通成功（开发环境自动支付）');
+      success(res, { order_no: orderNo, amount: pkg.price, expire_time: expireTime, payment_required: false }, '开通成功（模拟支付）');
     } else {
-      // 生产环境：返回订单信息，需完成支付后才能开通VIP
+      // 真实支付模式：返回订单信息，需完成支付后才能开通VIP
       success(res, {
         order_no: orderNo,
         amount: pkg.price,
@@ -87,9 +98,9 @@ async function createRechargeOrder(req, res) {
 
     const orderNo = generateOrderNo();
 
-    // 生产环境需对接微信/支付宝，仅开发/测试环境自动完成充值
-    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
-      console.warn('⚠️  开发环境：自动完成充值，生产环境需对接支付网关');
+    // 支付模拟模式：自动完成充值；生产模式：需对接真实支付网关
+    if (isSimulateMode()) {
+      console.warn('⚠️  支付模拟模式：自动完成充值');
 
       // 持久化订单记录
       try {
@@ -107,9 +118,9 @@ async function createRechargeOrder(req, res) {
       await Wallet.recharge(id, coins, 'order', null);
 
       const wallet = await Wallet.getOrCreate(id);
-      success(res, { order_no: orderNo, amount, coins, balance: wallet.balance }, '充值成功');
+      success(res, { order_no: orderNo, amount, coins, balance: wallet.balance }, '充值成功（模拟支付）');
     } else {
-      // 生产环境：返回订单信息，需完成支付后才能到账
+      // 真实支付模式：返回订单信息，需完成支付后才能到账
       await pool.execute(
         'INSERT INTO orders (user_id, package_id, order_no, amount, status) VALUES (?, ?, ?, ?, 0)',
         [id, COIN_PACKAGE_ID, orderNo, amount]

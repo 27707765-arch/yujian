@@ -61,7 +61,7 @@ app.use(express.urlencoded({ extended: true })); // URL 编码解析
 app.use(express.static('public')); // 前端页面服务
 app.use(express.static('uploads')); // 静态文件服务
 
-// 请求日志中间件（使用 Winston 记录到文件，同时输出到控制台）
+// 请求日志中间件（Winston 记录到文件，非生产环境额外输出到控制台）
 app.use((req, res, next) => {
   const startTime = Date.now();
   const logMessage = `${req.method} ${req.url}`;
@@ -74,10 +74,12 @@ app.use((req, res, next) => {
     userAgent: req.get('user-agent')
   });
 
-  // 响应完成后记录耗时
+  // 响应完成后记录耗时（生产环境仅写日志文件，开发环境同时输出控制台）
   res.on('finish', () => {
     const duration = Date.now() - startTime;
-    console.log(`${new Date().toISOString()} ${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`${new Date().toISOString()} ${req.method} ${req.url} ${res.statusCode} ${duration}ms`);
+    }
   });
 
   next();

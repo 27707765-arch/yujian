@@ -1,4 +1,4 @@
-const { pool } = require('../config/database');
+const { executeQuery, isDbAvailable } = require('../utils/database');
 const { success, error, serverError } = require('../utils/response');
 
 async function submitReport(req, res) {
@@ -10,25 +10,25 @@ async function submitReport(req, res) {
       return error(res, 400, '被举报用户ID和举报原因不能为空');
     }
 
-    const [users] = await pool.execute('SELECT id FROM users WHERE id = ?', [reported_user_id]);
-    if (users.length === 0) {
+    const [users] = await executeQuery('SELECT id FROM users WHERE id = ?', [reported_user_id]);
+    if (!users || users.length === 0) {
       return error(res, 404, '被举报用户不存在');
     }
 
-    const [reports] = await pool.execute(
+    const [reports] = await executeQuery(
       'SELECT id FROM reports WHERE reporter_id = ? AND reported_user_id = ? AND status = 0',
       [id, reported_user_id]
     );
-    if (reports.length > 0) {
+    if (reports && reports.length > 0) {
       return error(res, 400, '已经举报过该用户，请勿重复举报');
     }
 
-    const [result] = await pool.execute(
+    const [result] = await executeQuery(
       'INSERT INTO reports (reporter_id, reported_user_id, reason) VALUES (?, ?, ?)',
       [id, reported_user_id, reason]
     );
 
-    success(res, { report_id: result.insertId }, '举报成功，我们会尽快处理');
+    success(res, { report_id: result ? result.insertId : null }, '举报成功，我们会尽快处理');
   } catch (err) {
     serverError(res, err, '提交举报失败');
   }
@@ -38,7 +38,7 @@ async function getReports(req, res) {
   try {
     const { status = 0, limit = 20, offset = 0 } = req.query;
 
-    const [reports] = await pool.execute(
+    const [reports] = await executeQuery(
       `SELECT r.*, reporter.nickname as reporter_nickname, reported.nickname as reported_nickname
        FROM reports r
        LEFT JOIN users reporter ON r.reporter_id = reporter.id
@@ -47,11 +47,11 @@ async function getReports(req, res) {
       [parseInt(status), parseInt(limit), parseInt(offset)]
     );
 
-    const [countResult] = await pool.execute(
+    const [countResult] = await executeQuery(
       'SELECT COUNT(*) as count FROM reports WHERE status = ?', [parseInt(status)]
     );
 
-    success(res, { reports, total: countResult[0].count });
+    success(res, { reports: reports || [], total: countResult ? countResult[0].count : 0 });
   } catch (err) {
     serverError(res, err, '获取举报列表失败');
   }
@@ -66,15 +66,15 @@ async function handleReport(req, res) {
       return error(res, 400, '举报ID和处理动作不能为空');
     }
 
-    const [reports] = await pool.execute('SELECT * FROM reports WHERE id = ?', [id]);
-    if (reports.length === 0) {
+    const [reports] = await executeQuery('SELECT * FROM reports WHERE id = ?', [id]);
+    if (!reports || reports.length === 0) {
       return error(res, 404, '举报记录不存在');
     }
 
-    await pool.execute('UPDATE reports SET status = 1 WHERE id = ?', [id]);
+    await executeQuery('UPDATE reports SET status = 1 WHERE id = ?', [id]);
 
     if (action === 'ban') {
-      await pool.execute('UPDATE users SET status = 0 WHERE id = ?', [reports[0].reported_user_id]);
+      await executeQuery('UPDATE users SET status = 0 WHERE id = ?', [reports[0].reported_user_id]);
     }
 
     success(res, null, '处理举报成功');

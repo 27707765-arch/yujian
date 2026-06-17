@@ -62,7 +62,7 @@ async function addComment(req, res) {
   try {
     const { id } = req.user;
     const postId = parseInt(req.params.id);
-    const { content } = req.body;
+    const { content, parent_id } = req.body;
 
     if (!postId) return error(res, 400, '动态ID无效');
     if (!content || !content.trim()) return error(res, 400, '评论内容不能为空');
@@ -70,8 +70,8 @@ async function addComment(req, res) {
     const post = await Post.findById(postId);
     if (!post) return error(res, 404, '动态不存在');
 
-    await Post.addComment(postId, id, content.trim());
-    success(res, null, '评论成功');
+    await Post.addComment(postId, id, content.trim(), parent_id || null);
+    success(res, null, parent_id ? '回复成功' : '评论成功');
   } catch (err) {
     serverError(res, err, '评论失败');
   }
