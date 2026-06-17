@@ -1,0 +1,236 @@
+/**
+ * 签到与任务模型
+ * 管理用户每日签到和任务系统
+ */
+
+const { executeQuery, isDbAvailable } = require('../utils/database');
+const Wallet = require('./Wallet');
+
+// 内存存储
+const checkinMemory = new Map();
+const taskMemory = new Map();
+
+// 每日任务模板
+const DAILY_TASKS = [
+  { key: 'complete_profile', name: '完善个人资料', reward: 20, max: 1 },
+  { key: 'upload_photo', name: '上传3张照片', reward: 15, max: 1 },
+  { key: 'like_users', name: '喜欢10个用户', reward: 10, max: 1 },
+  { key: 'chat_start', name: '与1人发起聊天', reward: 10, max: 1 },
+  { key: 'post_moment', name: '发布1条动态', reward: 5, max: 1 },
+  { key: 'send_gift', name: '赠送1个礼物', reward: 30, max: 1 },
+];
+
+class Checkin {
+  /**
+   * 每日签到
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object>}
+   */
+  static async checkin(userId) {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // 检查今日是否已签到
+    const alreadyDone = await this.hasCheckedIn(userId, today);
+    if (alreadyDone) {
+      return { success: false, message: '今日已签到' };
+    }
+
+    // 计算连续签到天数
+    const streak = await this.calcStreak(userId, today);
+
+    // 计算奖励（基础5金币 + 连续签到加成）
+    const baseReward = 5;
+    const streakBonus = Math.min(streak, 7) * 2; // 最多7天加成
+    const totalReward = baseReward + streakBonus;
+
+    let persisted = false;
+    try {
+      if (isDbAvailable()) {
+        await executeQuery(
+          'INSERT INTO daily_checkins (user_id, checkin_date, streak_days, reward_coins) VALUES (?, ?, ?, ?)',
+          [userId, today, streak + 1, totalReward]
+        );
+        persisted = true;
+      }
+    } catch (err) {
+      console.error('签到持久化失败:', err.message);
+    }
+
+    // 仅当数据库不可用时存入内存（降级方案，避免双写不一致）
+    if (!persisted) {
+      if (!checkinMemory.has(userId)) checkinMemory.set(userId, []);
+      checkinMemory.get(userId).push({ date: today, streak: streak + 1, reward: totalReward });
+    }
+
+    // 发放金币
+    await Wallet.recharge(userId, totalReward, 'checkin', null);
+
+    return {
+      success: true,
+      streak: streak + 1,
+      reward: totalReward,
+      message: `签到成功！连续签到第${streak + 1}天`
+    };
+  }
+
+  /**
+   * 检查是否已签到
+   */
+  static async hasCheckedIn(userId, date) {
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery(
+          'SELECT id FROM daily_checkins WHERE user_id = ? AND checkin_date = ?',
+          [userId, date]
+        );
+        return rows.length > 0;
+      }
+    } catch (err) {
+      // fall through
+    }
+    const records = checkinMemory.get(userId) || [];
+    return records.some(r => r.date === date);
+  }
+
+  /**
+   * 计算连续签到天数
+   */
+  static async calcStreak(userId, today) {
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery(
+          'SELECT streak_days, checkin_date FROM daily_checkins WHERE user_id = ? ORDER BY checkin_date DESC LIMIT 1',
+          [userId]
+        );
+        if (rows.length === 0) return 0;
+        const lastDate = new Date(rows[0].checkin_date);
+        const expectedPrev = new Date(today);
+        expectedPrev.setDate(expectedPrev.getDate() - 1);
+        if (lastDate.toISOString().slice(0, 10) === expectedPrev.toISOString().slice(0, 10)) {
+          return rows[0].streak_days;
+        }
+        return 0;
+      }
+    } catch (err) {
+      // fall through
+    }
+    const records = (checkinMemory.get(userId) || []).sort((a, b) => b.date.localeCompare(a.date));
+    if (records.length === 0) return 0;
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (records[0].date === yesterday.toISOString().slice(0, 10)) {
+      return records[0].streak;
+    }
+    return 0;
+  }
+
+  /**
+   * 获取签到历史
+   */
+  static async getHistory(userId, limit = 30) {
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery(
+          'SELECT * FROM daily_checkins WHERE user_id = ? ORDER BY checkin_date DESC LIMIT ?',
+          [userId, limit]
+        );
+        return rows;
+      }
+    } catch (err) {
+      console.error('查询签到记录失败:', err.message);
+    }
+    return (checkinMemory.get(userId) || []).slice(-limit).reverse();
+  }
+
+  // ==================== 每日任务 ====================
+
+  /**
+   * 获取每日任务列表及用户进度
+   */
+  static async getDailyTasks(userId) {
+    const today = new Date().toISOString().slice(0, 10);
+    const progressMap = await this.getTaskProgressMap(userId, today);
+
+    return DAILY_TASKS.map(task => {
+      const progress = progressMap[task.key] || 0;
+      return { ...task, progress, completed: progress >= task.max };
+    });
+  }
+
+  /**
+   * 获取用户当天所有任务进度（查数据库，内存 fallback）
+   */
+  static async getTaskProgressMap(userId, date) {
+    try {
+      if (isDbAvailable()) {
+        // 查找当天已完成的任务记录
+        const [rows] = await executeQuery(
+          'SELECT task_key, MAX(progress) as progress FROM user_tasks WHERE user_id = ? AND task_date = ? GROUP BY task_key',
+          [userId, date]
+        );
+        const map = {};
+        rows.forEach(r => { map[r.task_key] = r.progress; });
+        return map;
+      }
+    } catch (err) {
+      console.error('查询任务进度失败:', err.message);
+    }
+    // 内存 fallback
+    const map = {};
+    for (const [key, value] of taskMemory.entries()) {
+      if (key.startsWith(`${userId}:${date}:`)) {
+        map[key.split(':')[2]] = value;
+      }
+    }
+    return map;
+  }
+
+  /**
+   * 更新任务进度（数据库 + 内存双写）
+   */
+  static async updateTaskProgress(userId, taskKey, increment = 1) {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // 获取当前进度
+    const progressMap = await this.getTaskProgressMap(userId, today);
+    const current = progressMap[taskKey] || 0;
+    const newProgress = current + increment;
+
+    // 持久化到数据库（UPSERT 模式）
+    try {
+      if (isDbAvailable()) {
+        if (current === 0) {
+          await executeQuery(
+            'INSERT INTO user_tasks (user_id, task_key, task_date, progress) VALUES (?, ?, ?, ?)',
+            [userId, taskKey, today, newProgress]
+          );
+        } else {
+          await executeQuery(
+            'UPDATE user_tasks SET progress = ? WHERE user_id = ? AND task_key = ? AND task_date = ?',
+            [newProgress, userId, taskKey, today]
+          );
+        }
+      }
+    } catch (err) {
+      console.error('任务进度持久化失败:', err.message);
+    }
+
+    // 内存 fallback
+    const key = `${userId}:${today}:${taskKey}`;
+    taskMemory.set(key, newProgress);
+
+    // 检查任务是否完成，发放奖励
+    const task = DAILY_TASKS.find(t => t.key === taskKey);
+    if (task && newProgress >= task.max && current < task.max) {
+      try {
+        await Wallet.recharge(userId, task.reward, 'task_reward', null);
+        return { completed: true, reward: task.reward, message: `完成任务「${task.name}」，获得${task.reward}金币` };
+      } catch (err) {
+        console.error('发放任务奖励失败:', err.message);
+      }
+    }
+    return { completed: false, progress: newProgress, max: task ? task.max : 1 };
+  }
+}
+
+module.exports = Checkin;
