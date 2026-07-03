@@ -25,4 +25,16 @@ router.post('/mark-read', chatController.markAsRead);
 // 获取未读消息数
 router.get('/unread-count', chatController.getUnreadCount);
 
+// 撤回消息（2分钟内）
+router.post('/messages/:id/recall', chatController.recallMessage);
+
+// 删除会话
+router.delete('/conversations/:id', chatController.deleteConversation);
+
+// 置顶会话
+router.put('/conversations/:id/pin', chatController.pinConversation);
+
+// 发送消息（HTTP回退，含图片消息支持）
+router.post('/messages', chatController.sendMessage);
+
 module.exports = router;

@@ -7,13 +7,37 @@ const uploadService = require('../services/upload.service');
 const router = express.Router();
 router.use(authMiddleware);
 
-const upload = uploadService.multipleUpload([{ name: 'images', maxCount: 9 }]);
+// 混合上传：图片（最多9张）+ 视频（最多1个）+ 封面（最多1张）
+const mediaUpload = uploadService.mediaUpload([
+  { name: 'images', maxCount: 9 },
+  { name: 'video', maxCount: 1 },
+  { name: 'video_cover', maxCount: 1 }
+]);
 
-// multer 必须在 contentAudit 之前，否则 req.body 为空
-router.post('/', upload, contentAudit({ fields: ['content'] }), postController.createPost);
+// 创建动态（支持图片和视频）
+router.post('/', mediaUpload, contentAudit({ fields: ['content'] }), postController.createPost);
+
+// 获取动态列表
 router.get('/', postController.getPosts);
+
+// 编辑动态
+router.put('/:id', mediaUpload, contentAudit({ fields: ['content'] }), postController.updatePost);
+
+// 删除动态（软删除）
+router.delete('/:id', postController.deletePost);
+
+// 获取点赞状态
+router.get('/:id/like', postController.checkLikeStatus);
+
+// 获取动态详情
 router.get('/:id', postController.getPostDetail);
+
+// 评论动态
 router.post('/:id/comment', contentAudit({ fields: ['content'] }), postController.addComment);
+
+// 点赞/取消点赞
 router.post('/:id/like', postController.toggleLike);
 
+// 点赞评论
+router.post('/comments/:id/like', postController.toggleCommentLike);
 module.exports = router;

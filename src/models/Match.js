@@ -151,6 +151,46 @@ class Match {
   }
 
   /**
+   * 批量检查用户与多个目标用户是否已匹配
+   * 用于推荐接口优化：一次查询替代 N 次 exists() 调用
+   * UNION 同时查询 user1→user2 和 user2→user1 两个方向
+   * @param {number} userId - 用户ID
+   * @param {number[]} targetIds - 目标用户ID数组
+   * @returns {Promise<Set<number>>} - 已匹配的对方用户ID集合
+   */
+  static async batchExists(userId, targetIds) {
+    if (!targetIds || targetIds.length === 0) {
+      return new Set();
+    }
+
+    try {
+      if (isDbAvailable()) {
+        const placeholders = targetIds.map(() => '?').join(', ');
+        // 双向查询：user1_id=userId AND user2_id IN targetIds  或  user2_id=userId AND user1_id IN targetIds
+        const sql = `SELECT user2_id AS matched_id FROM matches WHERE user1_id = ? AND user2_id IN (${placeholders}) AND status = 1
+                     UNION
+                     SELECT user1_id AS matched_id FROM matches WHERE user2_id = ? AND user1_id IN (${placeholders}) AND status = 1`;
+        const [rows] = await executeQuery(sql, [userId, ...targetIds, userId, ...targetIds]);
+        return new Set(rows.map(r => r.matched_id));
+      }
+    } catch (error) {
+      console.error('批量查询匹配记录失败，使用内存存储:', error.message);
+    }
+
+    // 数据库不可用时使用内存存储降级
+    const result = new Set();
+    for (const match of memoryStore.values()) {
+      if (match.status !== 1) continue;
+      if (match.user1_id === userId && targetIds.includes(match.user2_id)) {
+        result.add(match.user2_id);
+      } else if (match.user2_id === userId && targetIds.includes(match.user1_id)) {
+        result.add(match.user1_id);
+      }
+    }
+    return result;
+  }
+
+  /**
    * 解除匹配
    * @param {number} user1_id - 用户1 ID
    * @param {number} user2_id - 用户2 ID

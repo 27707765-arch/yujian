@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>遇见 - 同城社交APP</title>
+  <!-- PWA 支持 -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#FF6B6B">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="遇见">
+  <link rel="apple-touch-icon" href="/icon.png">
   <style>
     * {
       margin: 0;
@@ -1680,7 +1687,10 @@
         </div>
       </div>
       
-      <div class="user-cards-container">
+      <div class="user-cards-container" id="cards-wrapper">
+        <div id="pull-indicator" style="display:none;text-align:center;padding:12px;color:#747D8C;font-size:14px;">
+          <span id="pull-icon">↓</span> <span id="pull-text">下拉刷新</span>
+        </div>
         <div id="same-city-cards" class="user-cards active"></div>
         <div id="nearby-cards" class="user-cards"></div>
         <!-- 加载状态 -->
@@ -1692,15 +1702,13 @@
         <div id="recommend-empty" style="display: none; text-align: center; padding: 60px 20px;">
           <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
           <p style="font-size: 16px; color: #747D8C; margin-bottom: 8px;">暂无更多推荐</p>
-          <p style="font-size: 14px; color: #A4B0BE;">试试扩大筛选范围或稍后再来</p>
-          <button class="btn btn-primary" id="retry-recommend-btn" style="margin-top: 20px; padding: 0 24px;">重新加载</button>
+          <p style="font-size: 14px; color: #A4B0BE;">试试扩大筛选范围或稍后再来，下拉可刷新</p>
         </div>
         <!-- 错误状态 -->
         <div id="recommend-error" style="display: none; text-align: center; padding: 60px 20px;">
           <div style="font-size: 48px; margin-bottom: 16px;">📡</div>
           <p style="font-size: 16px; color: #747D8C; margin-bottom: 8px;">加载失败</p>
-          <p style="font-size: 14px; color: #A4B0BE; margin-bottom: 16px;" id="recommend-error-msg">网络连接异常</p>
-          <button class="btn btn-primary" id="retry-recommend-error-btn" style="padding: 0 24px;">重试</button>
+          <p style="font-size: 14px; color: #A4B0BE; margin-bottom: 16px;" id="recommend-error-msg">网络连接异常，下拉可重试</p>
         </div>
       </div>
     </div>
@@ -2278,6 +2286,7 @@
               </svg>
               <span>添加照片</span>
             </div>
+            <input type="file" id="album-photo-input" accept="image/*" multiple style="display:none;">
           </div>
         </div>
         
@@ -3061,6 +3070,21 @@
     let wsConnection = null;
     let currentConversationId = null;
 
+    // ====== 连通性自检（页面加载时自动运行） ======
+    (async function connectivityCheck() {
+      try {
+        const r = await fetch(window.location.origin + '/health', { method: 'GET' });
+        if (r.ok) {
+          console.log('✅ 服务器连通正常');
+        } else {
+          showStatus('⚠️ 服务器返回异常: HTTP ' + r.status, 'error');
+        }
+      } catch (e) {
+        showStatus('⚠️ 无法连接服务器: ' + (e.message || String(e)), 'error');
+        console.error('连通性检查失败:', e);
+      }
+    })();
+
     // 声明全局变量
     let statusEl, loginPage, homePage, discoverPage, chatPage, chatDetailPage, userProfilePage, profilePage, navItems, chatItems, chatDetailBack, userProfileBack, userCards;
 
@@ -3310,11 +3334,73 @@
       }
     }
 
-    // 重试按钮
-    document.addEventListener('click', (e) => {
-      if (e.target.id === 'retry-recommend-btn' || e.target.id === 'retry-recommend-error-btn') {
-        loadRecommendations();
-      }
+    // ====== 首页下拉刷新 ======
+    let isPulling = false;
+    let pullStartY = 0;
+    let pullDistance = 0;
+    let isRefreshing = false;
+    const PULL_THRESHOLD = 60; // 触发刷新的下拉距离
+
+    function initPullToRefresh() {
+      const wrapper = document.getElementById('cards-wrapper');
+      if (!wrapper) return;
+
+      wrapper.addEventListener('touchstart', (e) => {
+        if (isRefreshing) return;
+        // 仅在滚动到顶部时触发
+        if (wrapper.scrollTop > 0 && document.scrollingElement.scrollTop > 0) return;
+        isPulling = true;
+        pullStartY = e.touches[0].clientY;
+        pullDistance = 0;
+      }, { passive: true });
+
+      wrapper.addEventListener('touchmove', (e) => {
+        if (!isPulling || isRefreshing) return;
+        pullDistance = e.touches[0].clientY - pullStartY;
+        const indicator = document.getElementById('pull-indicator');
+        const icon = document.getElementById('pull-icon');
+        const text = document.getElementById('pull-text');
+
+        if (pullDistance > 10 && indicator) {
+          indicator.style.display = 'block';
+          if (pullDistance >= PULL_THRESHOLD) {
+            if (icon) icon.textContent = '↑';
+            if (text) text.textContent = '释放刷新';
+          } else {
+            if (icon) icon.textContent = '↓';
+            if (text) text.textContent = '下拉刷新';
+          }
+        }
+      }, { passive: true });
+
+      wrapper.addEventListener('touchend', async () => {
+        if (!isPulling || isRefreshing) { isPulling = false; return; }
+        isPulling = false;
+
+        if (pullDistance >= PULL_THRESHOLD) {
+          isRefreshing = true;
+          const indicator = document.getElementById('pull-indicator');
+          const icon = document.getElementById('pull-icon');
+          const text = document.getElementById('pull-text');
+          if (indicator) indicator.style.display = 'block';
+          if (icon) icon.textContent = '↻';
+          if (text) text.textContent = '刷新中...';
+
+          await loadRecommendations();
+
+          if (indicator) indicator.style.display = 'none';
+          isRefreshing = false;
+          pullDistance = 0;
+        } else {
+          const indicator = document.getElementById('pull-indicator');
+          if (indicator) indicator.style.display = 'none';
+        }
+      });
+    }
+
+    // 初始化下拉刷新
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(initPullToRefresh, 500);
     });
 
     // ====== 会话列表 ======
@@ -3537,6 +3623,8 @@
       const data = await apiRequest('/posts?limit=20');
       if (data.code === 0 && data.data && data.data.length > 0) {
         followingPosts.innerHTML = data.data.map(p => renderPostHTML(p)).join('');
+        // 重新绑定新渲染的动态事件
+        bindPostActionEvents();
       } else {
         followingPosts.innerHTML = '<div style="text-align:center;padding:40px;color:#A4B0BE;">暂无动态，快来发第一条吧</div>';
       }
@@ -3547,6 +3635,7 @@
       const data = await apiRequest('/posts?limit=20');
       if (data.code === 0 && data.data && data.data.length > 0) {
         nearbyPosts.innerHTML = data.data.map(p => renderPostHTML(p)).join('');
+        bindPostActionEvents();
       } else {
         nearbyPosts.innerHTML = '<div style="text-align:center;padding:40px;color:#A4B0BE;">暂无附近动态</div>';
       }
@@ -3557,6 +3646,8 @@
       const imagesHtml = (p.images && p.images.length > 0)
         ? `<div class="post-images">${p.images.map(img => `<div class="post-image" style="background-image:url(${escHtml(img)});background-size:cover;background-position:center;"></div>`).join('')}</div>`
         : '';
+      const likedClass = p.is_liked ? ' liked' : '';
+      const likeColor = p.is_liked ? 'color:var(--primary-color);' : '';
       return `
         <div class="post" data-post-id="${p.id}">
           <div class="post-header">
@@ -3569,7 +3660,7 @@
           <div class="post-content">${escHtml(p.content)}</div>
           ${imagesHtml}
           <div class="post-actions">
-            <div class="post-action" onclick="event.stopPropagation();">
+            <div class="post-action${likedClass}" onclick="event.stopPropagation();" style="${likeColor}">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
@@ -3584,7 +3675,130 @@
           </div>
         </div>`;
     }
-    
+
+    // 加载帖子评论（从API获取并渲染）
+    async function loadPostComments(postEl, postId) {
+      try {
+        const data = await apiRequest(`/posts/${postId}`);
+        if (data.code === 0 && data.data && data.data.comments) {
+          // 移除旧评论
+          const oldComments = postEl.querySelector('.comments');
+          if (oldComments) oldComments.remove();
+
+          // 渲染新评论
+          const commentsContainer = document.createElement('div');
+          commentsContainer.className = 'comments';
+          commentsContainer.style.borderTop = '1px solid #F1F2F6';
+          data.data.comments.forEach(c => {
+            const commentEl = createCommentElement(c);
+            commentsContainer.appendChild(commentEl);
+            // 渲染子回复
+            if (c.replies && c.replies.length > 0) {
+              c.replies.forEach(r => {
+                const replyEl = createCommentElement(r, true);
+                commentsContainer.appendChild(replyEl);
+              });
+            }
+          });
+          postEl.insertBefore(commentsContainer, postEl.querySelector('.post-actions'));
+        }
+      } catch (err) {
+        console.error('加载评论失败:', err);
+      }
+    }
+
+    function createCommentElement(c, isReply = false) {
+      const el = document.createElement('div');
+      el.className = 'comment';
+      el.style.display = 'flex';
+      el.style.alignItems = 'flex-start';
+      el.style.gap = '12px';
+      el.style.padding = '12px 16px';
+      el.style.borderTop = '1px solid #F1F2F6';
+      if (isReply) el.style.paddingLeft = '56px';
+
+      const avatar = document.createElement('div');
+      avatar.className = 'comment-avatar';
+      avatar.style.width = '32px';
+      avatar.style.height = '32px';
+      avatar.style.borderRadius = '50%';
+      avatar.style.background = 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))';
+
+      const content = document.createElement('div');
+      content.style.flex = '1';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'center';
+      header.style.marginBottom = '4px';
+
+      const author = document.createElement('span');
+      author.style.fontSize = '14px';
+      author.style.fontWeight = '600';
+      author.style.color = 'var(--text-primary)';
+      author.textContent = c.nickname || '用户';
+
+      const time = document.createElement('span');
+      time.style.fontSize = '12px';
+      time.style.color = 'var(--text-tertiary)';
+      time.textContent = timeAgo(c.created_at);
+
+      const text = document.createElement('div');
+      text.style.fontSize = '14px';
+      text.style.lineHeight = '1.4';
+      text.style.color = 'var(--text-primary)';
+      text.textContent = c.content;
+
+      header.appendChild(author);
+      header.appendChild(time);
+      content.appendChild(header);
+      content.appendChild(text);
+      el.appendChild(avatar);
+      el.appendChild(content);
+      return el;
+    }
+
+    // 加载用户相册照片
+    async function loadUserPhotos() {
+      try {
+        const data = await apiRequest('/user/photos');
+        if (data.code === 0 && data.data) {
+          const grid = document.querySelector('.photos-grid');
+          if (grid && data.data.length > 0) {
+            grid.innerHTML = data.data.map(p => `
+              <div class="photo-item" style="background-image:url(${escHtml(p.url)});background-size:cover;background-position:center;border-radius:8px;position:relative;">
+                <span style="position:absolute;top:4px;right:4px;cursor:pointer;background:rgba(0,0,0,0.5);color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;"
+                  onclick="event.stopPropagation();deletePhoto(${p.id})">×</span>
+                ${p.is_cover ? '<span style="position:absolute;bottom:4px;left:4px;background:var(--primary-color);color:white;font-size:10px;padding:2px 6px;border-radius:8px;">封面</span>' : ''}
+              </div>`).join('');
+          }
+        }
+      } catch (err) {
+        console.error('加载相册失败:', err);
+      }
+    }
+
+    // 删除照片
+    async function deletePhoto(photoId) {
+      if (!confirm('确定删除这张照片吗？')) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/user/photos/${photoId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.code === 0) {
+          showStatus('照片已删除', 'success');
+          loadUserPhotos();
+        } else {
+          showStatus(data.message || '删除失败', 'error');
+        }
+      } catch (err) {
+        showStatus('网络异常', 'error');
+      }
+    }
+
     // 我页面粉丝、关注、获赞点击事件
     const fansBtn = document.getElementById('fans-btn');
     const followingBtn = document.getElementById('following-btn');
@@ -4068,17 +4282,50 @@
     
 
     
-    // 添加照片按钮点击事件
+    // 添加照片按钮点击事件 — 调用真实相册选择器
     const addPhotoBtn = document.getElementById('add-photo-btn');
-    if (addPhotoBtn) {
+    const albumPhotoInput = document.getElementById('album-photo-input');
+    if (addPhotoBtn && albumPhotoInput) {
       addPhotoBtn.addEventListener('click', () => {
-        console.log('点击添加照片按钮');
-        // 显示访问权限提示
-        if (confirm('需要访问您的相册权限以选择照片，是否允许？')) {
-          showStatus('权限已授予，正在打开相册...', 'success');
-        } else {
-          showStatus('权限被拒绝，无法添加照片', 'error');
+        // iOS/Android: 直接触发文件选择器（浏览器会请求相册权限）
+        albumPhotoInput.click();
+      });
+
+      // 选择照片后上传
+      albumPhotoInput.addEventListener('change', async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        showStatus('正在上传照片...', 'info');
+        let uploaded = 0;
+        for (const file of files) {
+          const formData = new FormData();
+          formData.append('photo', file);
+          try {
+            const res = await fetch(`${API_BASE_URL}/user/photos`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` },
+              body: formData
+            });
+            const data = await res.json();
+            if (data.code === 0) {
+              uploaded++;
+            } else {
+              console.error('照片上传失败:', data.message);
+            }
+          } catch (err) {
+            console.error('上传出错:', err);
+          }
         }
+        if (uploaded > 0) {
+          showStatus(`成功上传${uploaded}张照片`, 'success');
+          // 刷新相册显示
+          if (typeof loadUserPhotos === 'function') loadUserPhotos();
+        } else {
+          showStatus('上传失败，请重试', 'error');
+        }
+        // 清空input以便可以重新选择相同文件
+        albumPhotoInput.value = '';
       });
     }
     
@@ -4619,7 +4866,9 @@
               sendCodeBtn.textContent = originalText;
             }
           } catch (error) {
-            showStatus('请求失败：' + error.message, 'error');
+            const errMsg = error.name + ': ' + (error.message || String(error) || '未知网络错误');
+            showStatus('网络异常 - ' + errMsg, 'error');
+            console.error('SendCode Error:', error);
             sendCodeBtn.disabled = false;
             sendCodeBtn.textContent = originalText;
           }
@@ -4865,44 +5114,71 @@
       const postActions = document.querySelectorAll('.post-action');
       
       postActions.forEach(action => {
-        action.addEventListener('click', (e) => {
+        action.addEventListener('click', async (e) => {
           e.stopPropagation(); // 阻止事件冒泡，避免触发帖子头部的点击事件
           
           const actionType = action.textContent.trim();
           const post = action.closest('.post');
           
           if (actionType.includes('赞') || action.querySelector('path[d*="M20.84 4.61"]')) {
-            // 点赞操作
+            // 点赞操作 — 调用后端API
             console.log('点击点赞按钮');
-            
-            // 切换点赞状态
+            const postId = post ? post.dataset.postId : null;
+            if (!postId) return;
+
             const likeCountEl = action.querySelector('span');
-            let likeCount = parseInt(likeCountEl.textContent) || 0;
-            
-            if (action.classList.contains('liked')) {
-              // 取消点赞
+            const wasLiked = action.classList.contains('liked');
+
+            // 乐观更新UI
+            const currentCount = parseInt(likeCountEl.textContent) || 0;
+            if (wasLiked) {
               action.classList.remove('liked');
               action.style.color = 'var(--text-secondary)';
-              likeCount--;
-              showStatus('取消点赞成功', 'info');
+              likeCountEl.textContent = Math.max(0, currentCount - 1);
             } else {
-              // 点赞
               action.classList.add('liked');
               action.style.color = 'var(--primary-color)';
-              likeCount++;
-              showStatus('点赞成功', 'success');
+              likeCountEl.textContent = currentCount + 1;
             }
-            
-            // 更新点赞数
-            likeCountEl.textContent = likeCount;
+
+            // 调用API
+            try {
+              const data = await apiRequest(`/posts/${postId}/like`, { method: 'POST' });
+              if (data.code !== 0) {
+                // 失败回滚
+                if (wasLiked) {
+                  action.classList.add('liked');
+                  action.style.color = 'var(--primary-color)';
+                } else {
+                  action.classList.remove('liked');
+                  action.style.color = 'var(--text-secondary)';
+                }
+                likeCountEl.textContent = currentCount;
+                showStatus(data.message || '操作失败', 'error');
+              } else {
+                showStatus(data.data.message || (data.data.liked ? '点赞成功' : '取消点赞'), 'success');
+              }
+            } catch (err) {
+              // 网络错误回滚
+              if (wasLiked) {
+                action.classList.add('liked');
+                action.style.color = 'var(--primary-color)';
+              } else {
+                action.classList.remove('liked');
+                action.style.color = 'var(--text-secondary)';
+              }
+              likeCountEl.textContent = currentCount;
+              showStatus('网络异常，请重试', 'error');
+            }
           } else if (actionType.includes('评论') || action.querySelector('path[d*="M21 15a2 2"]')) {
-            // 评论操作
+            // 评论操作 — 调用后端API
             console.log('点击评论按钮');
-            
+            const postId = post ? post.dataset.postId : null;
+            if (!postId) return;
+
             // 检查是否已有评论输入框
             let commentForm = post.querySelector('.comment-form');
             if (!commentForm) {
-              // 创建评论输入框
               commentForm = document.createElement('div');
               commentForm.className = 'comment-form';
               commentForm.style.padding = '16px';
@@ -4910,7 +5186,7 @@
               commentForm.style.display = 'flex';
               commentForm.style.alignItems = 'center';
               commentForm.style.gap = '12px';
-              
+
               const input = document.createElement('input');
               input.type = 'text';
               input.placeholder = '写下你的评论...';
@@ -4920,112 +5196,55 @@
               input.style.border = '1px solid #E1E3E9';
               input.style.borderRadius = '18px';
               input.style.fontSize = '14px';
-              
-              const button = document.createElement('button');
-              button.textContent = '发送';
-              button.style.height = '36px';
-              button.style.padding = '0 16px';
-              button.style.border = 'none';
-              button.style.borderRadius = '18px';
-              button.style.background = 'var(--primary-color)';
-              button.style.color = 'white';
-              button.style.fontSize = '14px';
-              button.style.fontWeight = '600';
-              button.style.cursor = 'pointer';
-              
-              // 发送评论
-              button.addEventListener('click', () => {
+
+              const sendBtn = document.createElement('button');
+              sendBtn.textContent = '发送';
+              sendBtn.style.height = '36px';
+              sendBtn.style.padding = '0 16px';
+              sendBtn.style.border = 'none';
+              sendBtn.style.borderRadius = '18px';
+              sendBtn.style.background = 'var(--primary-color)';
+              sendBtn.style.color = 'white';
+              sendBtn.style.fontSize = '14px';
+              sendBtn.style.fontWeight = '600';
+              sendBtn.style.cursor = 'pointer';
+
+              // 发送评论到后端
+              sendBtn.addEventListener('click', async () => {
                 const commentText = input.value.trim();
-                if (commentText) {
-                  // 创建评论元素
-                  const comment = document.createElement('div');
-                  comment.className = 'comment';
-                  comment.style.display = 'flex';
-                  comment.style.alignItems = 'flex-start';
-                  comment.style.gap = '12px';
-                  comment.style.padding = '12px 16px';
-                  comment.style.borderTop = '1px solid #F1F2F6';
-                  
-                  const avatar = document.createElement('div');
-                  avatar.className = 'comment-avatar';
-                  avatar.style.width = '32px';
-                  avatar.style.height = '32px';
-                  avatar.style.borderRadius = '50%';
-                  avatar.style.background = 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))';
-                  
-                  const commentContent = document.createElement('div');
-                  commentContent.className = 'comment-content';
-                  commentContent.style.flex = '1';
-                  
-                  const commentHeader = document.createElement('div');
-                  commentHeader.className = 'comment-header';
-                  commentHeader.style.display = 'flex';
-                  commentHeader.style.justifyContent = 'space-between';
-                  commentHeader.style.alignItems = 'center';
-                  commentHeader.style.marginBottom = '4px';
-                  
-                  const commentAuthor = document.createElement('span');
-                  commentAuthor.className = 'comment-author';
-                  commentAuthor.style.fontSize = '14px';
-                  commentAuthor.style.fontWeight = '600';
-                  commentAuthor.style.color = 'var(--text-primary)';
-                  commentAuthor.textContent = '我的昵称';
-                  
-                  const commentTime = document.createElement('span');
-                  commentTime.className = 'comment-time';
-                  commentTime.style.fontSize = '12px';
-                  commentTime.style.color = 'var(--text-tertiary)';
-                  commentTime.textContent = '刚刚';
-                  
-                  const commentTextEl = document.createElement('div');
-                  commentTextEl.className = 'comment-text';
-                  commentTextEl.style.fontSize = '14px';
-                  commentTextEl.style.lineHeight = '1.4';
-                  commentTextEl.style.color = 'var(--text-primary)';
-                  commentTextEl.textContent = commentText;
-                  
-                  commentHeader.appendChild(commentAuthor);
-                  commentHeader.appendChild(commentTime);
-                  commentContent.appendChild(commentHeader);
-                  commentContent.appendChild(commentTextEl);
-                  comment.appendChild(avatar);
-                  comment.appendChild(commentContent);
-                  
-                  // 插入评论到评论列表
-                  const commentsContainer = post.querySelector('.comments');
-                  if (!commentsContainer) {
-                    const newCommentsContainer = document.createElement('div');
-                    newCommentsContainer.className = 'comments';
-                    post.insertBefore(newCommentsContainer, post.querySelector('.post-actions'));
-                    newCommentsContainer.appendChild(comment);
+                if (!commentText) return;
+                if (!token) { showStatus('请先登录', 'error'); return; }
+
+                sendBtn.disabled = true;
+                sendBtn.textContent = '...';
+                try {
+                  const data = await apiRequest(`/posts/${postId}/comment`, {
+                    method: 'POST',
+                    body: JSON.stringify({ content: commentText })
+                  });
+                  if (data.code === 0) {
+                    showStatus('评论成功', 'success');
+                    input.value = '';
+                    // 刷新评论列表
+                    await loadPostComments(post, postId);
+                    // 更新评论数
+                    const countEl = action.querySelector('span');
+                    const current = parseInt(countEl.textContent) || 0;
+                    countEl.textContent = current + 1;
                   } else {
-                    commentsContainer.appendChild(comment);
+                    showStatus(data.message || '评论失败', 'error');
                   }
-                  
-                  // 更新评论数
-                  const commentCountEl = action.querySelector('span');
-                  let commentCount = parseInt(commentCountEl.textContent) || 0;
-                  commentCount++;
-                  commentCountEl.textContent = commentCount;
-                  
-                  // 清空输入框
-                  input.value = '';
-                  showStatus('评论成功', 'success');
+                } catch (err) {
+                  showStatus('网络异常，请重试', 'error');
+                } finally {
+                  sendBtn.disabled = false;
+                  sendBtn.textContent = '发送';
                 }
               });
-              
+
               commentForm.appendChild(input);
-              commentForm.appendChild(button);
-              
-              // 插入到帖子底部
+              commentForm.appendChild(sendBtn);
               post.insertBefore(commentForm, post.querySelector('.post-actions'));
-            } else {
-              // 切换评论输入框显示状态
-              if (commentForm.style.display === 'none') {
-                commentForm.style.display = 'flex';
-              } else {
-                commentForm.style.display = 'flex';
-              }
             }
           }
         });
@@ -5109,6 +5328,14 @@
       if (bottomNav) {
         bottomNav.style.display = 'flex';
       }
+    }
+  </script>
+  <!-- 注册 Service Worker（PWA 离线支持） -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
     }
   </script>
 </body>

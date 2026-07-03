@@ -19,13 +19,17 @@ const { success, error, serverError } = require('../utils/response');
 async function recommendUsers(req, res) {
   try {
     const { id } = req.user;
-    const { ageMin, ageMax, distance, limit } = req.query;
+    const { ageMin, ageMax, distance, limit, scope } = req.query;
+
+    // scope 只接受 city 或 nearby，其他值降级为 city
+    const validScope = scope === 'nearby' ? 'nearby' : 'city';
 
     const filters = {
+      scope: validScope,
       ageMin: ageMin ? parseInt(ageMin) : 18,
       ageMax: ageMax ? parseInt(ageMax) : 35,
-      distance: distance ? parseInt(distance) : 10,
-      limit: limit ? parseInt(limit) : 10
+      distance: distance ? parseInt(distance) : 20,
+      limit: limit ? parseInt(limit) : 20
     };
 
     const users = await matchService.recommendUsers(id, filters);
@@ -67,7 +71,11 @@ async function likeUser(req, res) {
 
     success(res, {
       matched: result.matched,
-      match_id: result.match_id
+      match_id: result.match_id || null,
+      conversation_id: result.conversation_id || null,
+      partner: result.partner || null,
+      common_tags: result.common_tags || [],
+      icebreakers: result.icebreakers || []
     }, result.message);
   } catch (err) {
     serverError(res, err, '喜欢用户失败');

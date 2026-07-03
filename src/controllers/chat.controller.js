@@ -7,6 +7,7 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const Checkin = require('../models/Checkin');
 const { success, error, serverError } = require('../utils/response');
+const websocketService = require('../services/websocket.service');
 
 /**
  * 获取会话列表
@@ -139,10 +140,122 @@ async function createConversation(req, res) {
   }
 }
 
+/**
+ * 撤回消息（发送后2分钟内有效）
+ * POST /api/chat/messages/:id/recall
+ * @param {Object} req - Express请求对象
+ * @param {Object} res - Express响应对象
+ */
+async function recallMessage(req, res) {
+  try {
+    const { id } = req.user;
+    const messageId = parseInt(req.params.id, 10);
+
+    if (isNaN(messageId) || messageId <= 0) {
+      return error(res, 400, '消息ID无效');
+    }
+
+    // 调用模型执行撤回（含归属校验、时效校验、防重复）
+    const result = await Message.recall(messageId, id);
+
+    if (!result.success) {
+      // 业务级失败：消息不存在、非本人、超时、已撤回
+      return error(res, 400, result.message);
+    }
+
+    // 通过 WebSocket 向接收者推送撤回事件
+    const { data } = result;
+    websocketService.sendToUser(data.receiver_id, {
+      type: 'message_recalled',
+      data: {
+        message_id: data.id,
+        conversation_id: data.conversation_id,
+        sender_id: data.sender_id,
+        recalled_at: new Date().toISOString()
+      }
+    });
+
+    // 同时告知发送者撤回成功（多设备同步）
+    websocketService.sendToUser(id, {
+      type: 'message_recalled',
+      data: {
+        message_id: data.id,
+        conversation_id: data.conversation_id,
+        sender_id: data.sender_id,
+        recalled_at: new Date().toISOString()
+      }
+    });
+
+    success(res, data, '消息已撤回');
+  } catch (err) {
+    serverError(res, err, '撤回消息失败');
+  }
+}
+
+/**
+ * 删除会话
+ * DELETE /api/chat/conversations/:id
+ */
+async function deleteConversation(req, res) {
+  try {
+    const { id } = req.user;
+    const convId = parseInt(req.params.id, 10);
+    if (isNaN(convId) || convId <= 0) return error(res, 400, '会话ID无效');
+    await Conversation.softDelete(convId, id);
+    success(res, null, '会话已删除');
+  } catch (err) {
+    serverError(res, err, '删除会话失败');
+  }
+}
+
+/**
+ * 置顶会话
+ * PUT /api/chat/conversations/:id/pin
+ */
+async function pinConversation(req, res) {
+  try {
+    const { id } = req.user;
+    const convId = parseInt(req.params.id, 10);
+    if (isNaN(convId) || convId <= 0) return error(res, 400, '会话ID无效');
+    await Conversation.togglePin(convId, id);
+    success(res, null, '操作成功');
+  } catch (err) {
+    serverError(res, err, '置顶会话失败');
+  }
+}
+
+/**
+ * 发送消息（HTTP回退）
+ * POST /api/chat/messages
+ */
+async function sendMessage(req, res) {
+  try {
+    const { id } = req.user;
+    const { conversation_id, content, type } = req.body;
+    if (!conversation_id) return error(res, 400, '会话ID不能为空');
+    if (!content) return error(res, 400, '消息内容不能为空');
+    const msgType = parseInt(type) || 0;
+    const msg = await Message.create(conversation_id, id, content, msgType);
+    // WebSocket推送
+    const conv = await Conversation.findById(conversation_id);
+    if (conv) {
+      const otherId = conv.user1_id === id ? conv.user2_id : conv.user1_id;
+      websocketService.sendToUser(otherId, { type: 'message', data: msg });
+    }
+    success(res, msg, '发送成功');
+  } catch (err) {
+    serverError(res, err, '发送消息失败');
+  }
+}
+
 module.exports = {
   getConversations,
   getMessages,
   markAsRead,
   getUnreadCount,
-  createConversation
+  createConversation,
+  recallMessage,
+  deleteConversation,
+  pinConversation,
+  sendMessage
 };

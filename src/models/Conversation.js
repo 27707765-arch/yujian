@@ -146,7 +146,7 @@ class Conversation {
            LEFT JOIN users u1 ON c.user1_id = u1.id
            LEFT JOIN users u2 ON c.user2_id = u2.id
            WHERE c.user1_id = ? OR c.user2_id = ?
-           ORDER BY c.last_message_time DESC NULLS LAST`,
+           ORDER BY c.last_message_time IS NULL ASC, c.last_message_time DESC`,
           [user_id, user_id, user_id, user_id, user_id]
         );
         return rows;
@@ -209,9 +209,46 @@ class Conversation {
     } catch (error) {
       console.error('数据库删除失败，使用内存存储:', error.message);
     }
-    
-    // 数据库不可用时使用内存存储
+
     return memoryStore.delete(id);
+  }
+
+  /**
+   * 软删除会话（标记用户已删除，仅本端不可见）
+   */
+  static async softDelete(convId, userId) {
+    try {
+      if (isDbAvailable()) {
+        const [result] = await executeQuery(
+          'UPDATE conversations SET is_deleted_by_user = ?, status = 0 WHERE id = ?',
+          [userId, convId]
+        );
+        return result.affectedRows > 0;
+      }
+    } catch (error) {
+      console.error('软删除失败:', error.message);
+    }
+    return memoryStore.delete(convId);
+  }
+
+  /**
+   * 切换会话置顶状态
+   */
+  static async togglePin(convId, userId) {
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery('SELECT is_pinned FROM conversations WHERE id = ?', [convId]);
+        const current = rows[0]?.is_pinned || 0;
+        const [result] = await executeQuery(
+          'UPDATE conversations SET is_pinned = ? WHERE id = ?',
+          [current ? 0 : 1, convId]
+        );
+        return result.affectedRows > 0;
+      }
+    } catch (error) {
+      console.error('置顶操作失败:', error.message);
+    }
+    return true;
   }
 }
 

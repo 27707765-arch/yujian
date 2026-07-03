@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B"/>
+      <stop offset="100%" style="stop-color:#FF4757"/>
+    </linearGradient>
+  </defs>
+  <!-- 背景圆角矩形 -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- 心形 -->
+  <path d="M256 380 C140 300 80 240 80 170 C80 120 115 85 165 85 C192 85 216 95 233 115 L256 142 L279 115 C296 95 320 85 347 85 C397 85 432 120 432 170 C432 240 372 300 256 380Z" fill="#FFFFFF" opacity="0.95"/>
+  <!-- "遇" 字 -->
+  <text x="256" y="340" text-anchor="middle" font-size="200" font-weight="bold" font-family="sans-serif" fill="#FF4757">遇</text>
+  <!-- 底部小字 -->
+  <text x="256" y="460" text-anchor="middle" font-size="36" font-weight="bold" font-family="sans-serif" fill="#FFFFFF" opacity="0.9">遇见</text>
+</svg>

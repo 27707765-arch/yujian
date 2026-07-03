@@ -29,13 +29,7 @@ class Checkin {
   static async checkin(userId) {
     const today = new Date().toISOString().slice(0, 10);
 
-    // 检查今日是否已签到
-    const alreadyDone = await this.hasCheckedIn(userId, today);
-    if (alreadyDone) {
-      return { success: false, message: '今日已签到' };
-    }
-
-    // 计算连续签到天数
+    // 计算连续签到天数（需在插入前计算，基于昨日记录）
     const streak = await this.calcStreak(userId, today);
 
     // 计算奖励（基础5金币 + 连续签到加成）
@@ -43,34 +37,43 @@ class Checkin {
     const streakBonus = Math.min(streak, 7) * 2; // 最多7天加成
     const totalReward = baseReward + streakBonus;
 
-    let persisted = false;
+    let actuallyInserted = false;
+
     try {
       if (isDbAvailable()) {
-        await executeQuery(
-          'INSERT INTO daily_checkins (user_id, checkin_date, streak_days, reward_coins) VALUES (?, ?, ?, ?)',
+        // 使用 INSERT IGNORE 原子化插入，消除"先查后插"的竞态条件
+        // 若今日已有记录，唯一约束 (user_id, checkin_date) 使本次插入静默忽略
+        const [result] = await executeQuery(
+          'INSERT IGNORE INTO daily_checkins (user_id, checkin_date, streak_days, reward_coins) VALUES (?, ?, ?, ?)',
           [userId, today, streak + 1, totalReward]
         );
-        persisted = true;
+        actuallyInserted = result.affectedRows > 0;
+      } else {
+        // 内存降级：JS 单线程中检查+插入天然原子
+        if (!checkinMemory.has(userId)) checkinMemory.set(userId, []);
+        const records = checkinMemory.get(userId);
+        const alreadyDone = records.some(r => r.date === today);
+        if (!alreadyDone) {
+          records.push({ date: today, streak: streak + 1, reward: totalReward });
+          actuallyInserted = true;
+        }
       }
     } catch (err) {
       console.error('签到持久化失败:', err.message);
     }
 
-    // 仅当数据库不可用时存入内存（降级方案，避免双写不一致）
-    if (!persisted) {
-      if (!checkinMemory.has(userId)) checkinMemory.set(userId, []);
-      checkinMemory.get(userId).push({ date: today, streak: streak + 1, reward: totalReward });
+    // 仅当真正插入了签到记录时才发放金币（affectedRows > 0）
+    if (actuallyInserted) {
+      await Wallet.recharge(userId, totalReward, 'checkin', null);
+      return {
+        success: true,
+        streak: streak + 1,
+        reward: totalReward,
+        message: `签到成功！连续签到第${streak + 1}天`
+      };
     }
 
-    // 发放金币
-    await Wallet.recharge(userId, totalReward, 'checkin', null);
-
-    return {
-      success: true,
-      streak: streak + 1,
-      reward: totalReward,
-      message: `签到成功！连续签到第${streak + 1}天`
-    };
+    return { success: false, message: '今日已签到' };
   }
 
   /**

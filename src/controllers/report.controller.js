@@ -28,7 +28,7 @@ async function submitReport(req, res) {
       [id, reported_user_id, reason]
     );
 
-    success(res, { report_id: result ? result.insertId : null }, '举报成功，我们会尽快处理');
+    success(res, { report_id: result && result.insertId ? result.insertId : null }, '举报成功，我们会尽快处理');
   } catch (err) {
     serverError(res, err, '提交举报失败');
   }

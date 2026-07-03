@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS users (
     height INT DEFAULT NULL COMMENT '身高(cm)',
     occupation VARCHAR(100) DEFAULT NULL COMMENT '职业',
     location VARCHAR(100) DEFAULT NULL COMMENT '位置',
+    province VARCHAR(50) DEFAULT NULL COMMENT '省份',
+    city VARCHAR(50) DEFAULT NULL COMMENT '地级市',
+    district VARCHAR(50) DEFAULT NULL COMMENT '区县',
     lat DECIMAL(10, 6) DEFAULT NULL COMMENT '纬度',
     lng DECIMAL(10, 6) DEFAULT NULL COMMENT '经度',
     bio VARCHAR(500) DEFAULT NULL COMMENT '个性签名',
@@ -24,8 +27,13 @@ CREATE TABLE IF NOT EXISTS users (
     vip_expire_time DATETIME DEFAULT NULL COMMENT 'VIP过期时间',
     role VARCHAR(20) DEFAULT 'user' COMMENT '角色：user-普通用户，admin-管理员',
     status TINYINT(1) DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
+    email VARCHAR(100) DEFAULT NULL COMMENT '邮箱地址',
+    email_verified TINYINT(1) DEFAULT 0 COMMENT '邮箱是否已验证',
+    password_hash VARCHAR(255) DEFAULT NULL COMMENT 'bcrypt密码哈希',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_email (email),
+    INDEX idx_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
 -- 会话表
@@ -419,3 +427,73 @@ CREATE TABLE IF NOT EXISTS user_tasks (
 -- users 表增加礼物统计字段
 ALTER TABLE users ADD COLUMN IF NOT EXISTS gifts_received_count INT DEFAULT 0 COMMENT '收到礼物数';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS gifts_sent_count INT DEFAULT 0 COMMENT '送出礼物数';
+
+-- messages 表增加消息撤回字段
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_recalled TINYINT(1) DEFAULT 0 COMMENT '是否已撤回：0-未撤回，1-已撤回';
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS recalled_at DATETIME DEFAULT NULL COMMENT '撤回时间';
+
+-- users 表增加新手引导完成标记
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed TINYINT(1) DEFAULT 0 COMMENT '是否完成新手引导：0-未完成，1-已完成';
+
+-- posts 表增加视频相关字段
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_url VARCHAR(500) DEFAULT NULL COMMENT '视频URL';
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_duration INT DEFAULT NULL COMMENT '视频时长(秒)';
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_cover VARCHAR(500) DEFAULT NULL COMMENT '视频封面URL';
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS edited_at DATETIME DEFAULT NULL COMMENT '最后编辑时间';
+
+-- users 表增加行政区划字段（用于同城匹配）
+ALTER TABLE users ADD COLUMN IF NOT EXISTS province VARCHAR(50) DEFAULT NULL COMMENT '省份' AFTER location;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(50) DEFAULT NULL COMMENT '地级市' AFTER province;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS district VARCHAR(50) DEFAULT NULL COMMENT '区县' AFTER city;
+
+-- users 表增加同城/附近查询索引
+-- 同城查询：按 city + status 过滤
+CREATE INDEX IF NOT EXISTS idx_users_city ON users (city, status);
+-- 附近查询：Bounding Box 预过滤走 lat/lng
+CREATE INDEX IF NOT EXISTS idx_users_lat_lng ON users (lat, lng);
+
+-- 推送日志表（用于排查推送失败问题）
+CREATE TABLE IF NOT EXISTS push_logs (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL COMMENT '目标用户ID',
+    title VARCHAR(100) NOT NULL COMMENT '推送标题',
+    body VARCHAR(500) NOT NULL COMMENT '推送内容',
+    data JSON DEFAULT NULL COMMENT '附加数据',
+    push_type VARCHAR(30) NOT NULL COMMENT '推送类型：match/like/message/view/gift/security/system',
+    channel VARCHAR(20) NOT NULL COMMENT '发送渠道：websocket/apns/android/huawei/xiaomi/oppo/vivo',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '状态：pending/sent/failed/skipped',
+    error_message VARCHAR(500) DEFAULT NULL COMMENT '失败原因',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX idx_push_logs_user (user_id),
+    INDEX idx_push_logs_created (created_at),
+    INDEX idx_push_logs_status (status),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='推送日志表';
+
+-- 用户反馈表
+CREATE TABLE IF NOT EXISTS feedbacks (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL COMMENT '反馈用户ID',
+    content TEXT NOT NULL COMMENT '反馈内容',
+    contact VARCHAR(100) DEFAULT NULL COMMENT '联系方式',
+    status TINYINT DEFAULT 0 COMMENT '状态: 0=未处理 1=已处理',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户反馈表';
+
+-- 评论点赞表
+CREATE TABLE IF NOT EXISTS comment_likes (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    comment_id INT UNSIGNED NOT NULL COMMENT '评论ID',
+    user_id INT UNSIGNED NOT NULL COMMENT '点赞用户ID',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_comment_user (comment_id, user_id),
+    INDEX idx_comment_likes_comment (comment_id),
+    INDEX idx_comment_likes_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评论点赞表';
+
+-- 会话表增加 is_pinned 字段（如果不存在）
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_pinned TINYINT DEFAULT 0 COMMENT '是否置顶';
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_deleted_by_user INT UNSIGNED DEFAULT NULL COMMENT '软删除用户ID';
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_sender_id INT UNSIGNED DEFAULT NULL COMMENT '最后发送者ID';
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_msg_type TINYINT DEFAULT 0 COMMENT '最后消息类型';

@@ -7,7 +7,10 @@
 const express = require('express');
 const userController = require('../controllers/user.controller');
 const authMiddleware = require('../middleware/auth');
+const contentAuditMiddleware = require('../middleware/contentAudit');
 const uploadService = require('../services/upload.service');
+const vipService = require('../services/vip.service');
+const { success, serverError } = require('../utils/response');
 
 const router = express.Router();
 
@@ -19,11 +22,14 @@ router.use(authMiddleware);
 // 获取用户信息
 router.get('/info', userController.getUserInfo);
 
-// 更新用户信息（含标签）
-router.put('/info', userController.updateUserInfo);
+// 更新用户信息（含标签，包含内容审核）
+router.put('/info', contentAuditMiddleware({ fields: ['nickname', 'bio'] }), userController.updateUserInfo);
 
 // 上传头像
 router.post('/avatar', uploadService.singleUpload('avatar'), userController.uploadAvatar);
+
+// 上报/更新当前位置（逆地理编码自动填充行政区划）
+router.post('/location', userController.updateLocation);
 
 // 获取其他用户资料
 router.get('/profile/:id', userController.getUserProfile);
@@ -55,12 +61,11 @@ router.put('/settings', userController.updateSettings);
 
 // VIP信息
 router.get('/vip-info', async (req, res) => {
-  const vipService = require('../services/vip.service');
   try {
     const info = await vipService.getVipInfo(req.user.id);
-    require('../utils/response').success(res, info);
+    success(res, info);
   } catch (err) {
-    require('../utils/response').serverError(res, err, '获取VIP信息失败');
+    serverError(res, err, '获取VIP信息失败');
   }
 });
 
@@ -82,5 +87,13 @@ router.get('/following', userController.getFollowing);
 
 // 获取看过我的人
 router.get('/viewers', userController.getViewers);
+
+// ==================== 新手引导 ====================
+
+// 获取引导完成状态
+router.get('/onboarding-status', userController.getOnboardingStatus);
+
+// 完成引导（领取奖励）
+router.post('/onboarding/complete', userController.completeOnboarding);
 
 module.exports = router;

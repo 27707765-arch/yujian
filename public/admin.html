@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>遇见 · 管理后台</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+/* =========================== CSS Reset & Variables =========================== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#0960bd;--primary-hover:#0078d4;--primary-active:#005a9e;--primary-light:rgba(9,96,189,.08);
+  --success:#55d187;--warning:#efbd47;--danger:#ed6c6c;--info:#909399;
+  --bg:#f0f2f5;--bg-card:#fff;--bg-header:#fff;--bg-sidebar:#001529;--bg-sidebar-hover:#002140;--bg-sidebar-active:#0960bd;
+  --text:#303133;--text-secondary:#606266;--text-muted:#909399;--text-placeholder:#c0c4cc;
+  --border:#dcdfe6;--border-light:#e4e7ed;--border-lighter:#ebeef5;--border-extra-light:#f2f6fc;
+  --radius:6px;--radius-lg:10px;--radius-sm:4px;
+  --shadow:0 1px 2px rgba(0,0,0,.03),0 1px 6px -1px rgba(0,0,0,.02),0 2px 4px rgba(0,0,0,.02);
+  --shadow-lg:0 4px 16px rgba(0,0,0,.08);--shadow-xl:0 12px 32px rgba(0,0,0,.12);
+  --sidebar-width:220px;--sidebar-collapsed:64px;--header-height:48px;
+  --transition:all .2s cubic-bezier(.4,0,.2,1);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* =========================== Layout =========================== */
+.app-layout{display:flex;min-height:100vh;width:100%}
+
+/* Sidebar */
+.sidebar{
+  position:fixed;top:0;left:0;bottom:0;z-index:1001;
+  width:var(--sidebar-width);background:var(--bg-sidebar);
+  display:flex;flex-direction:column;
+  transition:var(--transition);overflow:hidden;
+  box-shadow:2px 0 8px rgba(0,0,0,.15);
+}
+.sidebar.collapsed{width:var(--sidebar-collapsed)}
+.sidebar-logo{
+  height:var(--header-height);display:flex;align-items:center;padding:0 16px;
+  color:#fff;font-size:16px;font-weight:700;white-space:nowrap;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  overflow:hidden;
+}
+.sidebar-logo .logo-icon{width:32px;height:32px;border-radius:6px;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sidebar-logo .logo-text{margin-left:10px;opacity:1;transition:opacity .15s}
+.sidebar.collapsed .logo-text{opacity:0;width:0;margin-left:0}
+.sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0}
+.sidebar-nav::-webkit-scrollbar{width:4px}
+.sidebar-nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:2px}
+.sidebar-nav a{
+  display:flex;align-items:center;height:44px;padding:0 20px;color:rgba(255,255,255,.65);text-decoration:none;
+  font-size:14px;cursor:pointer;transition:var(--transition);white-space:nowrap;
+  border-left:3px solid transparent;overflow:hidden;
+}
+.sidebar-nav a:hover{color:#fff;background:var(--bg-sidebar-hover)}
+.sidebar-nav a.active{color:#fff;background:var(--bg-sidebar-active);border-left-color:#fff}
+.sidebar-nav a .nav-icon{width:20px;text-align:center;margin-right:10px;font-size:16px;flex-shrink:0}
+.sidebar-nav a .nav-title{opacity:1;transition:opacity .15s}
+.sidebar.collapsed .nav-title{opacity:0;width:0}
+.sidebar-nav a .nav-badge{margin-left:auto;background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center}
+.sidebar.collapsed .nav-badge{display:none}
+.sidebar-collapse{
+  height:40px;display:flex;align-items:center;justify-content:center;
+  color:rgba(255,255,255,.65);cursor:pointer;font-size:16px;
+  border-top:1px solid rgba(255,255,255,.08);transition:var(--transition);flex-shrink:0;
+}
+.sidebar-collapse:hover{color:#fff;background:var(--bg-sidebar-hover)}
+
+/* Main */
+.main{flex:1;margin-left:var(--sidebar-width);transition:var(--transition);min-width:0}
+.main.expanded{margin-left:var(--sidebar-collapsed)}
+
+/* Header */
+.header{
+  height:var(--header-height);background:var(--bg-header);border-bottom:1px solid var(--border-lighter);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+  position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.04);
+}
+.header-left{display:flex;align-items:center;gap:12px}
+.header-breadcrumb{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text-muted)}
+.header-breadcrumb span{color:var(--text);font-weight:600}
+.header-right{display:flex;align-items:center;gap:16px}
+.header-right .user{font-size:13px;color:var(--text-secondary);display:flex;align-items:center;gap:6px}
+.header-right .user-avatar{width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+.hamburger{display:none;font-size:20px;cursor:pointer;color:var(--text);padding:4px}
+.collapse-btn{font-size:16px;cursor:pointer;color:var(--text-muted);padding:4px 6px;border-radius:4px;transition:var(--transition)}
+.collapse-btn:hover{color:var(--primary);background:var(--primary-light)}
+
+/* Content */
+.content{padding:20px;min-height:calc(100vh - var(--header-height))}
+
+/* =========================== Components =========================== */
+
+/* Stat Cards */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{
+  background:var(--bg-card);border-radius:var(--radius);padding:18px 20px;
+  box-shadow:var(--shadow);border:1px solid var(--border-lighter);
+  display:flex;align-items:flex-start;gap:14px;transition:var(--transition);cursor:default;
+}
+.stat-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+.stat-card .card-icon{
+  width:44px;height:44px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+}
+.stat-card .card-info{flex:1;min-width:0}
+.stat-card .card-label{font-size:13px;color:var(--text-secondary);margin-bottom:4px}
+.stat-card .card-value{font-size:26px;font-weight:700;line-height:1.2}
+.stat-card .card-sub{font-size:12px;color:var(--text-muted);margin-top:4px;display:flex;align-items:center;gap:4px}
+.stat-card .card-trend{font-size:12px;display:inline-flex;align-items:center;gap:2px}
+.stat-card .card-trend.up{color:var(--success)}.stat-card .card-trend.down{color:var(--danger)}
+
+/* Section */
+.section-card{
+  background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);
+  border:1px solid var(--border-lighter);margin-bottom:20px;
+}
+.section-header{padding:14px 20px;border-bottom:1px solid var(--border-lighter);display:flex;align-items:center;justify-content:space-between}
+.section-header h3{font-size:15px;font-weight:600}
+.section-body{padding:16px 20px}
+
+/* Toolbar */
+.toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.toolbar input,.toolbar select{
+  height:32px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  font-size:13px;color:var(--text);outline:none;background:#fff;transition:var(--transition);
+}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
+.toolbar input{width:180px}.toolbar input.sm{width:80px}.toolbar input.date{width:130px}
+.toolbar .spacer{flex:1}
+
+/* Buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 14px;
+  border:none;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;
+  transition:var(--transition);white-space:nowrap;font-weight:500;
+}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-hover)}
+.btn-success{background:var(--success);color:#fff}.btn-success:hover{opacity:.85}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{opacity:.85}
+.btn-warning{background:var(--warning);color:#fff}
+.btn-default{background:#fff;color:var(--text);border:1px solid var(--border)}.btn-default:hover{color:var(--primary);border-color:var(--primary)}
+.btn-text{background:transparent;color:var(--text-secondary);padding:0 8px}.btn-text:hover{color:var(--primary)}
+.btn-sm{height:28px;padding:0 10px;font-size:12px}
+.btn-xs{height:24px;padding:0 8px;font-size:11px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Table */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border-lighter)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{
+  background:#fafafa;padding:10px 12px;text-align:left;font-weight:600;color:var(--text-secondary);
+  border-bottom:1px solid var(--border);white-space:nowrap;font-size:12px;
+}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--border-lighter);color:var(--text)}
+tbody tr:hover td{background:var(--primary-light)}
+tbody tr:last-child td{border-bottom:none}
+.empty-row td{text-align:center;padding:48px 20px;color:var(--text-muted);font-size:14px}
+
+/* Tags */
+.tag{display:inline-block;padding:1px 8px;border-radius:3px;font-size:11px;font-weight:500;line-height:1.6}
+.tag-success{background:#e8f8ef;color:#28784a}
+.tag-danger{background:#fde8e8;color:#b83c3c}
+.tag-warning{background:#fef3e2;color:#8a611c}
+.tag-default{background:#f0f2f5;color:#606266}
+.tag-primary{background:#e8f0fe;color:#1a56db}
+
+/* Pagination */
+.pagination{display:flex;align-items:center;gap:6px;padding-top:14px;font-size:13px;flex-wrap:wrap}
+.pagination .page-btn{
+  min-width:32px;height:32px;border:1px solid var(--border);background:#fff;border-radius:var(--radius-sm);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--transition);
+}
+.pagination .page-btn:hover{border-color:var(--primary);color:var(--primary)}
+.pagination .page-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.pagination .page-btn:disabled{opacity:.4;cursor:not-allowed}
+.pagination .page-info{color:var(--text-muted);margin:0 4px}
+
+/* Summary */
+.summary-row{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.summary-item{background:var(--bg-card);padding:10px 16px;border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border-lighter);font-size:13px;color:var(--text-secondary)}
+.summary-item strong{font-size:18px;color:var(--text);margin:0 2px}
+
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--border)}
+.tabs button{padding:8px 16px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-1px;transition:var(--transition)}
+.tabs button.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.tabs button:hover{color:var(--primary)}
+
+/* Toggle */
+.toggle{position:relative;display:inline-block;width:38px;height:22px}
+.toggle input{display:none}
+.toggle-slider{position:absolute;top:0;left:0;right:0;bottom:0;background:#c0c4cc;border-radius:22px;cursor:pointer;transition:.2s}
+.toggle-slider::before{content:"";position:absolute;width:18px;height:18px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:var(--success)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(16px)}
+
+/* Chart */
+.chart-wrap{background:var(--bg-card);border-radius:var(--radius);padding:16px 20px;box-shadow:var(--shadow);border:1px solid var(--border-lighter);margin-bottom:16px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.chart-header h4{font-size:14px;font-weight:600}
+.bar-chart{display:flex;align-items:flex-end;gap:8px;height:180px;padding-top:8px}
+.bar-item{flex:1;display:flex;flex-direction:column;align-items:center;min-width:28px}
+.bar-fill{width:100%;max-width:44px;background:var(--primary);border-radius:4px 4px 0 0;min-height:2px;transition:height .5s cubic-bezier(.4,0,.2,1);position:relative;cursor:pointer}
+.bar-fill:hover{filter:brightness(1.1)}
+.bar-label{font-size:10px;color:var(--text-muted);margin-top:5px;transform:rotate(-35deg);transform-origin:top left;white-space:nowrap}
+.bar-value{font-size:11px;color:var(--text-secondary);margin-bottom:3px;font-weight:600}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:var(--radius-lg);padding:24px;max-width:520px;width:92vw;max-height:82vh;overflow-y:auto;box-shadow:var(--shadow-xl)}
+.modal h3{font-size:16px;margin-bottom:18px;font-weight:600}
+.modal .form-item{margin-bottom:14px}
+.modal .form-item label{display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px;font-weight:500}
+.modal .form-item input,.modal .form-item select,.modal .form-item textarea{
+  width:100%;height:34px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;outline:none;transition:var(--transition)
+}
+.modal .form-item input:focus,.modal .form-item select:focus,.modal .form-item textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
+.modal .form-item textarea{height:auto;padding:8px 10px;resize:vertical;min-height:60px}
+.modal .form-row{display:flex;gap:10px}
+.modal .form-row .form-item{flex:1}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border-lighter)}
+
+/* Confirm */
+.confirm-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:2100;align-items:center;justify-content:center}
+.confirm-overlay.show{display:flex}
+.confirm-box{background:#fff;border-radius:var(--radius-lg);padding:28px 24px;max-width:400px;width:90vw;text-align:center;box-shadow:var(--shadow-xl)}
+.confirm-box .confirm-icon{font-size:44px;margin-bottom:12px}
+.confirm-box p{font-size:14px;color:var(--text);margin-bottom:20px;line-height:1.6}
+.confirm-box .confirm-actions{display:flex;gap:10px;justify-content:center}
+
+/* Toast */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-120px);z-index:9999;padding:10px 20px;border-radius:var(--radius);color:#fff;font-size:13px;box-shadow:var(--shadow-lg);transition:transform .3s;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{background:var(--success)}
+.toast.error{background:var(--danger)}
+.toast.info{background:var(--primary)}
+
+/* Loading */
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-center{display:flex;align-items:center;justify-content:center;padding:60px 20px;gap:10px;color:var(--text-muted);font-size:14px}
+
+/* Login */
+.login-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#001529 0%,#003366 50%,#001529 100%);z-index:9999;align-items:center;justify-content:center;flex-direction:column}
+.login-overlay.show{display:flex}
+.login-card{background:#fff;border-radius:12px;padding:36px 32px;width:380px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-card .login-logo{text-align:center;font-size:20px;font-weight:700;margin-bottom:4px;color:var(--text)}
+.login-card .login-sub{text-align:center;font-size:13px;color:var(--text-muted);margin-bottom:24px}
+.login-card .login-error{color:var(--danger);font-size:12px;text-align:center;margin-top:6px;min-height:18px}
+.login-card .form-item{margin-bottom:14px}
+.login-card .form-item label{display:block;font-size:13px;color:var(--text-secondary);margin-bottom:4px}
+.login-card .form-item input{width:100%;height:38px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;outline:none}
+.login-card .form-item input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.login-card .form-row{display:flex;gap:10px;align-items:flex-end}
+.login-card .form-row .form-item{flex:1;margin-bottom:0}
+
+/* Responsive */
+@media (max-width:1024px){
+  .sidebar{transform:translateX(-100%)}.sidebar.mobile-open{transform:translateX(0)}
+  .sidebar-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:1000}
+  .sidebar-overlay.show{display:block}
+  .main{margin-left:0!important}.hamburger{display:block}.collapse-btn{display:none}
+  .content{padding:12px}
+  .stat-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .toolbar{flex-direction:column;align-items:stretch}.toolbar input,.toolbar select{width:100%!important}
+  .summary-row{flex-direction:column}.header{padding:0 12px}
+}
+@media (max-width:480px){
+  .stat-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .stat-card{padding:12px;gap:8px}.stat-card .card-value{font-size:20px}
+  .stat-card .card-icon{width:34px;height:34px;font-size:16px}
+  table{font-size:12px}thead th,tbody td{padding:8px 6px}
+}
+
+/* Refresh Bar */
+.refresh-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--text-muted);flex-wrap:wrap}
+.refresh-bar .dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.refresh-bar .dot.paused{background:var(--warning);animation:none}
+
+/* Skeleton loading for dashboard cards */
+.skeleton{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+
+<!-- Login Overlay -->
+<div class="login-overlay show" id="login-overlay">
+  <div class="login-card">
+    <div class="login-logo">⚡ 遇见 · 管理后台</div>
+    <div class="login-sub">仅限管理员账号登录</div>
+    <div class="form-item"><label>手机号</label><input type="tel" id="login-phone" placeholder="请输入管理员手机号" maxlength="11" autocomplete="tel"></div>
+    <div class="form-row">
+      <div class="form-item"><label>验证码</label><input type="text" id="login-code" placeholder="验证码" maxlength="6"></div>
+      <button class="btn btn-primary" id="btn-send-code" onclick="sendLoginCode()" style="height:38px;white-space:nowrap">获取验证码</button>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn btn-primary" onclick="adminLogin()" style="width:100%;height:42px;margin-top:8px;font-size:15px">登 录</button>
+  </div>
+</div>
+
+<!-- App Layout -->
+<div class="app-layout" id="app-layout" style="display:none">
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">⚡</span><span class="logo-text">遇见 Admin</span>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <a data-page="dashboard" class="active" onclick="navigate('dashboard')"><span class="nav-icon">📊</span><span class="nav-title">仪表盘</span></a>
+      <a data-page="users" onclick="navigate('users')"><span class="nav-icon">👥</span><span class="nav-title">用户管理</span></a>
+      <a data-page="posts" onclick="navigate('posts')"><span class="nav-icon">📝</span><span class="nav-title">动态管理</span></a>
+      <a data-page="reports" onclick="navigate('reports')"><span class="nav-icon">🚩</span><span class="nav-title">举报管理</span><span class="nav-badge" id="report-badge" style="display:none">0</span></a>
+      <a data-page="orders" onclick="navigate('orders')"><span class="nav-icon">💰</span><span class="nav-title">订单管理</span></a>
+      <a data-page="gifts" onclick="navigate('gifts')"><span class="nav-icon">🎁</span><span class="nav-title">礼物管理</span></a>
+      <a data-page="gift-records" onclick="navigate('gift-records')"><span class="nav-icon">📋</span><span class="nav-title">礼物记录</span></a>
+      <a data-page="transactions" onclick="navigate('transactions')"><span class="nav-icon">⏱️</span><span class="nav-title">交易流水</span></a>
+      <a data-page="revenue" onclick="navigate('revenue')"><span class="nav-icon">📈</span><span class="nav-title">营收统计</span></a>
+    </nav>
+    <div class="sidebar-collapse" onclick="toggleSidebarCollapse()" title="折叠侧边栏">◀</div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main" id="main-area">
+    <header class="header">
+      <div class="header-left">
+        <span class="hamburger" onclick="toggleMobileSidebar()">☰</span>
+        <span class="collapse-btn" onclick="toggleSidebarCollapse()" title="折叠侧边栏">☰</span>
+        <div class="header-breadcrumb">遇见 / <span id="page-title">仪表盘</span></div>
+      </div>
+      <div class="header-right">
+        <span id="header-time" style="font-size:12px;color:var(--text-muted)"></span>
+        <div class="user"><span class="user-avatar" id="header-avatar">管</span><span id="header-user">管理员</span></div>
+        <button class="btn btn-text btn-sm" onclick="logout()">退出</button>
+      </div>
+    </header>
+    <div class="content" id="content-area"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Confirm -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">⚠️</div>
+    <p id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-default" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+// ============================================================
+//  State
+// ============================================================
+const S = {
+  token: null,
+  adminUser: null,
+  page: 'dashboard',
+  pageSize: 20,
+  refreshTimer: null,
+  sidebarCollapsed: false,
+  filters: {}
+};
+
+const PAGE_NAMES = {
+  dashboard:'仪表盘',users:'用户管理',posts:'动态管理',reports:'举报管理',
+  orders:'订单管理',gifts:'礼物管理','gift-records':'礼物记录',
+  transactions:'交易流水',revenue:'营收统计'
+};
+
+// ============================================================ Init ============================================================
+(function init(){
+  const t = localStorage.getItem('ad_token');
+  const u = localStorage.getItem('ad_user');
+  if (t && u) {
+    try {
+      S.token = t;
+      S.adminUser = JSON.parse(u);
+      // 验证 token 是否过期（简单检查：解码 JWT payload 中的 exp）
+      const payload = JSON.parse(atob(t.split('.')[1]));
+      if (payload.exp * 1000 > Date.now()) {
+        showApp();
+        startClock();
+        return;
+      }
+    } catch(e) { /* token 无效，回退到登录 */ }
+  }
+  clearStoredAuth();
+  showLogin();
+  startClock();
+})();
+
+function startClock(){
+  setInterval(()=>{
+    const el = document.getElementById('header-time');
+    if (el) el.textContent = new Date().toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }, 1000);
+}
+
+function clearStoredAuth(){
+  localStorage.removeItem('ad_token');
+  localStorage.removeItem('ad_user');
+  S.token = null; S.adminUser = null;
+}
+
+// ============================================================ Auth ============================================================
+function showLogin(){
+  document.getElementById('login-overlay').classList.add('show');
+  document.getElementById('app-layout').style.display = 'none';
+}
+
+function showApp(){
+  document.getElementById('login-overlay').classList.remove('show');
+  document.getElementById('app-layout').style.display = 'flex';
+  document.getElementById('header-user').textContent = S.adminUser?.nickname || '管理员';
+  document.getElementById('header-avatar').textContent = (S.adminUser?.nickname || '管')[0];
+  navigate('dashboard');
+}
+
+function setLoginError(msg){
+  const el = document.getElementById('login-error');
+  el.textContent = msg || '';
+}
+
+async function sendLoginCode(){
+  const phone = document.getElementById('login-phone').value.trim();
+  if (!/^1[3-9]\d{9}$/.test(phone)) { setLoginError('请输入有效的手机号'); return; }
+  const btn = document.getElementById('btn-send-code');
+  btn.disabled = true; btn.textContent = '发送中...';
+  try {
+    const resp = await fetch('/api/auth/send-code',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone})
+    });
+    const d = await resp.json();
+    if (d.code === 0) {
+      toast('验证码已发送','success');
+      if (d.data?.code) { document.getElementById('login-code').value = d.data.code; toast('开发模式：已自动填入','info'); }
+      let cd = 60;
+      const iv = setInterval(()=>{
+        if (cd<=0){clearInterval(iv);btn.disabled=false;btn.textContent='获取验证码';return;}
+        btn.textContent = cd+'s'; cd--;
+      },1000);
+      setLoginError('');
+    } else {
+      setLoginError(d.message||'发送失败'); btn.disabled = false; btn.textContent = '获取验证码';
+    }
+  } catch(e){ setLoginError('网络错误'); btn.disabled = false; btn.textContent = '获取验证码'; }
+}
+
+async function adminLogin(){
+  const phone = document.getElementById('login-phone').value.trim();
+  const code = document.getElementById('login-code').value.trim();
+  if (!phone || !code) { setLoginError('请填写手机号和验证码'); return; }
+  try {
+    const resp = await fetch('/api/auth/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone,code})
+    });
+    const d = await resp.json();
+    if (d.code === 0 && d.data) {
+      if (d.data.user.role !== 'admin') { setLoginError('该账号不是管理员，无法登录'); return; }
+      S.token = d.data.token;
+      S.adminUser = d.data.user;
+      localStorage.setItem('ad_token', S.token);
+      localStorage.setItem('ad_user', JSON.stringify(S.adminUser));
+      setLoginError('');
+      showApp();
+      toast('登录成功','success');
+    } else {
+      setLoginError(d.message||'登录失败');
+    }
+  } catch(e){ setLoginError('网络错误，请重试'); }
+}
+
+function logout(){
+  if (S.refreshTimer) { clearInterval(S.refreshTimer); S.refreshTimer = null; }
+  clearStoredAuth();
+  document.getElementById('login-phone').value = '';
+  document.getElementById('login-code').value = '';
+  setLoginError('');
+  showLogin();
+}
+
+// ============================================================ API ============================================================
+async function api(method, path, body){
+  const headers = {'Content-Type':'application/json'};
+  if (S.token) headers['Authorization'] = 'Bearer ' + S.token;
+  const opts = {method,headers};
+  if (body) opts.body = JSON.stringify(body);
+  const resp = await fetch(path, opts);
+  const data = await resp.json();
+  if (resp.status === 401 || data.code === 401) {
+    clearStoredAuth();
+    showLogin();
+    toast('登录已过期，请重新登录','error');
+    throw new Error('Unauthorized');
+  }
+  if (data.code !== 0 && data.code !== undefined) {
+    throw new Error(data.message || '请求失败');
+  }
+  return data;
+}
+
+// ============================================================ Navigation ============================================================
+function navigate(page){
+  if (S.refreshTimer) { clearInterval(S.refreshTimer); S.refreshTimer = null; }
+  S.page = page;
+  S.filters = {};
+  document.querySelectorAll('#sidebar-nav a').forEach(a=>a.classList.remove('active'));
+  const link = document.querySelector(`#sidebar-nav a[data-page="${page}"]`);
+  if (link) link.classList.add('active');
+  document.getElementById('page-title').textContent = PAGE_NAMES[page]||page;
+  if (window.innerWidth <= 1024) closeMobileSidebar();
+  switch(page){
+    case 'dashboard': renderDashboard(); break;
+    case 'users': renderUsers(); break;
+    case 'posts': renderPosts(); break;
+    case 'reports': renderReports(); break;
+    case 'orders': renderOrders(); break;
+    case 'gifts': renderGifts(); break;
+    case 'gift-records': renderGiftRecords(); break;
+    case 'transactions': renderTransactions(); break;
+    case 'revenue': renderRevenue(); break;
+  }
+}
+
+// ============================================================ Sidebar ============================================================
+function toggleSidebarCollapse(){
+  S.sidebarCollapsed = !S.sidebarCollapsed;
+  document.getElementById('sidebar').classList.toggle('collapsed', S.sidebarCollapsed);
+  document.getElementById('main-area').classList.toggle('expanded', S.sidebarCollapsed);
+  localStorage.setItem('ad_sidebar', S.sidebarCollapsed?'1':'0');
+}
+// 恢复折叠状态
+(function(){
+  if (localStorage.getItem('ad_sidebar') === '1') {
+    S.sidebarCollapsed = true;
+    setTimeout(()=>{
+      document.getElementById('sidebar').classList.add('collapsed');
+      document.getElementById('main-area').classList.add('expanded');
+    },100);
+  }
+})();
+
+function toggleMobileSidebar(){
+  document.getElementById('sidebar').classList.toggle('mobile-open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+function closeMobileSidebar(){
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+document.addEventListener('click',function(e){
+  if (e.target.closest('#sidebar-nav a')) setTimeout(closeMobileSidebar,150);
+});
+
+// ============================================================ Toast ============================================================
+function toast(msg,type){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast '+type;
+  requestAnimationFrame(()=>{el.classList.add('show')});
+  clearTimeout(el._tid);
+  el._tid = setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+// ============================================================ Confirm ============================================================
+let _confirmCb = null;
+function showConfirm(msg,cb,okText='确认'){
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-ok-btn').textContent = okText;
+  document.getElementById('confirm-overlay').classList.add('show');
+  _confirmCb = cb;
+  document.getElementById('confirm-ok-btn').onclick = ()=>{closeConfirm();if(cb)cb();};
+}
+function closeConfirm(){
+  document.getElementById('confirm-overlay').classList.remove('show');
+  _confirmCb = null;
+}
+
+// ============================================================ Modal ============================================================
+function showModal(html){
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+// ============================================================ Utils ============================================================
+function fmtTime(ts){if(!ts)return'-';const d=new Date(ts);const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+function fmtMoney(v){return'¥'+(Number(v)||0).toFixed(2);}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function trunc(s,n){if(!s)return'';return s.length>n?s.slice(0,n)+'…':s;}
+
+function buildPagination(offset,total,size,fn){
+  const pages=Math.ceil(total/size)||1;
+  if(pages<=1)return'';
+  const cur=Math.floor(offset/size);
+  let h=`<div class="pagination"><span class="page-info">共 ${total} 条 / ${pages} 页</span>`;
+  h+=`<button class="page-btn" ${cur===0?'disabled':''} onclick="${fn}(0)">«</button>`;
+  for(let i=Math.max(0,cur-2);i<Math.min(pages,cur+3);i++){
+    h+=`<button class="page-btn${i===cur?' active':''}" onclick="${fn}(${i*size})">${i+1}</button>`;
+  }
+  h+=`<button class="page-btn" ${(offset+size)>=total?'disabled':''} onclick="${fn}(${Math.max(0,total-size)})">»</button></div>`;
+  return h;
+}
+
+// ============================================================ Dashboard ============================================================
+async function renderDashboard(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  await loadDashboard();
+  // 30秒自动刷新
+  S.refreshTimer = setInterval(()=>{
+    if (S.page === 'dashboard') loadDashboard(true);
+  }, 30000);
+}
+
+async function loadDashboard(silent){
+  const area = document.getElementById('content-area');
+  try {
+    const d = (await api('GET','/api/admin/dashboard/enhanced')).data;
+    const now = fmtTime(new Date().toISOString());
+    const cards = [
+      {icon:'👥',color:'#e8f0fe',label:'总用户数',value:d.total_users||0,sub:`今日新增 ${d.today_new_users||0}`},
+      {icon:'🟢',color:'#e8f8ef',label:'今日活跃',value:d.today_active_users||0,sub:`在线 ${d.online_users||0}`},
+      {icon:'📝',color:'#fef3e2',label:'总动态',value:d.total_posts||0,sub:`今日 +${d.today_posts||0} · 已删 ${d.deleted_posts||0}`},
+      {icon:'🚩',color:'#fde8e8',label:'待处理举报',value:d.pending_reports||0,sub:`总计 ${d.total_reports||0} · 已处理 ${d.handled_reports||0}`},
+      {icon:'💰',color:'#e8f8ef',label:'总营收',value:fmtMoney(d.total_revenue),sub:`今日 ${fmtMoney(d.today_revenue)}`},
+      {icon:'📅',color:'#e8f0fe',label:'本周营收',value:fmtMoney(d.week_revenue),sub:`本月 ${fmtMoney(d.month_revenue)}`},
+      {icon:'💬',color:'#f0f2f5',label:'今日消息',value:d.today_messages||0,sub:`总计 ${d.total_messages||0}`},
+      {icon:'💕',color:'#fde8e8',label:'今日匹配',value:d.today_matches||0,sub:`总计 ${d.total_matches||0}`},
+      {icon:'🎁',color:'#fef3e2',label:'今日礼物',value:d.today_gifts||0,sub:`价值 ${d.today_gift_value||0} 金币`},
+      {icon:'💭',color:'#e8f0fe',label:'今日评论',value:d.today_comments||0,sub:`总计 ${d.total_comments||0}`},
+    ];
+    let isPaused = !S.refreshTimer;
+    area.innerHTML = `
+      <div class="refresh-bar">
+        <span class="dot${isPaused?' paused':''}"></span>
+        ${isPaused ? '自动刷新已暂停' : '实时监控中'} · 更新于 ${now}
+        <button class="btn btn-text btn-sm" onclick="loadDashboard()">🔄 刷新</button>
+        <button class="btn btn-text btn-sm" id="btn-toggle-refresh" onclick="toggleAutoRefresh()">${isPaused?'▶ 恢复':'⏸ 暂停'}</button>
+        <span class="spacer"></span>
+        <span style="font-size:11px">每30秒自动刷新</span>
+      </div>
+      <div class="stat-grid">
+        ${cards.map(c=>`
+          <div class="stat-card">
+            <div class="card-icon" style="background:${c.color}">${c.icon}</div>
+            <div class="card-info">
+              <div class="card-label">${c.label}</div>
+              <div class="card-value">${c.value}</div>
+              <div class="card-sub">${c.sub}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    // 更新举报徽标
+    const badge = document.getElementById('report-badge');
+    if (badge) {
+      if (d.pending_reports > 0) { badge.style.display = ''; badge.textContent = d.pending_reports; }
+      else badge.style.display = 'none';
+    }
+    if (!silent) {
+      // 数据更新动画
+      area.querySelectorAll('.stat-card').forEach((c,i)=>{c.style.animation=`fadeIn .3s ${i*.05}s both`;});
+    }
+  } catch(e){
+    if (!silent) area.innerHTML = `<div class="empty-row"><td>加载失败: ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderDashboard()">重试</button></td></div>`;
+  }
+}
+
+function toggleAutoRefresh(){
+  if (S.refreshTimer) {
+    clearInterval(S.refreshTimer); S.refreshTimer = null;
+    const el = document.getElementById('btn-toggle-refresh'); if(el) el.textContent = '▶ 恢复';
+    const dot = document.querySelector('.refresh-bar .dot'); if(dot) dot.classList.add('paused');
+  } else {
+    S.refreshTimer = setInterval(()=>{ if(S.page==='dashboard') loadDashboard(true); },30000);
+    const el = document.getElementById('btn-toggle-refresh'); if(el) el.textContent = '⏸ 暂停';
+    const dot = document.querySelector('.refresh-bar .dot'); if(dot) dot.classList.remove('paused');
+  }
+}
+
+// ============================================================ Users ============================================================
+function renderUsers(){ S.filters={offset:0,keyword:'',status:''}; loadUsers(); }
+async function loadUsers(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({limit:S.pageSize,offset:S.filters.offset});
+    if(S.filters.status!=='')p.set('status',S.filters.status);
+    if(S.filters.keyword)p.set('keyword',S.filters.keyword);
+    const r = await api('GET','/api/admin/users?'+p);
+    const {users,total}=r.data;
+    let h = `
+      <div class="section-card">
+        <div class="section-header"><h3>👥 用户列表</h3><span style="font-size:13px;color:var(--text-muted)">共 ${total} 条</span></div>
+        <div class="section-body">
+          <div class="toolbar">
+            <input placeholder="搜索昵称/手机号..." value="${esc(S.filters.keyword)}" id="us">
+            <select id="ust" onchange="S.filters.status=this.value;S.filters.offset=0;loadUsers()">
+              <option value="">全部状态</option><option value="1" ${S.filters.status==='1'?'selected':''}>正常</option><option value="0" ${S.filters.status==='0'?'selected':''}>已封禁</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="S.filters.keyword=document.getElementById('us').value;S.filters.offset=0;loadUsers()">🔍 搜索</button>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>ID</th><th>手机号</th><th>昵称</th><th>性别</th><th>VIP</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
+            <tbody>${users.length===0?'<tr class="empty-row"><td colspan="8">暂无数据</td></tr>':users.map(u=>`
+              <tr>
+                <td>${u.id}</td><td>${u.phone||'-'}</td><td><strong>${esc(u.nickname||'')}</strong></td>
+                <td>${u.gender==='male'?'男':u.gender==='female'?'女':u.gender||'-'}</td>
+                <td>${u.is_vip?'<span class="tag tag-success">VIP'+u.vip_level+'</span>':'<span class="tag tag-default">普通</span>'}</td>
+                <td><span class="tag ${u.status===1?'tag-success':'tag-danger'}">${u.status===1?'正常':'已封禁'}</span></td>
+                <td>${fmtTime(u.created_at)}</td>
+                <td>${u.status===1?`<button class="btn btn-danger btn-xs" onclick="toggleUser(${u.id},'ban')">封禁</button>`:`<button class="btn btn-success btn-xs" onclick="toggleUser(${u.id},'unban')">解封</button>`}</td>
+              </tr>`).join('')}</tbody>
+          </table></div>
+          ${buildPagination(S.filters.offset,total,S.pageSize,'userPage')}
+        </div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderUsers()">重试</button></div>`; }
+}
+function userPage(o){ S.filters.offset=o; loadUsers(); }
+async function toggleUser(id,action){
+  const label = action==='ban'?'封禁':'解封';
+  showConfirm(`确定要<b>${label}</b>该用户吗？`,async()=>{
+    try{ await api('PUT','/api/admin/users/'+id,{action}); toast('用户已'+label,'success'); loadUsers(); }
+    catch(e){ toast(e.message,'error'); }
+  },label);
+}
+
+// ============================================================ Posts ============================================================
+function renderPosts(){ S.filters={offset:0,keyword:'',status:'',user_id:''}; loadPosts(); }
+async function loadPosts(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({limit:S.pageSize,offset:S.filters.offset});
+    if(S.filters.status!=='')p.set('status',S.filters.status);
+    if(S.filters.keyword)p.set('keyword',S.filters.keyword);
+    if(S.filters.user_id)p.set('user_id',S.filters.user_id);
+    const r = await api('GET','/api/admin/posts?'+p);
+    const {posts,total}=r.data;
+    let h = `
+      <div class="section-card">
+        <div class="section-header"><h3>📝 动态列表</h3><span style="font-size:13px;color:var(--text-muted)">共 ${total} 条</span></div>
+        <div class="section-body">
+          <div class="toolbar">
+            <input placeholder="搜索内容..." value="${esc(S.filters.keyword)}" id="ps">
+            <select id="pst" onchange="S.filters.status=this.value;S.filters.offset=0;loadPosts()">
+              <option value="">全部状态</option><option value="1" ${S.filters.status==='1'?'selected':''}>正常</option><option value="0" ${S.filters.status==='0'?'selected':''}>已删除</option>
+            </select>
+            <input class="sm" placeholder="用户ID" value="${S.filters.user_id}" id="puid">
+            <button class="btn btn-primary btn-sm" onclick="S.filters.keyword=document.getElementById('ps').value;S.filters.user_id=document.getElementById('puid').value;S.filters.offset=0;loadPosts()">🔍 搜索</button>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>ID</th><th>作者</th><th>内容</th><th>图片</th><th>👍</th><th>💬</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody>${posts.length===0?'<tr class="empty-row"><td colspan="9">暂无数据</td></tr>':posts.map(p=>`
+              <tr>
+                <td>${p.id}</td><td>${esc(p.nickname||'用户'+p.user_id)}</td>
+                <td>${esc(trunc(p.content,40))}</td>
+                <td>${(p.images||[]).length?(p.images||[]).length+'张':'-'}</td>
+                <td>${p.like_count||0}</td><td>${p.comment_count||0}</td>
+                <td><span class="tag ${p.status===1?'tag-success':'tag-default'}">${p.status===1?'正常':'已删除'}</span></td>
+                <td>${fmtTime(p.created_at)}</td>
+                <td>
+                  <button class="btn btn-text btn-xs" onclick="viewPost(${p.id})">详情</button>
+                  ${p.status===1?`<button class="btn btn-danger btn-xs" onclick="togglePost(${p.id},0)">删除</button>`:`<button class="btn btn-success btn-xs" onclick="togglePost(${p.id},1)">恢复</button>`}
+                </td>
+              </tr>`).join('')}</tbody>
+          </table></div>
+          ${buildPagination(S.filters.offset,total,S.pageSize,'postPage')}
+        </div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderPosts()">重试</button></div>`; }
+}
+function postPage(o){ S.filters.offset=o; loadPosts(); }
+async function viewPost(id){
+  try {
+    const d = (await api('GET','/api/admin/posts/'+id)).data;
+    let imgs = '';
+    if (d.images&&d.images.length) imgs = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">'+d.images.map(i=>`<img src="${i}" style="max-width:120px;max-height:120px;border-radius:4px;object-fit:cover">`).join('')+'</div>';
+    showModal(`
+      <h3>📝 动态详情 #${d.id}</h3>
+      <p style="font-size:13px"><strong>作者:</strong> ${esc(d.nickname||'用户'+d.user_id)} (ID:${d.user_id}) · <span class="tag ${d.status===1?'tag-success':'tag-default'}">${d.status===1?'正常':'已删除'}</span></p>
+      <div style="background:#fafafa;padding:12px;border-radius:4px;margin:10px 0;white-space:pre-wrap;font-size:14px">${esc(d.content||'(无文字)')}</div>
+      ${imgs}
+      <p style="font-size:13px;margin-top:8px">👍 ${d.like_count_detail||0} · 💬 ${d.comment_count_detail||0} · ${fmtTime(d.created_at)}</p>
+      <div class="modal-footer"><button class="btn btn-default" onclick="closeModal()">关闭</button></div>
+    `);
+  } catch(e){ toast(e.message,'error'); }
+}
+async function togglePost(id,status){
+  showConfirm(`确定要<b>${status===0?'删除':'恢复'}</b>该动态吗？`,async()=>{
+    try{ await api('PUT','/api/admin/posts/'+id+'/status',{status}); toast(status===0?'已删除':'已恢复','success'); loadPosts(); }
+    catch(e){ toast(e.message,'error'); }
+  },status===0?'删除':'恢复');
+}
+
+// ============================================================ Reports ============================================================
+function renderReports(){ S.filters={offset:0,status:'0'}; loadReports(); }
+async function loadReports(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const r = await api('GET','/api/admin/reports?status='+S.filters.status+'&limit='+S.pageSize+'&offset='+S.filters.offset);
+    const {reports,total,pending_count,handled_count}=r.data;
+    const badge = document.getElementById('report-badge');
+    if(badge){ if(pending_count>0){badge.style.display='';badge.textContent=pending_count}else badge.style.display='none'; }
+    let h = `
+      <div class="section-card">
+        <div class="section-header"><h3>🚩 举报管理</h3></div>
+        <div class="section-body">
+          <div class="tabs">
+            <button class="${S.filters.status==='0'?'active':''}" onclick="S.filters.status='0';S.filters.offset=0;loadReports()">⏳ 待处理 (${pending_count||0})</button>
+            <button class="${S.filters.status==='1'?'active':''}" onclick="S.filters.status='1';S.filters.offset=0;loadReports()">✅ 已处理 (${handled_count||0})</button>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>ID</th><th>举报人</th><th>被举报人</th><th>原因</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody>${reports.length===0?'<tr class="empty-row"><td colspan="7">暂无数据</td></tr>':reports.map(r=>`
+              <tr>
+                <td>${r.id}</td><td>${esc(r.reporter_nickname||'用户'+r.reporter_id)}</td>
+                <td>${esc(r.reported_nickname||'用户'+r.reported_user_id)} <span class="tag tag-xs ${r.reported_status===0?'tag-danger':'tag-success'}">${r.reported_status===0?'已封':'正常'}</span></td>
+                <td>${esc(r.reason||'')}</td>
+                <td><span class="tag ${r.status===0?'tag-warning':'tag-success'}">${r.status===0?'待处理':'已处理'}</span></td>
+                <td>${fmtTime(r.created_at)}</td>
+                <td>${r.status===0?`<button class="btn btn-danger btn-xs" onclick="handleRpt(${r.id},'ban','${esc(r.reported_nickname||'')}')">封禁</button> <button class="btn btn-default btn-xs" onclick="handleRpt(${r.id},'dismiss')">驳回</button>`:'<span style="color:var(--text-muted);font-size:12px">已处理</span>'}</td>
+              </tr>`).join('')}</tbody>
+          </table></div>
+          ${buildPagination(S.filters.offset,total,S.pageSize,'rptPage')}
+        </div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderReports()">重试</button></div>`; }
+}
+function rptPage(o){ S.filters.offset=o; loadReports(); }
+async function handleRpt(id,action,nickname){
+  const label = action==='ban'?`封禁用户 "${nickname}"`:'驳回举报';
+  showConfirm(`确定要<b>${label}</b>吗？`,async()=>{
+    try{ await api('PUT','/api/admin/reports/'+id+'/handle',{action}); toast(action==='ban'?'已封禁用户':'已驳回举报','success'); loadReports(); }
+    catch(e){ toast(e.message,'error'); }
+  },action==='ban'?'封禁':'驳回');
+}
+
+// ============================================================ Orders ============================================================
+function renderOrders(){ S.filters={offset:0,status:'',user_id:'',start:'',end:''}; loadOrders(); }
+async function loadOrders(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({limit:S.pageSize,offset:S.filters.offset});
+    if(S.filters.status!=='')p.set('status',S.filters.status);
+    if(S.filters.user_id)p.set('user_id',S.filters.user_id);
+    if(S.filters.start)p.set('start_date',S.filters.start);
+    if(S.filters.end)p.set('end_date',S.filters.end);
+    const r = await api('GET','/api/admin/orders?'+p);
+    const {orders,total,summary}=r.data;
+    let h = `
+      <div class="summary-row">
+        <div class="summary-item">💰 总营收: <strong>${fmtMoney(summary.total_revenue)}</strong></div>
+        <div class="summary-item">✅ 已支付: <strong>${summary.paid_count||0}</strong> 笔</div>
+        <div class="summary-item">⏳ 待支付: <strong>${summary.pending_count||0}</strong> 笔</div>
+        <div class="summary-item">❌ 已取消: <strong>${summary.cancelled_count||0}</strong> 笔</div>
+      </div>
+      <div class="section-card">
+        <div class="section-header"><h3>💰 订单列表</h3></div>
+        <div class="section-body">
+          <div class="toolbar">
+            <select id="ost" onchange="S.filters.status=this.value;S.filters.offset=0;loadOrders()">
+              <option value="">全部状态</option><option value="1" ${S.filters.status==='1'?'selected':''}>已支付</option><option value="0" ${S.filters.status==='0'?'selected':''}>待支付</option><option value="2" ${S.filters.status==='2'?'selected':''}>已取消</option>
+            </select>
+            <input class="sm" placeholder="用户ID" value="${S.filters.user_id}" id="ouid">
+            <input class="date" type="date" value="${S.filters.start}" id="ods"> <span style="font-size:12px;color:var(--text-muted)">至</span>
+            <input class="date" type="date" value="${S.filters.end}" id="ode">
+            <button class="btn btn-primary btn-sm" onclick="S.filters.user_id=document.getElementById('ouid').value;S.filters.start=document.getElementById('ods').value;S.filters.end=document.getElementById('ode').value;S.filters.offset=0;loadOrders()">🔍 筛选</button>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>ID</th><th>订单号</th><th>用户</th><th>金额</th><th>套餐</th><th>状态</th><th>时间</th></tr></thead>
+            <tbody>${orders.length===0?'<tr class="empty-row"><td colspan="7">暂无数据</td></tr>':orders.map(o=>`
+              <tr>
+                <td>${o.id}</td><td style="font-size:11px">${o.order_no||'-'}</td>
+                <td>${esc(o.nickname||'用户'+o.user_id)}</td><td>${fmtMoney(o.amount)}</td>
+                <td>${esc(o.package_name||'-')}</td>
+                <td><span class="tag ${o.status===1?'tag-success':o.status===0?'tag-warning':'tag-default'}">${o.status===1?'已支付':o.status===0?'待支付':'已取消'}</span></td>
+                <td>${fmtTime(o.created_at)}</td>
+              </tr>`).join('')}</tbody>
+          </table></div>
+          ${buildPagination(S.filters.offset,total,S.pageSize,'orderPage')}
+        </div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderOrders()">重试</button></div>`; }
+}
+function orderPage(o){ S.filters.offset=o; loadOrders(); }
+
+// ============================================================ Gifts ============================================================
+function renderGifts(){ loadGifts(); }
+async function loadGifts(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const gifts = (await api('GET','/api/admin/gifts')).data;
+    let h = `
+      <div class="section-card">
+        <div class="section-header"><h3>🎁 礼物管理</h3><button class="btn btn-primary btn-sm" onclick="giftForm()">＋ 新增礼物</button></div>
+        <div class="section-body">
+          <div class="table-wrap"><table>
+            <thead><tr><th>ID</th><th>图标</th><th>名称</th><th>价格</th><th>分类</th><th>动画</th><th>排序</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody>${gifts.length===0?'<tr class="empty-row"><td colspan="9">暂无礼物</td></tr>':gifts.map(g=>`
+              <tr>
+                <td>${g.id}</td>
+                <td>${g.image?`<img src="${g.image}" style="width:28px;height:28px;border-radius:4px;object-fit:contain">`:'🎁'}</td>
+                <td><strong>${esc(g.name)}</strong></td><td>${g.price} 💰</td>
+                <td>${esc(g.category||'通用')}</td><td><span class="tag tag-primary">${esc(g.animation_type||'normal')}</span></td>
+                <td>${g.sort_order||0}</td>
+                <td><label class="toggle" onclick="event.stopPropagation();togGift(${g.id},${g.is_active?0:1})"><input type="checkbox" ${g.is_active?'checked':''}><span class="toggle-slider"></span></label></td>
+                <td><button class="btn btn-text btn-xs" onclick="giftForm(${g.id})">✏️ 编辑</button></td>
+              </tr>`).join('')}</tbody>
+          </table></div>
+        </div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderGifts()">重试</button></div>`; }
+}
+async function giftForm(id){
+  let g = {name:'',image:'',price:'',animation_type:'normal',category:'通用',sort_order:0,is_active:1};
+  let title = '新增礼物';
+  if (id) {
+    try { const found = (await api('GET','/api/admin/gifts')).data.find(x=>x.id===id); if(found){g=found;title='编辑礼物';} } catch(e){}
+  }
+  showModal(`
+    <h3>${title}</h3>
+    <div class="form-row">
+      <div class="form-item"><label>名称 *</label><input id="gn" value="${esc(g.name)}"></div>
+      <div class="form-item"><label>价格(金币) *</label><input id="gp" type="number" value="${g.price||''}" min="1"></div>
+    </div>
+    <div class="form-item"><label>图片URL</label><input id="gi" value="${esc(g.image||'')}" placeholder="/gifts/xxx.png"></div>
+    <div class="form-row">
+      <div class="form-item"><label>分类</label><select id="gc">${['通用','鲜花','甜品','首饰','奢侈品','特效'].map(c=>`<option value="${c}" ${g.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="form-item"><label>动画类型</label><select id="ga">${['normal','rose','luxury','firework'].map(a=>`<option value="${a}" ${g.animation_type===a?'selected':''}>${a}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-item"><label>排序</label><input id="gs" type="number" value="${g.sort_order||0}"></div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveGift(${id||0})">💾 保存</button>
+    </div>
+  `);
+}
+async function saveGift(id){
+  const body = {name:document.getElementById('gn').value.trim(),image:document.getElementById('gi').value.trim(),price:Number(document.getElementById('gp').value),sort_order:Number(document.getElementById('gs').value),category:document.getElementById('gc').value,animation_type:document.getElementById('ga').value};
+  if(!body.name||!body.price){toast('请填写名称和价格','error');return;}
+  try {
+    if(id){await api('PUT','/api/admin/gifts/'+id,body);toast('更新成功','success');}
+    else{await api('POST','/api/admin/gifts',body);toast('创建成功','success');}
+    closeModal();loadGifts();
+  } catch(e){toast(e.message,'error');}
+}
+async function togGift(id,isActive){
+  try { await api('PUT','/api/admin/gifts/'+id+'/toggle',{is_active:isActive}); toast(isActive?'已上架':'已下架','success'); loadGifts(); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+// ============================================================ Gift Records ============================================================
+function renderGiftRecords(){ S.filters={offset:0,sender:'',receiver:'',start:'',end:''}; loadGiftRecords(); }
+async function loadGiftRecords(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({limit:S.pageSize,offset:S.filters.offset});
+    if(S.filters.sender)p.set('sender_id',S.filters.sender);
+    if(S.filters.receiver)p.set('receiver_id',S.filters.receiver);
+    if(S.filters.start)p.set('start_date',S.filters.start);
+    if(S.filters.end)p.set('end_date',S.filters.end);
+    const r = await api('GET','/api/admin/gift-records?'+p);
+    const {records,total,summary}=r.data;
+    let h = `
+      <div class="summary-row">
+        <div class="summary-item">📊 总记录: <strong>${summary.total_count||0}</strong></div>
+        <div class="summary-item">💰 总价值: <strong>${summary.total_value||0}</strong> 金币</div>
+      </div>
+      <div class="section-card">
+        <div class="section-header"><h3>📋 礼物记录</h3></div>
+        <div class="section-body">
+          <div class="toolbar">
+            <input class="sm" placeholder="发送者ID" value="${S.filters.sender}" id="grs">
+            <input class="sm" placeholder="接收者ID" value="${S.filters.receiver}" id="grr">
+            <input class="date" type="date" value="${S.filters.start}" id="grsd"> <span style="font-size:12px;color:var(--text-muted)">至</span>
+            <input class="date" type="date" value="${S.filters.end}" id="gred">
+            <button class="btn btn-primary btn-sm" onclick="S.filters.sender=document.getElementById('grs').value;S.filters.receiver=document.getElementById('grr').value;S.filters.start=document.getElementById('grsd').value;S.filters.end=document.getElementById('gred').value;S.filters.offset=0;loadGiftRecords()">🔍 筛选</button>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>ID</th><th>发送者</th><th>接收者</th><th>礼物</th><th>数量</th><th>总价</th><th>留言</th><th>时间</th></tr></thead>
+            <tbody>${records.length===0?'<tr class="empty-row"><td colspan="8">暂无记录</td></tr>':records.map(r=>`
+              <tr>
+                <td>${r.id}</td><td>${esc(r.sender_nickname||'用户'+r.sender_id)}</td><td>${esc(r.receiver_nickname||'用户'+r.receiver_id)}</td>
+                <td>${esc(r.gift_name||'礼物#'+r.gift_id)}</td><td>${r.quantity||1}</td>
+                <td>${r.total_price||0} 💰</td><td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(trunc(r.message,12))}</td>
+                <td>${fmtTime(r.created_at)}</td>
+              </tr>`).join('')}</tbody>
+          </table></div>
+          ${buildPagination(S.filters.offset,total,S.pageSize,'grPage')}
+        </div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderGiftRecords()">重试</button></div>`; }
+}
+function grPage(o){ S.filters.offset=o; loadGiftRecords(); }
+
+// ============================================================ Transactions ============================================================
+function renderTransactions(){ S.filters={offset:0,user_id:'',type:'',start:'',end:''}; loadTransactions(); }
+async function loadTransactions(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({limit:S.pageSize,offset:S.filters.offset});
+    if(S.filters.user_id)p.set('user_id',S.filters.user_id);
+    if(S.filters.type)p.set('type',S.filters.type);
+    if(S.filters.start)p.set('start_date',S.filters.start);
+    if(S.filters.end)p.set('end_date',S.filters.end);
+    const r = await api('GET','/api/admin/transactions?'+p);
+    const {transactions,total}=r.data;
+    const typeLabels = {recharge:'充值',gift_send:'赠送礼物',gift_receive:'收到礼物',checkin:'签到奖励',order:'支付'};
+    let h = `
+      <div class="section-card">
+        <div class="section-header"><h3>⏱️ 交易流水</h3></div>
+        <div class="section-body">
+          <div class="toolbar">
+            <input class="sm" placeholder="用户ID" value="${S.filters.user_id}" id="txu">
+            <select id="txt" onchange="S.filters.type=this.value;S.filters.offset=0;loadTransactions()">
+              <option value="">全部类型</option><option value="recharge" ${S.filters.type==='recharge'?'selected':''}>充值</option><option value="gift_send" ${S.filters.type==='gift_send'?'selected':''}>赠送礼物</option><option value="gift_receive" ${S.filters.type==='gift_receive'?'selected':''}>收到礼物</option><option value="checkin" ${S.filters.type==='checkin'?'selected':''}>签到</option>
+            </select>
+            <input class="date" type="date" value="${S.filters.start}" id="txs"> <span style="font-size:12px;color:var(--text-muted)">至</span>
+            <input class="date" type="date" value="${S.filters.end}" id="txe">
+            <button class="btn btn-primary btn-sm" onclick="S.filters.user_id=document.getElementById('txu').value;S.filters.start=document.getElementById('txs').value;S.filters.end=document.getElementById('txe').value;S.filters.offset=0;loadTransactions()">🔍 筛选</button>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>ID</th><th>用户</th><th>类型</th><th>金额</th><th>余额</th><th>描述</th><th>时间</th></tr></thead>
+            <tbody>${transactions.length===0?'<tr class="empty-row"><td colspan="7">暂无数据</td></tr>':transactions.map(t=>`
+              <tr>
+                <td>${t.id}</td><td>${esc(t.nickname||'用户'+t.user_id)}</td>
+                <td><span class="tag ${t.amount>=0?'tag-success':'tag-danger'}">${typeLabels[t.type]||t.type}</span></td>
+                <td style="color:${t.amount>=0?'var(--success)':'var(--danger)'};font-weight:600">${t.amount>=0?'+':''}${t.amount}</td>
+                <td>${t.balance_after||'-'}</td><td>${esc(t.description||'')}</td>
+                <td>${fmtTime(t.created_at)}</td>
+              </tr>`).join('')}</tbody>
+          </table></div>
+          ${buildPagination(S.filters.offset,total,S.pageSize,'txPage')}
+        </div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderTransactions()">重试</button></div>`; }
+}
+function txPage(o){ S.filters.offset=o; loadTransactions(); }
+
+// ============================================================ Revenue ============================================================
+function renderRevenue(){ S.filters={period:'day',start:'',end:''}; loadRevenue(); }
+async function loadRevenue(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({period:S.filters.period});
+    if(S.filters.start)p.set('start_date',S.filters.start);
+    if(S.filters.end)p.set('end_date',S.filters.end);
+    const r = await api('GET','/api/admin/revenue/trends?'+p);
+    const {trends,total_revenue,total_orders}=r.data;
+    const maxV = Math.max(...trends.map(t=>Number(t.revenue||0)),1);
+    let h = `
+      <div class="summary-row">
+        <div class="summary-item">📊 期间总营收: <strong>${fmtMoney(total_revenue)}</strong></div>
+        <div class="summary-item">📦 总订单: <strong>${total_orders}</strong> 笔</div>
+      </div>
+      <div class="toolbar" style="margin-top:14px">
+        <select id="rvp" onchange="S.filters.period=this.value;loadRevenue()">
+          <option value="day" ${S.filters.period==='day'?'selected':''}>按日</option>
+          <option value="week" ${S.filters.period==='week'?'selected':''}>按周</option>
+          <option value="month" ${S.filters.period==='month'?'selected':''}>按月</option>
+        </select>
+        <input class="date" type="date" value="${S.filters.start}" id="rvs"> <span style="font-size:12px;color:var(--text-muted)">至</span>
+        <input class="date" type="date" value="${S.filters.end}" id="rve">
+        <button class="btn btn-primary btn-sm" onclick="S.filters.start=document.getElementById('rvs').value;S.filters.end=document.getElementById('rve').value;loadRevenue()">🔍 查询</button>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-header"><h4>📈 营收趋势</h4><span style="font-size:12px;color:var(--text-muted)">单位: 元</span></div>
+        <div class="bar-chart">
+          ${trends.length===0?'<div style="width:100%;text-align:center;color:var(--text-muted);padding:40px">暂无营收数据</div>':trends.map(t=>{
+            const hPx = Math.max((Number(t.revenue||0)/maxV)*160,2);
+            return `<div class="bar-item" title="${t.date}: ${fmtMoney(t.revenue)} (${t.order_count}单)">
+              <div class="bar-value">${fmtMoney(t.revenue)}</div>
+              <div class="bar-fill" style="height:${hPx}px;background:${Number(t.revenue||0)===0?'var(--text-placeholder)':'var(--primary)'}"></div>
+              <div class="bar-label">${String(t.date||'').slice(5)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-header"><h4>📋 明细数据</h4></div>
+        <div class="section-body">
+          <div class="table-wrap"><table>
+            <thead><tr><th>日期</th><th>营收</th><th>订单数</th></tr></thead>
+            <tbody>${trends.length===0?'<tr class="empty-row"><td colspan="3">暂无数据</td></tr>':trends.map(t=>`
+              <tr><td>${t.date||'-'}</td><td><strong>${fmtMoney(t.revenue)}</strong></td><td>${t.order_count||0}</td></tr>
+            `).join('')}</tbody>
+          </table></div>
+        </div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderRevenue()">重试</button></div>`; }
+}
+
+// ============================================================ Keyboard ============================================================
+document.getElementById('login-code').addEventListener('keydown',function(e){if(e.key==='Enter')adminLogin();});
+document.getElementById('login-phone').addEventListener('keydown',function(e){if(e.key==='Enter')adminLogin();});
+
+// 初始化完成日志
+console.log('✅ 遇见管理后台 v2 已就绪 — Vue Vben 风格');
+</script>
+</body>
+</html>

@@ -61,27 +61,35 @@ class Wallet {
   static async recharge(userId, amount, referenceType = 'order', referenceId = null) {
     if (amount <= 0) throw new Error('充值金额必须大于0');
 
-    const wallet = await this.getOrCreate(userId);
-    const balanceAfter = wallet.balance + amount;
-
     try {
       if (isDbAvailable()) {
+        // 原子操作：balance = balance + amount，消除读-改-写竞态
+        // 若用户钱包行不存在，先通过 getOrCreate 确保行存在
+        await this.getOrCreate(userId);
         await executeQuery(
-          'UPDATE wallets SET balance = ?, total_recharge = total_recharge + ?, updated_at = NOW() WHERE user_id = ?',
-          [balanceAfter, amount, userId]
+          'UPDATE wallets SET balance = balance + ?, total_recharge = total_recharge + ?, updated_at = NOW() WHERE user_id = ?',
+          [amount, amount, userId]
         );
-        // 记录交易流水
-        await this.addTransaction(userId, 'recharge', amount, balanceAfter, referenceType, referenceId, '金币充值');
-        return this.getOrCreate(userId);
+        const wallet = await this.getOrCreate(userId);
+        await this.addTransaction(userId, 'recharge', amount, wallet.balance, referenceType, referenceId, '金币充值');
+        return wallet;
       }
     } catch (err) {
       console.error('数据库操作失败:', err.message);
     }
 
-    wallet.balance = balanceAfter;
+    // 内存降级（JS单线程天然原子）
+    const wallet = await this.getOrCreate(userId);
+    wallet.balance += amount;
     wallet.total_recharge += amount;
     wallet.updated_at = new Date();
     walletMemory.set(userId, wallet);
+    // 记录交易流水
+    transactionMemory.push({
+      id: txAutoId++, user_id: userId, type: 'recharge', amount, balance_after: wallet.balance,
+      reference_type: referenceType, reference_id: referenceId,
+      description: '金币充值', created_at: new Date()
+    });
     return wallet;
   }
 
@@ -95,31 +103,43 @@ class Wallet {
    * @returns {Promise<Object>} - { success, balance, message }
    */
   static async spend(userId, amount, type = 'gift_send', referenceType = null, referenceId = null) {
-    const wallet = await this.getOrCreate(userId);
-    if (wallet.balance < amount) {
-      return { success: false, balance: wallet.balance, message: '金币不足，请充值' };
-    }
-
-    const balanceAfter = wallet.balance - amount;
-
     try {
       if (isDbAvailable()) {
-        await executeQuery(
-          'UPDATE wallets SET balance = ?, total_spent = total_spent + ?, updated_at = NOW() WHERE user_id = ?',
-          [balanceAfter, amount, userId]
+        // 原子操作：balance = balance - amount，WHERE balance >= amount 保证不会超扣
+        const [result] = await executeQuery(
+          'UPDATE wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = NOW() WHERE user_id = ? AND balance >= ?',
+          [amount, amount, userId, amount]
         );
-        await this.addTransaction(userId, type, -amount, balanceAfter, referenceType, referenceId, '赠送礼物');
-        return { success: true, balance: balanceAfter, message: '消费成功' };
+        if (result.affectedRows === 0) {
+          // 可能是余额不足或钱包行不存在，获取钱包确认原因
+          const wallet = await this.getOrCreate(userId);
+          if (wallet.balance < amount) {
+            return { success: false, balance: wallet.balance, message: '金币不足，请充值' };
+          }
+        }
+        const wallet = await this.getOrCreate(userId);
+        await this.addTransaction(userId, type, -amount, wallet.balance, referenceType, referenceId, '赠送礼物');
+        return { success: true, balance: wallet.balance, message: '消费成功' };
       }
     } catch (err) {
       console.error('数据库操作失败:', err.message);
     }
 
-    wallet.balance = balanceAfter;
+    // 内存降级（JS单线程天然原子）
+    const wallet = await this.getOrCreate(userId);
+    if (wallet.balance < amount) {
+      return { success: false, balance: wallet.balance, message: '金币不足，请充值' };
+    }
+    wallet.balance -= amount;
     wallet.total_spent += amount;
     wallet.updated_at = new Date();
     walletMemory.set(userId, wallet);
-    return { success: true, balance: balanceAfter, message: '消费成功' };
+    transactionMemory.push({
+      id: txAutoId++, user_id: userId, type, amount: -amount, balance_after: wallet.balance,
+      reference_type: referenceType, reference_id: referenceId,
+      description: '赠送礼物', created_at: new Date()
+    });
+    return { success: true, balance: wallet.balance, message: '消费成功' };
   }
 
   /**
@@ -130,26 +150,33 @@ class Wallet {
    * @returns {Promise<Object>}
    */
   static async earn(userId, amount, referenceId = null) {
-    const wallet = await this.getOrCreate(userId);
-    const balanceAfter = wallet.balance + amount;
-
     try {
       if (isDbAvailable()) {
+        // 原子操作：balance = balance + amount，消除读-改-写竞态
+        await this.getOrCreate(userId);
         await executeQuery(
-          'UPDATE wallets SET balance = ?, total_earned = total_earned + ?, updated_at = NOW() WHERE user_id = ?',
-          [balanceAfter, amount, userId]
+          'UPDATE wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = NOW() WHERE user_id = ?',
+          [amount, amount, userId]
         );
-        await this.addTransaction(userId, 'gift_receive', amount, balanceAfter, 'gift_record', referenceId, '收到礼物');
-        return this.getOrCreate(userId);
+        const wallet = await this.getOrCreate(userId);
+        await this.addTransaction(userId, 'gift_receive', amount, wallet.balance, 'gift_record', referenceId, '收到礼物');
+        return wallet;
       }
     } catch (err) {
       console.error('数据库操作失败:', err.message);
     }
 
-    wallet.balance = balanceAfter;
+    // 内存降级（JS单线程天然原子）
+    const wallet = await this.getOrCreate(userId);
+    wallet.balance += amount;
     wallet.total_earned += amount;
     wallet.updated_at = new Date();
     walletMemory.set(userId, wallet);
+    transactionMemory.push({
+      id: txAutoId++, user_id: userId, type: 'gift_receive', amount, balance_after: wallet.balance,
+      reference_type: 'gift_record', reference_id: referenceId,
+      description: '收到礼物', created_at: new Date()
+    });
     return wallet;
   }
 

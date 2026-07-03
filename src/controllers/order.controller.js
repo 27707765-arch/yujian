@@ -47,6 +47,9 @@ async function createVipOrder(req, res) {
     if (packages.length === 0) return error(res, 404, '套餐不存在');
 
     const pkg = packages[0];
+    if (!pkg || !pkg.price || !pkg.duration) {
+      return error(res, 400, '套餐数据异常，请重新选择');
+    }
 
     // 金币充值套餐不能通过VIP接口购买
     if (package_id === COIN_PACKAGE_ID) {
@@ -94,7 +97,11 @@ async function createRechargeOrder(req, res) {
     const { id } = req.user;
     const { amount } = req.body;
 
-    if (!amount || amount <= 0) return error(res, 400, '请选择充值金额');
+    // 严格校验：金额必须为有效正数，防止 NaN/字符串/负数/零通过
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0 || !isFinite(numAmount)) {
+      return error(res, 400, '请选择有效的充值金额');
+    }
 
     const orderNo = generateOrderNo();
 
@@ -106,7 +113,7 @@ async function createRechargeOrder(req, res) {
       try {
         await pool.execute(
           'INSERT INTO orders (user_id, package_id, order_no, amount, status) VALUES (?, ?, ?, ?, 1)',
-          [id, COIN_PACKAGE_ID, orderNo, amount]
+          [id, COIN_PACKAGE_ID, orderNo, numAmount]
         );
       } catch (dbErr) {
         console.error('订单持久化失败:', dbErr.message);
@@ -114,21 +121,21 @@ async function createRechargeOrder(req, res) {
       }
 
       // 实际充值到钱包（1元 = 100金币）
-      const coins = amount * 100;
+      const coins = numAmount * 100;
       await Wallet.recharge(id, coins, 'order', null);
 
       const wallet = await Wallet.getOrCreate(id);
-      success(res, { order_no: orderNo, amount, coins, balance: wallet.balance }, '充值成功（模拟支付）');
+      success(res, { order_no: orderNo, amount: numAmount, coins, balance: wallet.balance }, '充值成功（模拟支付）');
     } else {
       // 真实支付模式：返回订单信息，需完成支付后才能到账
       await pool.execute(
         'INSERT INTO orders (user_id, package_id, order_no, amount, status) VALUES (?, ?, ?, ?, 0)',
-        [id, COIN_PACKAGE_ID, orderNo, amount]
+        [id, COIN_PACKAGE_ID, orderNo, numAmount]
       );
       success(res, {
         order_no: orderNo,
-        amount,
-        coins: amount * 100,
+        amount: numAmount,
+        coins: numAmount * 100,
         payment_required: true,
         message: '订单已创建，请完成支付'
       }, '订单已创建');

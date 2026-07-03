@@ -22,6 +22,51 @@ const DEFAULT_SETTINGS = {
 
 class UserSettings {
   /**
+   * 批量获取多个用户的隐私设置
+   * 用于推荐接口优化：一次查询替代 N 次 get() 调用
+   * @param {number[]} userIds - 用户ID数组
+   * @returns {Promise<Map<number, Object>>} - Map<userId, settings>
+   *   settings 仅包含推荐所需的两个字段: hide_distance, hide_online_status
+   */
+  static async batchGet(userIds) {
+    const result = new Map();
+    if (!userIds || userIds.length === 0) {
+      return result;
+    }
+
+    try {
+      if (isDbAvailable()) {
+        const placeholders = userIds.map(() => '?').join(', ');
+        const sql = `SELECT user_id, hide_distance, hide_online_status FROM user_settings WHERE user_id IN (${placeholders})`;
+        const [rows] = await executeQuery(sql, userIds);
+        for (const row of rows) {
+          result.set(row.user_id, row);
+        }
+        // 为没有设置记录的用户填充默认值
+        for (const uid of userIds) {
+          if (!result.has(uid)) {
+            result.set(uid, { user_id: uid, hide_distance: 0, hide_online_status: 0 });
+          }
+        }
+        return result;
+      }
+    } catch (err) {
+      console.error('批量查询用户设置失败，使用内存存储:', err.message);
+    }
+
+    // 数据库不可用时使用内存存储降级
+    for (const uid of userIds) {
+      const entry = memoryStore.get(uid);
+      if (entry) {
+        result.set(uid, entry);
+      } else {
+        result.set(uid, { user_id: uid, ...DEFAULT_SETTINGS });
+      }
+    }
+    return result;
+  }
+
+  /**
    * 获取用户设置（不存在则创建默认设置）
    * @param {number} userId - 用户ID
    * @returns {Promise<Object>}

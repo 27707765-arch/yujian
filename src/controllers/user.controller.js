@@ -9,10 +9,48 @@ const UserSettings = require('../models/UserSettings');
 const Like = require('../models/Like');
 const View = require('../models/View');
 const Checkin = require('../models/Checkin');
+const Wallet = require('../models/Wallet');
 const { success, error, serverError } = require('../utils/response');
 const { validateMagicBytes } = require('../services/upload.service');
 const { executeQuery, isDbAvailable } = require('../utils/database');
 const path = require('path');
+
+/**
+ * 逆地理编码：调用高德地图 Web API 根据经纬度查行政区划
+ * @param {number} lat - 纬度
+ * @param {number} lng - 经度
+ * @returns {Promise<Object|null>} - { province, city, district, location }，无 Key 时降级返回 null
+ */
+async function reverseGeocode(lat, lng) {
+  const key = process.env.GAODE_MAP_KEY;
+  // 没配 Key 时降级返回 null，location 由调用方拼坐标字符串
+  if (!key) {
+    return null;
+  }
+  try {
+    const url = `https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${key}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.status === '1' && data.regeocode) {
+      const addrComp = data.regeocode.addressComponent || {};
+      let province = addrComp.province || '';
+      // 直辖市高德返回 city 为空数组，用 province 顶替
+      let city = addrComp.city;
+      if (Array.isArray(city) && city.length === 0) {
+        city = province;
+      } else if (!city) {
+        city = province;
+      }
+      const district = addrComp.district || '';
+      const location = data.regeocode.formatted_address || '';
+      return { province, city, district, location };
+    }
+    return null;
+  } catch (err) {
+    console.error('逆地理编码失败:', err.message);
+    return null;
+  }
+}
 
 /**
  * 获取用户信息
@@ -40,6 +78,9 @@ async function getUserInfo(req, res) {
       height: user.height,
       occupation: user.occupation,
       location: user.location,
+      province: user.province || null,
+      city: user.city || null,
+      district: user.district || null,
       tags: user.tags ? (typeof user.tags === 'string' ? JSON.parse(user.tags) : user.tags) : [],
       bio: user.bio,
       is_vip: user.is_vip,
@@ -88,6 +129,21 @@ async function updateUserInfo(req, res) {
       updateData.tags = JSON.stringify(tags);
     }
 
+    // 当同时传了 lat 和 lng（都不是 null）时，自动逆地理编码填充行政区划
+    if (lat != null && lng != null) {
+      const geo = await reverseGeocode(lat, lng);
+      if (geo) {
+        updateData.province = geo.province;
+        updateData.city = geo.city;
+        updateData.district = geo.district;
+        // 高德返回的格式化地址更准确，覆盖 location 文本
+        if (geo.location) {
+          updateData.location = geo.location;
+        }
+      }
+    }
+    // 如果只传了 location 文本不传坐标，上面已只更新文本
+
     const updatedUser = await User.update(id, updateData);
 
     // 触发每日任务：完善个人资料
@@ -103,6 +159,9 @@ async function updateUserInfo(req, res) {
       height: updatedUser.height,
       occupation: updatedUser.occupation,
       location: updatedUser.location,
+      province: updatedUser.province || null,
+      city: updatedUser.city || null,
+      district: updatedUser.district || null,
       tags: updatedUser.tags ? (typeof updatedUser.tags === 'string' ? JSON.parse(updatedUser.tags) : updatedUser.tags) : [],
       bio: updatedUser.bio,
       is_vip: updatedUser.is_vip,
@@ -111,6 +170,52 @@ async function updateUserInfo(req, res) {
     }, '更新成功');
   } catch (err) {
     serverError(res, err, '更新用户信息失败');
+  }
+}
+
+/**
+ * 上报/更新当前位置
+ * POST /api/user/location
+ * 接收 lat、lng，校验后逆地理编码填充城市信息并更新用户记录
+ */
+async function updateLocation(req, res) {
+  try {
+    const { id } = req.user;
+    const { lat, lng } = req.body;
+
+    // 校验坐标格式
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+    if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+      return error(res, 400, '纬度格式不正确');
+    }
+    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+      return error(res, 400, '经度格式不正确');
+    }
+
+    const updateData = { lat: latNum, lng: lngNum };
+
+    // 逆地理编码填充行政区划
+    const geo = await reverseGeocode(latNum, lngNum);
+    if (geo) {
+      updateData.province = geo.province;
+      updateData.city = geo.city;
+      updateData.district = geo.district;
+      if (geo.location) {
+        updateData.location = geo.location;
+      }
+    }
+
+    await User.update(id, updateData);
+
+    success(res, {
+      location: updateData.location || `${latNum},${lngNum}`,
+      province: updateData.province || null,
+      city: updateData.city || null,
+      district: updateData.district || null
+    }, '位置更新成功');
+  } catch (err) {
+    serverError(res, err, '更新位置失败');
   }
 }
 
@@ -330,6 +435,18 @@ async function getUserProfile(req, res) {
     // 获取用户相册
     const photos = await UserPhoto.getByUserId(userId);
 
+    // 获取动态数和粉丝数
+    let postsCount = 0;
+    let fansCount = 0;
+    try {
+      if (isDbAvailable()) {
+        const [[pc]] = await executeQuery('SELECT COUNT(*) as cnt FROM posts WHERE user_id = ? AND status = 1', [userId]);
+        postsCount = pc?.cnt || 0;
+        const [[fc]] = await executeQuery('SELECT COUNT(*) as cnt FROM likes WHERE liked_user_id = ?', [userId]);
+        fansCount = fc?.cnt || 0;
+      }
+    } catch (e) { /* 静默 */ }
+
     success(res, {
       id: user.id,
       nickname: user.nickname,
@@ -342,6 +459,9 @@ async function getUserProfile(req, res) {
       tags: user.tags ? (typeof user.tags === 'string' ? JSON.parse(user.tags) : user.tags) : [],
       bio: user.bio,
       is_vip: user.is_vip,
+      posts_count: postsCount,
+      fans_count: fansCount,
+      gifts_received_count: user.gifts_received_count || 0,
       photos: photos
     });
   } catch (err) {
@@ -434,9 +554,91 @@ async function searchUsers(req, res) {
   }
 }
 
+// ==================== 新手引导 ====================
+
+/**
+ * 获取新手引导完成状态
+ * GET /api/user/onboarding-status
+ * 返回三步完成状态：头像、标签(>=3)、个性签名(>=2字)
+ */
+async function getOnboardingStatus(req, res) {
+  try {
+    const { id } = req.user;
+    const status = await User.getOnboardingStatus(id);
+
+    if (!status) {
+      return error(res, 404, '用户不存在');
+    }
+
+    success(res, status);
+  } catch (err) {
+    serverError(res, err, '获取引导状态失败');
+  }
+}
+
+/**
+ * 完成新手引导
+ * POST /api/user/onboarding/complete
+ * 标记引导完成，奖励 15 金币（仅首次）
+ */
+async function completeOnboarding(req, res) {
+  try {
+    const { id } = req.user;
+
+    // 先检查当前状态，防止重复领取
+    const status = await User.getOnboardingStatus(id);
+    if (!status) {
+      return error(res, 404, '用户不存在');
+    }
+
+    // 校验三步是否都已填写完整
+    if (!status.avatar) {
+      return error(res, 400, '请先设置头像');
+    }
+    if (!status.tags) {
+      return error(res, 400, '请至少选择3个兴趣标签');
+    }
+    if (!status.bio) {
+      return error(res, 400, '请填写个性签名（至少2个字）');
+    }
+
+    // 防止重复领取
+    if (status.completed) {
+      return error(res, 400, '新手引导已完成，不可重复领取奖励');
+    }
+
+    // 更新引导状态
+    const updated = await User.completeOnboarding(id);
+    if (!updated) {
+      return error(res, 500, '更新引导状态失败');
+    }
+
+    // 发放首次完成引导奖励：15 金币
+    try {
+      await Wallet.recharge(id, 15, 'onboarding_reward', null);
+    } catch (rewardErr) {
+      console.error('引导奖励发放失败:', rewardErr.message);
+      // 奖励发放失败不影响引导完成状态，但告知用户
+      return success(res, { coins_rewarded: 0 }, '引导已完成（奖励发放异常，请联系客服）');
+    }
+
+    // 获取最新余额返回
+    const balance = await Wallet.getBalance(id);
+
+    success(res, {
+      onboarding_completed: true,
+      coins_rewarded: 15,
+      balance
+    }, '恭喜完成新手引导！获得 15 金币奖励 🎉');
+  } catch (err) {
+    serverError(res, err, '完成引导失败');
+  }
+}
+
 module.exports = {
   getUserInfo,
   updateUserInfo,
+  updateLocation,
   uploadAvatar,
   uploadPhoto,
   deletePhoto,
@@ -449,5 +651,7 @@ module.exports = {
   getFans,
   getFollowing,
   getViewers,
-  searchUsers
+  searchUsers,
+  getOnboardingStatus,
+  completeOnboarding
 };

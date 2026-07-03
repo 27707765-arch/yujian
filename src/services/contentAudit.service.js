@@ -36,12 +36,19 @@ const sensitiveWords = [
  * @returns {string} [return.sensitiveWord] - 检测到的敏感词（仅当未通过审核时）
  */
 function checkSensitiveContent(content) {
-  // 检查内容是否为空或格式不正确
-  if (!content || typeof content !== 'string') {
-    return {
-      pass: true,
-      message: '内容为空或格式不正确'
-    };
+  // 空内容：未提供字段时不审核（由控制器层校验必填），但格式错误应拦截
+  if (content === undefined || content === null) {
+    return { pass: true, message: '无需审核' };
+  }
+
+  // 非字符串类型（对象、数组等）拒绝通过
+  if (typeof content !== 'string') {
+    return { pass: false, message: '内容格式不合法' };
+  }
+
+  // 空字符串（已trim）放行（由控制器校验最小长度）
+  if (content.trim().length === 0) {
+    return { pass: true, message: '内容为空' };
   }
 
   // 检查敏感词

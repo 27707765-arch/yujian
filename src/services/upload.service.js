@@ -84,6 +84,36 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
+// 视频文件大小限制（50MB）
+const VIDEO_MAX_SIZE = parseInt(process.env.VIDEO_MAX_SIZE || '52428800');
+// 视频允许的 MIME 类型
+const VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/webm'];
+// 图片允许的 MIME 类型（用于封面）
+const COVER_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+// 视频上传过滤器
+const videoFileFilter = (req, file, cb) => {
+  if (VIDEO_MIMES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('只允许上传视频文件（MP4/MOV/WEBM）'), false);
+  }
+};
+
+// 封面上传过滤器
+const coverFileFilter = (req, file, cb) => {
+  if (COVER_MIMES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('只允许上传图片文件作为封面'), false);
+  }
+};
+
+// 视频上传 multer 实例（限制 50MB）
+const videoUpload = multer({ storage, limits: { fileSize: VIDEO_MAX_SIZE }, fileFilter: videoFileFilter });
+// 封面上传 multer 实例（限制 10MB，复用图片限制）
+const coverUpload = multer({ storage, limits: { fileSize: parseInt(process.env.MAX_UPLOAD_SIZE || '10485760') }, fileFilter: coverFileFilter });
+
 /**
  * 单个文件上传中间件
  * @param {string} fieldName - 字段名
@@ -93,6 +123,38 @@ function singleUpload(fieldName) {
   return (req, res, next) => {
     upload.single(fieldName)(req, res, (err) => {
       if (err) return handleMulterError(err, res);
+      next();
+    });
+  };
+}
+
+/**
+ * 视频文件上传中间件（单独）
+ * @param {string} fieldName - 默认 'video'
+ */
+function videoUploadMiddleware(fieldName) {
+  return (req, res, next) => {
+    videoUpload.single(fieldName || 'video')(req, res, (err) => {
+      if (err) return handleMulterError(err, res);
+      next();
+    });
+  };
+}
+
+/**
+ * 混合上传中间件：支持图片 + 视频 + 封面
+ * @param {Array} fields - 字段配置，如 [{name:'images',maxCount:9},{name:'video',maxCount:1},{name:'video_cover',maxCount:1}]
+ */
+function mediaUpload(fields) {
+  return (req, res, next) => {
+    upload.fields(fields)(req, res, (err) => {
+      if (err) {
+        // 如果是 multer 标准错误（文件过大等），返回友好信息
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ code: 400, message: '文件大小超出限制（图片最大10MB，视频最大50MB）', data: null });
+        }
+        return handleMulterError(err, res);
+      }
       next();
     });
   };
@@ -147,5 +209,10 @@ function handleMulterError(err, res) {
 module.exports = {
   singleUpload,
   multipleUpload,
-  validateMagicBytes
+  mediaUpload,
+  videoUploadMiddleware,
+  validateMagicBytes,
+  // 常量
+  VIDEO_MAX_SIZE,
+  VIDEO_MIMES,
 };

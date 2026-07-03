@@ -12,9 +12,12 @@ const websocketService = require('./src/services/websocket.service');
 const contentAuditService = require('./src/services/contentAudit.service');
 const antifraudService = require('./src/services/antifraud.service');
 
-// 心跳配置
+// 心跳配置（针对移动网络优化）
+// 移动网络特点：4G/5G切换、信号波动可导致5-15秒无响应
+// 参考：微信心跳30s，钉钉心跳25s，WhatsApp心跳30s
 const HEARTBEAT_INTERVAL = 30000; // 服务端每30秒发送一次 ping
-const CONNECTION_TIMEOUT = 10000;  // 客户端10秒内未回复 pong 则断开
+const CONNECTION_TIMEOUT = 45000;  // 客户端45秒内（1.5个心跳周期）未回复 pong 则断开
+// 为什么45秒而不是更短：移动网络下TCP连接可能短暂阻塞10-20秒
 
 /**
  * 启动WebSocket服务器
@@ -23,24 +26,33 @@ const CONNECTION_TIMEOUT = 10000;  // 客户端10秒内未回复 pong 则断开
 function startWebSocketServer(server) {
   const wss = new WebSocket.Server({ server });
 
+  let onlineCount = 0;
+
   // 定时心跳检测：清理僵死连接
   const heartbeatTimer = setInterval(() => {
+    let deadCount = 0;
     wss.clients.forEach((ws) => {
       // 如果客户端超过超时时间未响应 pong，终止连接
       if (ws.isAlive === false) {
-        console.log('WebSocket 心跳超时，终止连接');
-        return ws.terminate();
+        deadCount++;
+        ws.terminate();
+        return;
       }
 
       // 标记为未响应，发送 ping
       ws.isAlive = false;
       ws.ping();
     });
+
+    if (deadCount > 0) {
+      console.log(`[WS] 心跳检测：清理 ${deadCount} 个僵死连接，当前在线: ${onlineCount - deadCount}`);
+    }
   }, HEARTBEAT_INTERVAL);
 
   // 服务器关闭时清理定时器
   wss.on('close', () => {
     clearInterval(heartbeatTimer);
+    console.log('[WS] WebSocket服务器已关闭');
   });
 
   // 处理连接
@@ -49,6 +61,9 @@ function startWebSocketServer(server) {
 
     // 初始化心跳状态
     ws.isAlive = true;
+    onlineCount++;
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    console.log(`[WS] 新连接 (IP: ${clientIp}, 当前在线: ${onlineCount})`);
 
     // 接收 pong 响应，标记连接为活跃
     ws.on('pong', () => {
@@ -60,6 +75,7 @@ function startWebSocketServer(server) {
     const token = url.searchParams.get('token');
 
     if (!token) {
+      console.log('[WS] 未提供认证令牌，关闭连接');
       ws.close(4001, '未提供认证令牌');
       return;
     }
@@ -68,15 +84,24 @@ function startWebSocketServer(server) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key');
       userId = decoded.id;
 
-      // 注册客户端
+      // 注册客户端 + 广播在线状态
       websocketService.registerClient(userId, ws);
+      ws._userId = userId;
 
-      // 发送连接成功消息
+      // 广播在线状态给所有会话对方
+      setTimeout(() => broadcastOnlineStatus(userId, true), 500);
+
+      // 发送连接成功消息（含心跳参数让客户端适配）
       ws.send(JSON.stringify({
         type: 'connected',
-        message: '连接成功'
+        message: '连接成功',
+        data: {
+          heartbeatInterval: HEARTBEAT_INTERVAL,  // 告知客户端心跳间隔
+          serverTime: new Date().toISOString()
+        }
       }));
     } catch (err) {
+      console.log(`[WS] 无效令牌: ${err.message}`);
       ws.close(4002, '无效的认证令牌');
       return;
     }
@@ -118,6 +143,12 @@ function startWebSocketServer(server) {
           case 'call_ice_candidate':
             handleIceCandidate(userId, data);
             break;
+          case 'recall_message':
+            handleRecallMessage(userId, data);
+            break;
+          case 'read_receipt':
+            handleReadReceipt(userId, data);
+            break;
           default:
             console.log('未知消息类型:', data.type);
         }
@@ -131,9 +162,27 @@ function startWebSocketServer(server) {
     });
 
     // 处理断开连接
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
+      onlineCount = Math.max(0, onlineCount - 1);
       if (userId) {
         websocketService.unregisterClient(userId, ws);
+
+        // 延迟30秒广播离线（防短暂断线）
+        const uid = userId;
+        setTimeout(() => {
+          if (!websocketService.isUserOnline(uid)) {
+            broadcastOnlineStatus(uid, false);
+          }
+        }, 30000);
+
+        // 给用户的其他设备发送离线通知（可选）
+        const closeReason = code === 4001 ? '未认证'
+          : code === 4002 ? '令牌无效'
+          : code === 1006 ? '网络异常断开'
+          : reason?.toString() || `正常关闭(code:${code})`;
+        console.log(`[WS] 用户 ${userId} 断开 (${closeReason}, 在线: ${onlineCount})`);
+      } else {
+        console.log(`[WS] 未认证连接断开 (在线: ${onlineCount})`);
       }
     });
 
@@ -336,6 +385,79 @@ function handleIceCandidate(userId, data) {
   websocketService.sendToUser(peer_id, {
     type: 'ice_candidate', data: { user_id: userId, candidate }
   });
+}
+
+/**
+ * 处理消息撤回（通过 WebSocket 实时撤回）
+ * 客户端发送 { type: "recall_message", data: { message_id } }
+ * 服务端校验后推送撤回事件给双方
+ */
+async function handleRecallMessage(userId, data) {
+  const { message_id } = data;
+  if (!message_id) return;
+
+  const result = await Message.recall(message_id, userId);
+
+  if (!result.success) {
+    // 撤回失败，仅通知发起者
+    websocketService.sendToUser(userId, {
+      type: 'recall_failed',
+      data: { message_id, reason: result.message }
+    });
+    return;
+  }
+
+  // 通知接收者
+  websocketService.sendToUser(result.data.receiver_id, {
+    type: 'message_recalled',
+    data: {
+      message_id: result.data.id,
+      conversation_id: result.data.conversation_id,
+      sender_id: userId,
+      recalled_at: new Date().toISOString()
+    }
+  });
+
+  // 通知发送者（多设备同步）
+  websocketService.sendToUser(userId, {
+    type: 'message_recalled',
+    data: {
+      message_id: result.data.id,
+      conversation_id: result.data.conversation_id,
+      sender_id: userId,
+      recalled_at: new Date().toISOString()
+    }
+  });
+}
+
+function handleReadReceipt(userId, data) {
+  const { conversation_id, receiver_id } = data;
+  if (conversation_id) {
+    // 通知会话对方已读
+    const targetId = receiver_id || userId;
+    websocketService.sendToUser(targetId, {
+      type: 'read_receipt',
+      data: { conversation_id, reader_id: userId, timestamp: new Date().toISOString() }
+    });
+  }
+}
+
+/**
+ * 广播在线/离线状态给用户的所有会话对方
+ */
+async function broadcastOnlineStatus(userId, online) {
+  try {
+    const conversations = await Conversation.getUserConversations(userId);
+    for (const conv of conversations) {
+      const otherId = conv.user1_id === userId ? conv.user2_id : conv.user1_id;
+      websocketService.sendToUser(otherId, {
+        type: 'online_status',
+        data: { user_id: userId, online }
+      });
+    }
+  } catch (err) {
+    // 静默处理，不影响主流程
+  }
 }
 
 module.exports = {

@@ -37,7 +37,7 @@ async function blockUser(req, res) {
 
     success(res, null, '拉黑成功');
   } catch (err) {
-    if (err.message.includes('已经拉黑')) {
+    if (err && err.message && err.message.includes('已经拉黑')) {
       return error(res, 400, err.message);
     }
     serverError(res, err, '拉黑失败');
@@ -95,10 +95,10 @@ async function getBlockList(req, res) {
 async function checkBlocked(req, res) {
   try {
     const { id } = req.user;
-    const targetUserId = parseInt(req.query.user_id);
+    const targetUserId = parseInt(req.query.user_id, 10);
 
-    if (!targetUserId) {
-      return error(res, 400, '目标用户ID不能为空');
+    if (isNaN(targetUserId) || targetUserId <= 0) {
+      return error(res, 400, '目标用户ID无效');
     }
 
     const isBlocked = await Block.isBlocked(id, targetUserId);

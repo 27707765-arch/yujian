@@ -150,6 +150,40 @@ class Like {
   }
 
   /**
+   * 批量检查用户是否已喜欢多个目标用户
+   * 用于推荐接口优化：一次查询替代 N 次 exists() 调用
+   * @param {number} userId - 用户ID
+   * @param {number[]} targetIds - 目标用户ID数组
+   * @returns {Promise<Set<number>>} - 已喜欢的 target_user_id 集合
+   */
+  static async batchExists(userId, targetIds) {
+    if (!targetIds || targetIds.length === 0) {
+      return new Set();
+    }
+
+    try {
+      if (isDbAvailable()) {
+        // 动态生成占位符: (?, ?, ?, ...)
+        const placeholders = targetIds.map(() => '?').join(', ');
+        const sql = `SELECT target_user_id FROM likes WHERE user_id = ? AND target_user_id IN (${placeholders})`;
+        const [rows] = await executeQuery(sql, [userId, ...targetIds]);
+        return new Set(rows.map(r => r.target_user_id));
+      }
+    } catch (error) {
+      console.error('批量查询喜欢记录失败，使用内存存储:', error.message);
+    }
+
+    // 数据库不可用时使用内存存储降级
+    const result = new Set();
+    for (const like of memoryStore.values()) {
+      if (like.user_id === userId && targetIds.includes(like.target_user_id)) {
+        result.add(like.target_user_id);
+      }
+    }
+    return result;
+  }
+
+  /**
    * 删除喜欢记录
    * @param {number} user_id - 用户ID
    * @param {number} target_user_id - 目标用户ID

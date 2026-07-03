@@ -11,14 +11,14 @@ let autoIncrementId = 1;
 class Post {
   // ==================== 动态 ====================
 
-  static async create(user_id, { content, images, topics }) {
+  static async create(user_id, { content, images, topics, video_url, video_duration, video_cover }) {
     const imagesJson = images && images.length > 0 ? JSON.stringify(images) : null;
     const topicsJson = topics && topics.length > 0 ? JSON.stringify(topics) : null;
     try {
       if (isDbAvailable()) {
         const [result] = await executeQuery(
-          'INSERT INTO posts (user_id, content, images, topics) VALUES (?, ?, ?, ?)',
-          [user_id, content || '', imagesJson, topicsJson]
+          'INSERT INTO posts (user_id, content, images, topics, video_url, video_duration, video_cover) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [user_id, content || '', imagesJson, topicsJson, video_url || null, video_duration || null, video_cover || null]
         );
         return this.findById(result.insertId);
       }
@@ -30,6 +30,7 @@ class Post {
     const post = {
       id, user_id, content: content || '',
       images: images || [], topics: topics || [],
+      video_url: video_url || null, video_duration: video_duration || null, video_cover: video_cover || null,
       like_count: 0, comment_count: 0,
       status: 1, created_at: new Date(), updated_at: new Date()
     };
@@ -58,7 +59,7 @@ class Post {
     return post && post.status === 1 ? post : null;
   }
 
-  static async getList({ limit = 20, offset = 0, user_id, topic } = {}) {
+  static async getList({ limit = 20, offset = 0, user_id, topic, scope, currentUserId } = {}) {
     try {
       if (isDbAvailable()) {
         let query = `SELECT p.*, u.nickname, u.avatar
@@ -73,6 +74,12 @@ class Post {
           query += ' AND JSON_CONTAINS(p.topics, ?, "$")';
           params.push(JSON.stringify(topic));
         }
+        // scope=following: 当前用户关注的人发布的帖子
+        if (scope === 'following' && currentUserId) {
+          query += ` AND p.user_id IN (SELECT matched_user_id FROM user_matches WHERE user_id = ?)`;
+          params.push(currentUserId);
+        }
+        // scope=nearby: 就近排序（按帖子发布时间降序即可，距离排序由前端推荐接口处理）
         query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
         params.push(parseInt(limit), parseInt(offset));
         const [rows] = await executeQuery(query, params);
@@ -147,10 +154,69 @@ class Post {
     } catch (err) {
       console.error('查询点赞状态失败:', err.message);
     }
-    return false;
+    // 内存降级：检查 _likesMemory
+    if (!this._likesMemory) return false;
+    const likes = this._likesMemory.get(postId);
+    return likes ? likes.has(userId) : false;
   }
 
   // ==================== 评论（支持嵌套） ====================
+
+  /**
+   * 更新动态（仅限作者本人）
+   * @param {number} id - 动态ID
+   * @param {number} user_id - 作者ID（校验用）
+   * @param {Object} data - { content, images }
+   * @returns {Promise<Object|null>}
+   */
+  static async update(id, user_id, { content, images }) {
+    try {
+      if (isDbAvailable()) {
+        const imagesJson = images && images.length > 0 ? JSON.stringify(images) : null;
+        await executeQuery(
+          'UPDATE posts SET content = ?, images = ?, edited_at = NOW() WHERE id = ? AND user_id = ? AND status = 1',
+          [content || '', imagesJson, id, user_id]
+        );
+        return this.findById(id);
+      }
+    } catch (err) {
+      console.error('更新动态失败:', err.message);
+    }
+    // 内存降级
+    const post = memoryStore.get(id);
+    if (!post || post.user_id !== user_id || post.status !== 1) return null;
+    post.content = content || '';
+    post.images = images || [];
+    post.edited_at = new Date();
+    memoryStore.set(id, post);
+    return post;
+  }
+
+  /**
+   * 软删除动态
+   * @param {number} id - 动态ID
+   * @param {number} user_id - 作者ID
+   * @returns {Promise<boolean>}
+   */
+  static async softDelete(id, user_id) {
+    try {
+      if (isDbAvailable()) {
+        const [result] = await executeQuery(
+          'UPDATE posts SET status = 0, edited_at = NOW() WHERE id = ? AND user_id = ? AND status = 1',
+          [id, user_id]
+        );
+        return result.affectedRows > 0;
+      }
+    } catch (err) {
+      console.error('软删除动态失败:', err.message);
+    }
+    const post = memoryStore.get(id);
+    if (!post || post.user_id !== user_id || post.status !== 1) return false;
+    post.status = 0;
+    post.edited_at = new Date();
+    memoryStore.set(id, post);
+    return true;
+  }
 
   static async addComment(post_id, user_id, content, parent_id = null) {
     try {
@@ -160,10 +226,37 @@ class Post {
           [post_id, user_id, content, parent_id]
         );
         await executeQuery('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?', [post_id]);
+        return;
       }
     } catch (err) {
       console.error('添加评论失败:', err.message);
     }
+
+    // 内存降级：保存评论到内存
+    if (!this._commentsMemory) this._commentsMemory = new Map(); // postId -> [{id, user_id, content, ...}]
+    if (!this._commentsMemory.has(post_id)) this._commentsMemory.set(post_id, []);
+    const commentId = (this._commentAutoId = (this._commentAutoId || 0) + 1);
+    const comment = {
+      id: commentId, post_id, user_id, content, parent_id, parent_id,
+      status: 1, created_at: new Date(), updated_at: new Date(),
+      nickname: null, avatar: null, replies: []
+    };
+    if (parent_id) {
+      // 找到父评论添加回复
+      const comments = this._commentsMemory.get(post_id);
+      const parent = comments.find(c => c.id === parent_id);
+      if (parent) {
+        parent.replies = parent.replies || [];
+        parent.replies.push(comment);
+      } else {
+        comments.push(comment);
+      }
+    } else {
+      this._commentsMemory.get(post_id).push(comment);
+    }
+    // 更新动态评论数
+    const post = memoryStore.get(post_id);
+    if (post) post.comment_count = (post.comment_count || 0) + 1;
   }
 
   static async getComments(post_id, limit = 50, offset = 0) {
@@ -178,23 +271,62 @@ class Post {
           [post_id, parseInt(limit), parseInt(offset)]
         );
 
-        // 获取每个评论的回复
-        for (const comment of comments) {
-          const [replies] = await executeQuery(
+        // 批量获取所有回复（消除 N+1 查询）
+        if (comments.length > 0) {
+          const parentIds = comments.map(c => c.id);
+          const placeholders = parentIds.map(() => '?').join(',');
+          const [allReplies] = await executeQuery(
             `SELECT pc.*, u.nickname, u.avatar
              FROM post_comments pc LEFT JOIN users u ON pc.user_id = u.id
-             WHERE pc.parent_id = ? ORDER BY pc.created_at ASC LIMIT 10`,
-            [comment.id]
+             WHERE pc.parent_id IN (${placeholders}) ORDER BY pc.created_at ASC LIMIT 100`,
+            parentIds
           );
-          comment.replies = replies;
+          // 按 parent_id 分组组装到对应评论
+          const replyMap = {};
+          allReplies.forEach(r => {
+            if (!replyMap[r.parent_id]) replyMap[r.parent_id] = [];
+            replyMap[r.parent_id].push(r);
+          });
+          comments.forEach(c => { c.replies = replyMap[c.id] || []; });
         }
         return comments;
       }
     } catch (err) {
       console.error('获取评论失败:', err.message);
     }
-    return [];
+
+    // 内存降级
+    const all = this._commentsMemory ? (this._commentsMemory.get(post_id) || []) : [];
+    const topLevel = all.filter(c => c.parent_id === null);
+    return topLevel.slice(offset, offset + limit);
   }
+
+  /**
+   * 评论点赞/取消
+   */
+  static async toggleCommentLike(commentId, userId) {
+    try {
+      if (isDbAvailable()) {
+        const [existing] = await executeQuery(
+          'SELECT id FROM comment_likes WHERE comment_id = ? AND user_id = ?', [commentId, userId]
+        );
+        if (existing.length > 0) {
+          await executeQuery('DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?', [commentId, userId]);
+          return { liked: false };
+        } else {
+          await executeQuery('INSERT INTO comment_likes (comment_id, user_id) VALUES (?, ?)', [commentId, userId]);
+          return { liked: true };
+        }
+      }
+    } catch (err) {
+      console.error('评论点赞失败:', err.message);
+    }
+    return { liked: false };
+  }
+
+  /**
+   * 获取评论列表
+   */
 }
 
 module.exports = Post;

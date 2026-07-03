@@ -1,0 +1,26 @@
+{
+  "name": "遇见 - 同城社交",
+  "short_name": "遇见",
+  "description": "遇见同城社交APP - 发现附近的有趣灵魂",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#FF6B6B",
+  "background_color": "#FFFFFF",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "lifestyle"],
+  "lang": "zh-CN"
+}

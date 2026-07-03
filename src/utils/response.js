@@ -1,12 +1,14 @@
 /**
  * 响应工具函数模块
  * 用于标准化API响应格式，提供统一的成功和错误响应处理
- * 
+ *
  * 包含三个核心函数：
  * - success: 处理成功响应
- * - error: 处理客户端错误响应
+ * - error: 处理客户端错误响应（支持业务错误码）
  * - serverError: 处理服务器内部错误响应
  */
+
+const { getDefaultMessage } = require('./errorCodes');
 
 /**
  * 成功响应
@@ -28,14 +30,16 @@ function success(res, data = null, message = 'success') {
  * @param {Object} res - Express响应对象
  * @param {number} statusCode - HTTP状态码，默认为400
  * @param {string} message - 错误消息，默认为'请求失败'
- * @param {number} code - 业务错误码，默认为400
+ * @param {number} code - 业务错误码（来自 ErrorCodes），默认跟随HTTP状态码
  * @returns {Object} - 格式化的错误响应
  */
-function error(res, statusCode = 400, message = '请求失败', code = 400) {
+function error(res, statusCode = 400, message = '请求失败', code) {
+  // 业务错误码默认跟随HTTP状态码（若未显式传入）
+  const businessCode = (code !== undefined) ? code : statusCode;
   return res.status(statusCode).json({
-    code,    // 业务错误码
-    message, // 错误消息
-    data: null // 错误响应无数据
+    code: businessCode,    // 业务错误码（默认跟随HTTP状态码）
+    message,               // 错误消息
+    data: null             // 错误响应无数据
   });
 }
 
@@ -49,9 +53,9 @@ function error(res, statusCode = 400, message = '请求失败', code = 400) {
 function serverError(res, err, message = '服务器内部错误') {
   // 记录错误信息到控制台
   console.error(message + ':', err);
-  
+
   return res.status(500).json({
-    code: 500, // 服务器错误状态码
+    code: 5501, // 使用 ErrorCodes.SERVER_ERROR 避免硬编码
     message,   // 错误消息
     data: null // 错误响应无数据
   });

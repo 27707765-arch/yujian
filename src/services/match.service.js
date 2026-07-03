@@ -12,11 +12,16 @@ const Skip = require('../models/Skip');
 const Block = require('../models/Block');
 const UserSettings = require('../models/UserSettings');
 const View = require('../models/View');
+const Conversation = require('../models/Conversation');
+const Message = require('../models/Message');
+const websocketService = require('./websocket.service');
+const pushService = require('./push.service');
 
 /**
  * 推荐用户
  * @param {number} user_id - 用户ID
  * @param {Object} filters - 筛选条件
+ * @param {string} filters.scope - 查询模式：city=同城，nearby=附近
  * @param {number} filters.ageMin - 最小年龄
  * @param {number} filters.ageMax - 最大年龄
  * @param {number} filters.distance - 距离(km)
@@ -30,11 +35,12 @@ async function recommendUsers(user_id, filters = {}) {
       throw new Error('用户不存在');
     }
 
-    const { ageMin = 18, ageMax = 35, distance = 10, limit = 10 } = filters;
+    const { scope = 'city', ageMin = 18, ageMax = 35, distance = 20, limit = 20 } = filters;
 
-    // 获取附近的用户
+    // 根据查询模式获取候选用户
     let users = [];
-    if (currentUser.lat && currentUser.lng) {
+    if (scope === 'nearby' && currentUser.lat && currentUser.lng) {
+      // 附近：按 20km 距离查（Bounding Box 预过滤）
       users = await User.getNearbyUsers(
         user_id,
         currentUser.lat,
@@ -42,7 +48,15 @@ async function recommendUsers(user_id, filters = {}) {
         distance,
         limit * 3 // 多取一些，因为需要多层过滤
       );
+    } else if (scope === 'city' && currentUser.city) {
+      // 同城：按 city 字段查同市用户
+      users = await User.getUsersByCity(
+        user_id,
+        currentUser.city,
+        limit * 3
+      );
     } else {
+      // 降级：当前用户没有 city 也没有坐标时，取全部用户
       try {
         const result = await executeQuery(
           'SELECT * FROM users WHERE id != ? AND status = 1 LIMIT ?',
@@ -83,47 +97,117 @@ async function recommendUsers(user_id, filters = {}) {
     // 合并所有排除的ID
     const excludedIds = new Set([...skippedIds, ...blockedIds, ...blockedByOthers]);
 
-    // 进一步过滤
+    // ==================== 批量查询（消除 N+1 问题） ====================
+    // 提取所有候选用户的 ID 列表
+    const candidateIds = ageFiltered.map(u => u.id);
+    let excludedSet = excludedIds; // 已包含 skippedIds + blockedIds + blockedByOthers
+
+    // 一次性批量查询：已喜欢列表、已匹配列表、隐私设置
+    const [likedSet, matchedSet, settingsMap] = await Promise.all([
+      Like.batchExists(user_id, candidateIds),
+      Match.batchExists(user_id, candidateIds),
+      UserSettings.batchGet(candidateIds)
+    ]);
+
+    // 收集待记录的浏览，在循环外批量处理
+    const viewPromises = [];
+
+    // 循环内仅做内存判断，不再逐条查询数据库
     const recommendedUsers = [];
     for (const user of ageFiltered) {
       // 排除已跳过和拉黑相关
-      if (excludedIds.has(user.id)) continue;
+      if (excludedSet.has(user.id)) continue;
 
-      // 检查是否已喜欢
-      const liked = await Like.exists(user_id, user.id);
-      if (liked) continue;
+      // 内存判断：是否已喜欢（Set.has 查找 O(1)）
+      if (likedSet.has(user.id)) continue;
 
-      // 检查是否已匹配
-      const matched = await Match.exists(user_id, user.id);
-      if (matched) continue;
+      // 内存判断：是否已匹配
+      if (matchedSet.has(user.id)) continue;
 
-      // 检查目标用户的隐私设置（是否允许陌生人聊天等不影响推荐展示）
-
-      // 异步记录浏览（不阻塞推荐返回）
-      View.create(user_id, user.id).catch(err => {
-        console.error('浏览记录写入失败:', err.message);
-      });
-
-      // 处理隐私：如果用户隐藏距离，则不返回具体距离
+      // 用 Map 读取隐私设置，替换逐条查询
+      const settings = settingsMap.get(user.id);
       let userForRecommend = { ...user };
-      try {
-        const targetSettings = await UserSettings.get(user.id);
-        if (targetSettings.hide_distance) {
-          userForRecommend._distance_hidden = true;
-        }
-      } catch (settingsErr) {
-        // 获取设置失败不影响推荐
+      if (settings && settings.hide_distance) {
+        userForRecommend._distance_hidden = true;
       }
+
+      // 浏览记录异步写入（收集 Promise，不阻塞推荐返回）
+      viewPromises.push(
+        View.create(user_id, user.id).catch(err => {
+          console.error('浏览记录写入失败:', err.message);
+        })
+      );
 
       recommendedUsers.push(userForRecommend);
       if (recommendedUsers.length >= limit) break;
     }
+
+    // 异步写入浏览记录（不阻塞返回，静默失败）
+    Promise.allSettled(viewPromises).catch(() => {});
 
     return recommendedUsers;
   } catch (err) {
     console.error('推荐用户失败:', err);
     return [];
   }
+}
+
+// ==================== 破冰话题生成 ====================
+
+/** 标签 → 话题模板映射表 */
+const ICEBREAKER_TEMPLATES = {
+  '健身': '健身达人！你一般多久练一次？',
+  '跑步': '跑步爱好者！你一般跑几公里？',
+  '瑜伽': '瑜伽让人平静，你练了多久了？',
+  '篮球': '篮球场上见！你打什么位置？',
+  '游泳': '游泳健将！你喜欢泳池还是海边？',
+  '滑雪': '滑雪超酷！单板还是双板？',
+  '冲浪': '冲浪也太帅了吧！在哪里学过？',
+  '旅行': '你们都爱旅行，最近去过哪里？',
+  '美食': '你们都喜欢美食，要不要聊聊最爱的餐厅？',
+  '摄影': '你们都爱摄影，用什么设备拍？',
+  '宠物': '你们都养宠物吗？什么品种？',
+  '音乐': '你们最近在听什么歌？',
+  '电影': '你们最近看了什么好电影？',
+  '游戏': '你们玩什么游戏？可以一起组队！',
+  '读书': '你们都喜欢读书，最近在读什么？',
+  '画画': '你们都喜欢画画，什么风格？',
+};
+
+/**
+ * 根据共同标签生成破冰话题列表
+ * @param {string[]} commonTags - 交集标签数组
+ * @returns {string[]} - 2-3 条话题文案
+ */
+function generateIcebreakers(commonTags) {
+  if (!commonTags || commonTags.length === 0) return [];
+  const topics = [];
+  const tags = commonTags.slice(0, 3);
+  for (const tag of tags) {
+    let template = null;
+    for (const [key, value] of Object.entries(ICEBREAKER_TEMPLATES)) {
+      if (tag.includes(key) || key.includes(tag)) {
+        template = value;
+        break;
+      }
+    }
+    topics.push(template || `你们有很多共同爱好（${tag}），来聊聊吧！`);
+  }
+  return topics.slice(0, 3);
+}
+
+/**
+ * 安全解析用户 tags 字段
+ * @param {*} tagsField - 数据库 tags 列
+ * @returns {string[]}
+ */
+function parseTags(tagsField) {
+  if (!tagsField) return [];
+  if (Array.isArray(tagsField)) return tagsField;
+  if (typeof tagsField === 'string') {
+    try { return JSON.parse(tagsField); } catch (e) { return []; }
+  }
+  return [];
 }
 
 /**
@@ -134,58 +218,110 @@ async function recommendUsers(user_id, filters = {}) {
  */
 async function handleLike(user_id, target_user_id) {
   try {
-    // 检查是否存在拉黑关系
     const isBlocked = await Block.isMutualBlocked(user_id, target_user_id);
     if (isBlocked) {
       return { success: false, message: '无法操作，存在拉黑关系' };
     }
 
-    // 检查目标用户是否存在
     const targetUser = await User.findById(target_user_id);
     if (!targetUser) {
       throw new Error('目标用户不存在');
     }
 
-    // 检查是否已喜欢
     const liked = await Like.exists(user_id, target_user_id);
     if (liked) {
       throw new Error('已经喜欢过该用户');
     }
 
-    // 检查是否已匹配
     const matched = await Match.exists(user_id, target_user_id);
     if (matched) {
       throw new Error('已经匹配过该用户');
     }
 
-    // 创建喜欢记录
     await Like.create(user_id, target_user_id);
-
-    // 检查对方是否也喜欢了自己
     const mutualLike = await Like.exists(target_user_id, user_id);
 
     if (mutualLike) {
-      // 创建匹配记录
+      // ============ 匹配成功 ============
       const match = await Match.create(user_id, target_user_id);
+
+      // 获取双方完整信息
+      const [currentUser, partner] = await Promise.all([
+        User.findById(user_id),
+        User.findById(target_user_id)
+      ]);
+
+      // 创建会话
+      const conversation = await Conversation.createOrGet(user_id, target_user_id);
+
+      // 发送系统消息：互相喜欢
+      await Message.create({
+        conversation_id: conversation.id,
+        sender_id: 0,
+        receiver_id: user_id,
+        content: '💕 你们互相喜欢，开始聊天吧！',
+        type: 99
+      });
+
+      // 计算共同标签并生成破冰话题
+      const userTags = parseTags(currentUser.tags);
+      const targetTags = parseTags(partner.tags);
+      const commonTags = userTags.filter(t => targetTags.includes(t));
+
+      const icebreakers = generateIcebreakers(commonTags);
+      const icebreakerMessages = [];
+      for (const topic of icebreakers) {
+        const msg = await Message.create({
+          conversation_id: conversation.id,
+          sender_id: 0,
+          receiver_id: user_id,
+          content: `💬 ${topic}`,
+          type: 99
+        });
+        icebreakerMessages.push({ id: msg.id, content: topic });
+      }
+
+      // WebSocket 实时推送双方
+      const partnerData = { id: partner.id, nickname: partner.nickname, avatar: partner.avatar, gender: partner.gender, age: partner.age, location: partner.location };
+      const currentData = { id: currentUser.id, nickname: currentUser.nickname, avatar: currentUser.avatar, gender: currentUser.gender, age: currentUser.age, location: currentUser.location };
+
+      websocketService.sendToUser(user_id, {
+        type: 'match_success',
+        data: { match_id: match.id, conversation_id: conversation.id, partner: partnerData, common_tags: commonTags, icebreakers: icebreakerMessages }
+      });
+      websocketService.sendToUser(target_user_id, {
+        type: 'match_success',
+        data: { match_id: match.id, conversation_id: conversation.id, partner: currentData, common_tags: commonTags, icebreakers: icebreakerMessages }
+      });
+
+      // 推送通知（异步）
+      pushService.sendToUser(target_user_id, {
+        title: '💕 新的匹配！',
+        body: `${currentUser.nickname || '有人'} 也喜欢了你，快去聊天吧！`,
+        data: { type: 'match', match_id: match.id, user_id }
+      }).catch(() => {});
+      pushService.sendToUser(user_id, {
+        title: '💕 匹配成功',
+        body: `你和 ${partner.nickname || 'TA'} 互相喜欢，开始聊天吧！`,
+        data: { type: 'match', match_id: match.id, user_id: target_user_id }
+      }).catch(() => {});
+
       return {
         success: true,
         matched: true,
         match_id: match.id,
+        conversation_id: conversation.id,
+        partner: partnerData,
+        common_tags: commonTags,
+        icebreakers: icebreakerMessages,
         message: '匹配成功！'
       };
     }
 
-    return {
-      success: true,
-      matched: false,
-      message: '喜欢成功'
-    };
+    return { success: true, matched: false, message: '喜欢成功' };
   } catch (err) {
     console.error('处理喜欢失败:', err);
-    return {
-      success: false,
-      message: err.message
-    };
+    return { success: false, message: err.message };
   }
 }
 
