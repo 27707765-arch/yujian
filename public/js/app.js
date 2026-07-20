@@ -5,7 +5,7 @@
 import { createApp, h } from 'vue';
 import { createRouter, createWebHashHistory } from 'vue-router';
 import { isLoggedIn } from './store/userStore.js';
-import { state as uiState, setNavVisibility, setBackButton, clearBackButton } from './store/uiStore.js';
+import { state as uiState, setNavVisibility, setBackButton, clearBackButton, setPageTitle } from './store/uiStore.js';
 import { state as chatState } from './store/chatStore.js';
 import { toasts } from './utils/toast.js';
 import { wsState } from './utils/websocket.js';
@@ -42,8 +42,8 @@ import ImagePreview, { openImagePreview, closeImagePreview } from './components/
 const NAV_PAGES = ['/home', '/discover', '/chat', '/my'];
 
 const routes = [
-  { path: '/', component: WelcomePage, meta: { title: '遇见' } },
-  { path: '/login', component: LoginPage, meta: { title: '登录' } },
+  { path: '/', component: WelcomePage, meta: { title: '' } },
+  { path: '/login', component: LoginPage, meta: { title: '' } },
   { path: '/home', component: HomePage, meta: { title: '遇见', nav: true } },
   { path: '/discover', component: DiscoverPage, meta: { title: '动态', nav: true } },
   { path: '/chat', component: ChatListPage, meta: { title: '消息', nav: true } },
@@ -77,6 +77,7 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   document.title = to.meta.title ? `${to.meta.title} - 遇见` : '遇见';
+  setPageTitle(to.meta.title || '');
   setNavVisibility(NAV_PAGES.includes(to.path));
 
   if (to.path !== '/' && to.path !== '/home' && to.path !== '/login') {

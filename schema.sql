@@ -497,3 +497,99 @@ ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_pinned TINYINT DEFAULT 0 C
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_deleted_by_user INT UNSIGNED DEFAULT NULL COMMENT '软删除用户ID';
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_sender_id INT UNSIGNED DEFAULT NULL COMMENT '最后发送者ID';
 ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_msg_type TINYINT DEFAULT 0 COMMENT '最后消息类型';
+
+-- ====================================================================
+-- 多重身份认证系统（任务1）
+-- ====================================================================
+
+-- 认证记录表
+CREATE TABLE IF NOT EXISTS user_verifications (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL COMMENT '用户ID',
+    verification_type ENUM('real_name', 'face', 'education', 'vehicle', 'income') NOT NULL COMMENT '认证类型',
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending' COMMENT '审核状态',
+    real_name VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
+    id_card_number VARCHAR(18) DEFAULT NULL COMMENT '身份证号',
+    id_card_front_url VARCHAR(255) DEFAULT NULL COMMENT '身份证正面照URL',
+    id_card_back_url VARCHAR(255) DEFAULT NULL COMMENT '身份证反面照URL',
+    face_image_url VARCHAR(255) DEFAULT NULL COMMENT '人脸照片URL',
+    face_video_url VARCHAR(255) DEFAULT NULL COMMENT '活体检测视频URL',
+    school_name VARCHAR(100) DEFAULT NULL COMMENT '学校名称',
+    education_level VARCHAR(20) DEFAULT NULL COMMENT '学历层次',
+    graduation_year INT DEFAULT NULL COMMENT '毕业年份',
+    education_cert_url VARCHAR(255) DEFAULT NULL COMMENT '学历证书URL',
+    car_brand VARCHAR(50) DEFAULT NULL COMMENT '车辆品牌',
+    car_model VARCHAR(50) DEFAULT NULL COMMENT '车辆型号',
+    driving_license_url VARCHAR(255) DEFAULT NULL COMMENT '驾驶证URL',
+    reviewed_by INT UNSIGNED DEFAULT NULL COMMENT '审核人ID',
+    reviewed_at DATETIME DEFAULT NULL COMMENT '审核时间',
+    rejected_reason VARCHAR(255) DEFAULT NULL COMMENT '拒绝原因',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_user_type (user_id, verification_type),
+    INDEX idx_status (status),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户认证记录表';
+
+-- users表新增认证字段
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_real_name_verified TINYINT(1) DEFAULT 0 COMMENT '是否实名认证';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_face_verified TINYINT(1) DEFAULT 0 COMMENT '是否人脸认证';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_education_verified TINYINT(1) DEFAULT 0 COMMENT '是否学历认证';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_vehicle_verified TINYINT(1) DEFAULT 0 COMMENT '是否车辆认证';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_level TINYINT DEFAULT 0 COMMENT '认证等级(0-4)';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_badges JSON DEFAULT NULL COMMENT '认证徽章列表';
+
+-- ====================================================================
+-- 语音/视频通话系统（任务3）
+-- ====================================================================
+
+-- 通话记录表
+CREATE TABLE IF NOT EXISTS call_records (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    channel_name VARCHAR(100) NOT NULL COMMENT 'Agora频道名',
+    caller_id INT UNSIGNED NOT NULL COMMENT '发起方用户ID',
+    callee_id INT UNSIGNED NOT NULL COMMENT '接收方用户ID',
+    call_type ENUM('voice', 'video') NOT NULL COMMENT '通话类型',
+    status ENUM('ringing', 'connected', 'ended', 'missed', 'rejected', 'cancelled') NOT NULL DEFAULT 'ringing' COMMENT '通话状态',
+    started_at DATETIME DEFAULT NULL COMMENT '发起时间',
+    connected_at DATETIME DEFAULT NULL COMMENT '接通时间',
+    ended_at DATETIME DEFAULT NULL COMMENT '结束时间',
+    duration INT DEFAULT 0 COMMENT '通话时长（秒）',
+    end_reason VARCHAR(50) DEFAULT NULL COMMENT '结束原因',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX idx_caller (caller_id, created_at),
+    INDEX idx_callee (callee_id, created_at),
+    FOREIGN KEY (caller_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (callee_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通话记录表';
+
+-- 用户行为记录表
+CREATE TABLE IF NOT EXISTS user_behaviors (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL COMMENT '行为发起用户ID',
+    target_user_id INT UNSIGNED NOT NULL COMMENT '目标用户ID',
+    action ENUM('view', 'like', 'skip', 'message', 'match', 'unmatch') NOT NULL COMMENT '行为类型',
+    duration INT DEFAULT NULL COMMENT '停留时长（秒）',
+    source VARCHAR(50) DEFAULT NULL COMMENT '来源页面',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX idx_user_action (user_id, action, created_at),
+    INDEX idx_target (target_user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户行为记录表';
+
+-- 用户兴趣画像表
+CREATE TABLE IF NOT EXISTS user_interest_profiles (
+    user_id INT UNSIGNED PRIMARY KEY COMMENT '用户ID',
+    interest_vector JSON DEFAULT NULL COMMENT '兴趣标签向量',
+    behavior_pattern JSON DEFAULT NULL COMMENT '行为模式统计',
+    preference_age_min INT DEFAULT 18 COMMENT '偏好最小年龄',
+    preference_age_max INT DEFAULT 35 COMMENT '偏好最大年龄',
+    preference_distance INT DEFAULT 50 COMMENT '偏好距离(km)',
+    preference_gender TINYINT(1) DEFAULT NULL COMMENT '偏好性别',
+    last_active_at DATETIME DEFAULT NULL COMMENT '最后活跃时间',
+    activity_score FLOAT DEFAULT 0 COMMENT '活跃度评分(0-100)',
+    popularity_score FLOAT DEFAULT 0 COMMENT '受欢迎度评分(0-100)',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户兴趣画像表';

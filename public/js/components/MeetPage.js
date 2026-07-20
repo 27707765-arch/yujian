@@ -35,7 +35,7 @@ export default {
     }
 
     function viewUser(u) { router.push(`/user/${u.id}`); }
-    function startChat(u) { router.push(`/chat/u?user_id=${u.id}`); }
+    function startChat(u) { router.push(`/chat/${u.id}`); }
     function timeAgo(t) {
       const d = Math.floor((Date.now() - new Date(t).getTime()) / 1000);
       if (d < 3600) return Math.floor(d/60) + '分钟前';

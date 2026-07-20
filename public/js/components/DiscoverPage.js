@@ -67,7 +67,7 @@ export default {
       <div style="display:flex;gap:4px;background:#F2F2F7;border-radius:14px;padding:4px;margin-bottom:20px">
         <button @click="switchTab('following')" :style="tab==='following'?{flex:1,padding:'10px',borderRadius:'11px',border:'none',fontSize:'14px',fontWeight:700,cursor:'pointer',background:'#FFF',color:'#1D1D1F',boxShadow:'0 2px 8px rgba(0,0,0,.06)'}:{flex:1,padding:'10px',borderRadius:'11px',border:'none',fontSize:'14px',fontWeight:500,cursor:'pointer',background:'transparent',color:'#86868B'}">关注</button>
         <button @click="switchTab('nearby')" :style="tab==='nearby'?{flex:1,padding:'10px',borderRadius:'11px',border:'none',fontSize:'14px',fontWeight:700,cursor:'pointer',background:'#FFF',color:'#1D1D1F',boxShadow:'0 2px 8px rgba(0,0,0,.06)'}:{flex:1,padding:'10px',borderRadius:'11px',border:'none',fontSize:'14px',fontWeight:500,cursor:'pointer',background:'transparent',color:'#86868B'}">附近</button>
-        <button @click="router.push('/create-post')" style="padding:10px 16px;borderRadius:11px;border:none;fontSize:14px;fontWeight:600;cursor:pointer;background:linear-gradient(135deg,#FF5E7D,#FF8099);color:#FFF">➕ 发动态</button>
+        <button @click="router.push('/create-post')" style="padding:10px 16px;border-radius:11px;border:none;fontSize:14px;fontWeight:600;cursor:pointer;background:linear-gradient(135deg,#FF5E7D,#FF8099);color:#FFF">➕ 发动态</button>
       </div>
 
       <!-- 骨架 -->

@@ -28,12 +28,12 @@ var LoginPage = {
   methods: {
     sendCode: async function(){
       if(!/^1[3-9]\d{9}$/.test(this.phone)){toast("请输入正确的手机号","terr");return}
-      try{var r=await api("/auth/send-code",{method:"POST",body:JSON.stringify({phone:this.phone})});if(r.code===0){this.sent=true;this.countdown=60;var s=this;var iv=setInterval(function(){s.countdown--;if(s.countdown<=0){clearInterval(iv);s.sent=false}},1000);toast("验证码已发送","tok")}else toast(r.message||"发送失败","terr")}catch(e){toast("网络错误","terr")}
+      try{var r=await api("/auth/send-code",{method:"POST",body:JSON.stringify({phone:this.phone})});if(r.code===0){this.sent=true;this.countdown=60;if(r.data&&r.data.code)this.code=r.data.code;var s=this;var iv=setInterval(function(){s.countdown--;if(s.countdown<=0){clearInterval(iv);s.sent=false}},1000);toast("验证码已发送","tok")}else toast(r.message||"发送失败","terr")}catch(e){toast("网络错误","terr")}
     },
     doLogin: async function(){
       if(!this.phone||!this.code){toast("请输入手机号和验证码","terr");return}
       this.loading=true;
-      try{var r=await api("/auth/login",{method:"POST",body:JSON.stringify({phone:this.phone,code:this.code})});if(r.code===0&&r.data){localStorage.setItem("token",r.data.token);localStorage.setItem("userId",r.data.user.id);if(r.data.user.nickname)localStorage.setItem("uname",r.data.user.nickname);wsConnect();toast("登录成功","tok");this.$router.replace("/home")}else toast(r.message||"登录失败","terr")}catch(e){toast("网络错误","terr")}
+      try{var r=await api("/auth/login",{method:"POST",body:JSON.stringify({login:this.phone,code:this.code})});if(r.code===0&&r.data){localStorage.setItem("token",r.data.token);localStorage.setItem("userId",r.data.user.id);if(r.data.user.nickname)localStorage.setItem("uname",r.data.user.nickname);wsConnect();toast("登录成功","tok");this.$router.replace("/home")}else toast(r.message||"登录失败","terr")}catch(e){toast("网络错误","terr")}
       this.loading=false;
     }
   },

@@ -164,24 +164,26 @@ export default {
               </div>
 
               <!-- 子评论（嵌套回复） -->
-              <div v-for="reply in c.replies" v-if="c.replies" :key="reply.id"
-                style="display:flex;gap:10px;margin-bottom:10px;padding-bottom:10px;padding-left:46px;border-bottom:1px solid var(--border)">
-                <div class="avatar-circle avatar-sm">
-                  <img v-if="reply.avatar" :src="reply.avatar" />
-                  <span v-else class="avatar-default" style="font-size:16px">👤</span>
-                </div>
-                <div style="flex:1">
-                  <div class="info-row" style="margin-bottom:4px">
-                    <span class="post-card-username">{{ reply.nickname || '用户' }}</span>
-                    <span style="font-size:11px;color:var(--text-muted)">{{ timeAgo(reply.created_at) }}</span>
+              <template v-if="c.replies">
+                <div v-for="reply in c.replies" :key="reply.id"
+                  style="display:flex;gap:10px;margin-bottom:10px;padding-bottom:10px;padding-left:46px;border-bottom:1px solid var(--border)">
+                  <div class="avatar-circle avatar-sm">
+                    <img v-if="reply.avatar" :src="reply.avatar" />
+                    <span v-else class="avatar-default" style="font-size:16px">👤</span>
                   </div>
-                  <div v-if="reply.reply_to_nickname" style="font-size:12px;color:var(--text-muted);margin-bottom:4px;background:var(--bg-page);padding:2px 8px;border-radius:4px">
-                    回复 @{{ reply.reply_to_nickname }}
+                  <div style="flex:1">
+                    <div class="info-row" style="margin-bottom:4px">
+                      <span class="post-card-username">{{ reply.nickname || '用户' }}</span>
+                      <span style="font-size:11px;color:var(--text-muted)">{{ timeAgo(reply.created_at) }}</span>
+                    </div>
+                    <div v-if="reply.reply_to_nickname" style="font-size:12px;color:var(--text-muted);margin-bottom:4px;background:var(--bg-page);padding:2px 8px;border-radius:4px">
+                      回复 @{{ reply.reply_to_nickname }}
+                    </div>
+                    <p style="font-size:14px;line-height:1.5;margin-bottom:4px">{{ reply.content }}</p>
+                    <span @click="startReply(reply)" style="font-size:12px;color:var(--text-muted);cursor:pointer">回复</span>
                   </div>
-                  <p style="font-size:14px;line-height:1.5;margin-bottom:4px">{{ reply.content }}</p>
-                  <span @click="startReply(reply)" style="font-size:12px;color:var(--text-muted);cursor:pointer">回复</span>
                 </div>
-              </div>
+              </template>
             </template>
           </div>
         </div>

@@ -107,6 +107,7 @@ async function requestWithRetry(url, options) {
  * @param {number} quality - 压缩质量
  * @returns {Promise<File>}
  */
+function compressImage(file, maxWidth = 800, quality = 0.8) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {

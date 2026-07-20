@@ -67,7 +67,7 @@ export default {
       return m[type] || '✅';
     }
 
-    return { ...status, tasks, loading, checkingIn, coinAnimation, weekDays, doCheckin, taskIcon };
+    return { status, tasks, loading, checkingIn, coinAnimation, weekDays, doCheckin, taskIcon };
   },
   template: `
     <div class="page-padding">
@@ -75,8 +75,8 @@ export default {
       <div class="gradient-header-pink" style="border-radius:var(--radius);margin-bottom:12px">
         <div class="text-center">
           <div style="font-size:14px;opacity:.9">连续签到</div>
-          <div style="font-size:48px;font-weight:700;margin:8px 0">{{ streak || 0 }}<span style="font-size:24px"> 天</span></div>
-          <div style="font-size:13px;opacity:.8">今日奖励：🪙 +{{ Math.min((streak || 0) + 1, 7) * 10 }} 金币</div>
+          <div style="font-size:48px;font-weight:700;margin:8px 0">{{ status.streak || 0 }}<span style="font-size:24px"> 天</span></div>
+          <div style="font-size:13px;opacity:.8">今日奖励：🪙 +{{ Math.min((status.streak || 0) + 1, 7) * 10 }} 金币</div>
         </div>
 
         <!-- 7天日历 -->
@@ -95,7 +95,7 @@ export default {
 
         <!-- 签到按钮 -->
         <div class="text-center mt-12">
-          <button v-if="!today_checked_in" class="btn" style="background:#fff;color:var(--primary);font-weight:700"
+          <button v-if="!status.today_checked_in" class="btn" style="background:#fff;color:var(--primary);font-weight:700"
             @click="doCheckin" :disabled="checkingIn">
             {{ checkingIn ? '签到中...' : '✨ 今日签到 ✨' }}
           </button>

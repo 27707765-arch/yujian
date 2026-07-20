@@ -40,7 +40,9 @@ const ALLOWED_UPDATE_COLUMNS = new Set([
   'nickname', 'avatar', 'gender', 'age', 'height', 'occupation',
   'location', 'province', 'city', 'district', 'lat', 'lng', 'bio',
   'tags', 'status', 'is_vip', 'vip_expire_time', 'onboarding_completed',
-  'email', 'email_verified', 'password_hash'
+  'email', 'email_verified', 'password_hash',
+  'is_real_name_verified', 'is_face_verified', 'is_education_verified',
+  'is_vehicle_verified', 'verification_level', 'verified_badges'
 ]);
 
 class User {

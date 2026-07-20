@@ -11,6 +11,7 @@ const Block = require('./src/models/Block');
 const websocketService = require('./src/services/websocket.service');
 const contentAuditService = require('./src/services/contentAudit.service');
 const antifraudService = require('./src/services/antifraud.service');
+const callService = require('./src/services/call.service');
 
 // 心跳配置（针对移动网络优化）
 // 移动网络特点：4G/5G切换、信号波动可导致5-15秒无响应
@@ -335,11 +336,13 @@ function handleStopTyping(userId, data) {
 
 /**
  * 发起通话请求（voice/video）
+ * 增强版：创建通话记录 + 生成Agora Token
  */
 async function handleCallRequest(userId, data) {
   const { receiver_id, call_type = 'voice' } = data;
   if (!receiver_id) return;
 
+  // 1. 拉黑检测
   const blocked = await Block.isMutualBlocked(userId, receiver_id);
   if (blocked) {
     websocketService.sendToUser(userId, {
@@ -349,31 +352,120 @@ async function handleCallRequest(userId, data) {
     return;
   }
 
+  // 2. 检查对方是否在线
+  const isOnline = websocketService.isUserOnline(receiver_id);
+  if (!isOnline) {
+    websocketService.sendToUser(userId, {
+      type: 'call_user_offline',
+      data: { receiver_id, message: '对方不在线' }
+    });
+    return;
+  }
+
+  // 3. 创建通话记录 + 生成Token
+  let callRecord = null;
+  try {
+    callRecord = await callService.initiateCall(userId, receiver_id, call_type);
+  } catch (err) {
+    websocketService.sendToUser(userId, {
+      type: 'call_error',
+      data: { receiver_id, message: err.message }
+    });
+    return;
+  }
+
+  // 4. 转发呼叫请求（携带Token和记录ID）
   websocketService.sendToUser(receiver_id, {
     type: 'call_request',
-    data: { caller_id: userId, call_type, timestamp: new Date().toISOString() }
+    data: {
+      caller_id: userId,
+      call_type,
+      call_id: callRecord.call_id,
+      channel_name: callRecord.channel_name,
+      agora_token: callRecord.token,
+      simulate: callRecord.simulate,
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  // 5. 给发起方确认（带call_id和token）
+  websocketService.sendToUser(userId, {
+    type: 'call_initiated',
+    data: {
+      receiver_id,
+      call_id: callRecord.call_id,
+      channel_name: callRecord.channel_name,
+      agora_token: callRecord.token,
+      simulate: callRecord.simulate
+    }
   });
 }
 
-function handleCallAccept(userId, data) {
-  const { caller_id } = data;
+async function handleCallAccept(userId, data) {
+  const { caller_id, call_id } = data;
   if (!caller_id) return;
+
+  // 如果有call_id，更新通话记录为connected
+  if (call_id) {
+    try {
+      await callService.acceptCall(call_id, userId);
+    } catch (err) {
+      console.error('更新通话记录失败:', err.message);
+    }
+  }
+
+  // 给接听方生成Token
+  const channelName = data.channel_name;
+  const token = channelName ? callService.generateToken(channelName, userId) : null;
+
   websocketService.sendToUser(caller_id, {
-    type: 'call_accepted', data: { receiver_id: userId }
+    type: 'call_accepted',
+    data: {
+      receiver_id: userId,
+      call_id,
+      channel_name: channelName,
+      agora_token: token
+    }
   });
 }
 
-function handleCallReject(userId, data) {
-  const { caller_id, reason } = data;
+async function handleCallReject(userId, data) {
+  const { caller_id, reason, call_id } = data;
   if (!caller_id) return;
+
+  // 更新通话记录状态
+  if (call_id) {
+    try {
+      await callService.rejectCall(call_id, userId, caller_id);
+    } catch (err) {
+      console.error('更新通话拒绝记录失败:', err.message);
+    }
+  }
+
   websocketService.sendToUser(caller_id, {
     type: 'call_rejected', data: { receiver_id: userId, reason: reason || '对方拒绝了通话' }
   });
 }
 
-function handleCallEnd(userId, data) {
-  const { peer_id } = data;
+async function handleCallEnd(userId, data) {
+  const { peer_id, call_id, end_reason } = data;
   if (!peer_id) return;
+
+  // 计算通话时长并更新记录
+  if (call_id) {
+    try {
+      const result = await callService.endCall(call_id, userId, end_reason || 'hangup');
+      // 将通话时长传给对方
+      websocketService.sendToUser(peer_id, {
+        type: 'call_ended',
+        data: { user_id: userId, call_id, duration: result.duration, end_reason: end_reason || 'hangup' }
+      });
+      return;
+    } catch (err) {
+      console.error('更新通话结束记录失败:', err.message);
+    }
+  }
+
   websocketService.sendToUser(peer_id, {
     type: 'call_ended', data: { user_id: userId }
   });

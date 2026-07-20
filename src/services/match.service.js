@@ -16,6 +16,7 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const websocketService = require('./websocket.service');
 const pushService = require('./push.service');
+const MatchAlgorithm = require('./matchAlgorithm.service');
 
 /**
  * 推荐用户
@@ -145,6 +146,16 @@ async function recommendUsers(user_id, filters = {}) {
     // 异步写入浏览记录（不阻塞返回，静默失败）
     Promise.allSettled(viewPromises).catch(() => {});
 
+    // 智能排序：用匹配算法对推荐用户按分数降序排列
+    if (recommendedUsers.length > 1) {
+      try {
+        const scored = await MatchAlgorithm.reRankUsers(currentUser, recommendedUsers);
+        return scored;
+      } catch (algoErr) {
+        console.error('匹配算法排序失败，使用默认排序:', algoErr.message);
+      }
+    }
+
     return recommendedUsers;
   } catch (err) {
     console.error('推荐用户失败:', err);
@@ -239,6 +250,10 @@ async function handleLike(user_id, target_user_id) {
     }
 
     await Like.create(user_id, target_user_id);
+
+    // 记录用户行为：喜欢
+    MatchAlgorithm.recordBehavior(user_id, target_user_id, 'like');
+
     const mutualLike = await Like.exists(target_user_id, user_id);
 
     if (mutualLike) {
@@ -344,6 +359,10 @@ async function handleSkip(user_id, target_user_id) {
     }
 
     await Skip.create(user_id, target_user_id);
+
+    // 记录用户行为：跳过
+    MatchAlgorithm.recordBehavior(user_id, target_user_id, 'skip');
+
     return {
       success: true,
       message: '跳过成功'

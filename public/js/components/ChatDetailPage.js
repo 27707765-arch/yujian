@@ -1,13 +1,14 @@
 /**
  * 聊天详情页 - WebSocket实时聊天 + 图片发送 + 上拉加载 + 时间分组
  */
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../utils/api.js';
 import { chatState, addLocalMessage } from '../store/chatStore.js';
 import { userState } from '../store/userStore.js';
 import { toast } from '../utils/toast.js';
 import { wsState, send, onMessage, offMessage } from '../utils/websocket.js';
+import { openImagePreview } from './ImagePreview.js';
 
 export default {
   setup() {
@@ -19,7 +20,6 @@ export default {
     const loading = ref(true);
     const chatEl = ref(null);
     const uploading = ref(false);
-    const imagePreview = reactive({ visible: false, url: '' });
     const hasMore = ref(true);
     const loadingMore = ref(false);
     const PAGE_SIZE = 50;
@@ -174,7 +174,11 @@ export default {
       scrollToBottom();
       const sent = send({ type: 'message', data: { ...msg, _temp_id: tempId } });
       if (!sent) {
-        try { await api.post('/chat/messages', msg); } catch (err) { toast.error('发送失败'); }
+        try { await api.post('/chat/messages', msg); } catch (err) {
+          toast.error('发送失败');
+          const failedIdx = messages.value.findIndex(m => m._temp_id === tempId);
+          if (failedIdx > -1) { messages.value[failedIdx]._failed = true; messages.value[failedIdx]._local = false; }
+        }
       }
     }
 
@@ -207,24 +211,30 @@ export default {
         fd.append('image', compressed);
         const res = await api.upload('/upload/image', fd);
         if (res.code === 0 && res.data) {
+          const tempId = '_tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
           const msg = {
             conversation_id: conversationId.value,
             sender_id: userState.userId,
             content: res.data.url,
-            type: 1
+            type: 1,
+            _temp_id: tempId
           };
-          messages.value.push({ ...msg, _local: true, created_at: new Date().toISOString() });
+          messages.value.push({ ...msg, _local: true, _temp_id: tempId, created_at: new Date().toISOString() });
           scrollToBottom();
           const sent = send({ type: 'message', data: msg });
           if (!sent) {
-            try { await api.post('/chat/messages', msg); } catch (err) { toast.error('发送失败'); }
+            try { await api.post('/chat/messages', msg); } catch (err) {
+              toast.error('发送失败');
+              const failedIdx = messages.value.findIndex(m => m._temp_id === tempId);
+              if (failedIdx > -1) { messages.value[failedIdx]._failed = true; messages.value[failedIdx]._local = false; }
+            }
           }
         }
       } catch (err) { toast.error('图片上传失败: ' + err.message); }
       finally { uploading.value = false; e.target.value = ''; }
     }
 
-    function previewImage(url) { imagePreview.url = url; imagePreview.visible = true; }
+    function previewImage(url) { openImagePreview([url], 0); }
 
     // 长按消息操作
     const showMsgMenu = ref(false);
@@ -273,6 +283,15 @@ export default {
       showMsgMenu.value = false;
     }
 
+    async function resendMsg(msg) {
+      msg._failed = false; msg._local = true;
+      const sent = send({ type: 'message', data: { conversation_id: conversationId.value, sender_id: userState.userId, content: msg.content, type: msg.type } });
+      if (!sent) {
+        try { await api.post('/chat/messages', { conversation_id: conversationId.value, content: msg.content, type: msg.type }); msg._local = false; }
+        catch (err) { msg._failed = true; msg._local = false; toast.error('重发失败'); }
+      } else { msg._local = false; }
+    }
+
     // 在线状态与已读回执监听
     const partnerOnline = ref(false);
     function handleOnlineStatus(data) {
@@ -315,18 +334,15 @@ export default {
       offMessage('gift_received', handleWsMessage);
       offMessage('online_status', handleOnlineStatus);
       offMessage('read_receipt', handleReadReceipt);
-    onUnmounted(() => {
-      offMessage('message', handleWsMessage);
-      offMessage('gift_received', handleWsMessage);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', onViewportResize);
       }
     });
 
-    return { messages, processedMessages, text, loading, loadingMore, hasMore, uploading, chatEl, imagePreview,
+    return { messages, processedMessages, text, loading, loadingMore, hasMore, uploading, chatEl,
       showMsgMenu, menuTarget,
       sendMessage, onKeydown, onScroll, timeStr, onImageSelect, previewImage,
-      onMsgTouchStart, onMsgTouchEnd, onMsgTouchMove, copyMsg, recallMsg, deleteMsgLocal };
+      onMsgTouchStart, onMsgTouchEnd, onMsgTouchMove, copyMsg, recallMsg, deleteMsgLocal, resendMsg };
   },
   template: `
     <div style="display:flex;flex-direction:column;height:100%">
@@ -360,6 +376,7 @@ export default {
               <div v-else style="font-size:15px;line-height:1.5;word-break:break-word">{{ item.content }}</div>
               <div :style="{fontSize:'10px',marginTop:'4px',textAlign:'right',opacity:item.sender_id===userState.userId?0.7:0.5,color:item.type===99?'var(--text-muted)':(item.sender_id===userState.userId?'#fff':'var(--text-muted)')}">
                 {{ timeStr(item.created_at) }}<span v-if="item._local" style="margin-left:4px">⏳</span>
+                <span v-if="item._failed" style="margin-left:4px;color:var(--error);cursor:pointer" @click="resendMsg(item)">❗</span>
                 <span v-if="item.sender_id===userState.userId && item._read" style="margin-left:4px">✓✓</span>
               </div>
               </div>
@@ -382,11 +399,6 @@ export default {
           <input v-model="text" placeholder="说点什么..." @keydown="onKeydown" :disabled="uploading" />
         </div>
         <button class="btn btn-primary" style="border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0" @click="sendMessage" :disabled="!text.trim()||uploading">➤</button>
-      </div>
-
-      <div v-if="imagePreview.visible" class="image-preview-overlay" @click="imagePreview.visible = false">
-        <img :src="imagePreview.url" class="image-preview-img" />
-        <button class="image-preview-close" @click="imagePreview.visible = false">✕</button>
       </div>
 
       <!-- 长按操作菜单 -->

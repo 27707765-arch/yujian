@@ -19,7 +19,9 @@ export default {
 
     onMounted(async () => {
       if (!isLoggedIn.value) { router.replace('/login'); return; }
-      await loadConversations(); loading.value = false;
+      await loadConversations();
+      chatState.unreadCount = chatState.conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+      loading.value = false;
       onMessage('message', handleNewMessage);
     });
     onUnmounted(() => { offMessage('message', handleNewMessage); });

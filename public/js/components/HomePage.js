@@ -21,6 +21,7 @@ export default {
     const showMatchModal = ref(false);
     const matchData = ref(null);
     const refreshing = ref(false);
+    const locationFailed = ref(false);
     const pullDistance = ref(0);
     const pullThreshold = 60;
     let touchStartY = 0;
@@ -49,8 +50,8 @@ export default {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(async (pos) => {
           try { const res = await api.post('/user/location', { lat: pos.coords.latitude, lng: pos.coords.longitude }); if (res.code === 0 && res.data?.city) currentCity.value = res.data.city; } catch (e) {}
-          finally { loadRecommend(); }
-        }, () => { loadRecommend(); }, { timeout: 8000, enableHighAccuracy: false });
+          finally { locationFailed.value = false; loadRecommend(); }
+        }, () => { locationFailed.value = true; loadRecommend(); }, { timeout: 8000, enableHighAccuracy: false });
       } else { loadRecommend(); }
     }
 
@@ -89,7 +90,7 @@ export default {
 
     return {
       users, loading, error, errorMsg, tab, currentCity, showFilter, filterAge,
-      showMatchModal, matchData, refreshing, pullDistance, pullHint,
+      showMatchModal, matchData, refreshing, locationFailed, pullDistance, pullHint,
       switchTab, like, skip, viewProfile, loadRecommend, parseTags,
       closeMatchModal, startChatFromMatch, onTouchStart, onTouchMove, onTouchEnd, router
     };
@@ -113,6 +114,12 @@ export default {
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <button class="btn btn-sm btn-outline" @click="showFilter=!showFilter" style="border-color:#E5E5EA;color:#86868B">🔍 筛选</button>
         <button class="btn btn-sm btn-outline" @click="router.push('/search')" style="border-color:#E5E5EA;color:#86868B">🔎 搜索</button>
+      </div>
+
+      <!-- 定位失败提示 -->
+      <div v-if="locationFailed && !loading" style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#FFF8E1;border-radius:12px;margin-bottom:12px;font-size:13px;color:#F57F17">
+        <span>📍 无法获取位置，请手动设置城市</span>
+        <button @click="router.push('/edit-profile')" style="border:none;background:none;color:var(--primary);font-weight:600;cursor:pointer;font-size:13px">去设置</button>
       </div>
 
       <!-- 筛选面板 -->
@@ -171,8 +178,8 @@ export default {
           </div>
           <!-- 操作 -->
           <div style="display:flex;flex-direction:column;gap:10px;flex-shrink:0">
-            <button @click.stop="skip(user)" style="width:40px;height:40px;borderRadius:50%;border:2px solid #E5E5EA;background:#FFF;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#AEAEB2">✕</button>
-            <button @click.stop="like(user)" style="width:40px;height:40px;borderRadius:50%;border:none;background:linear-gradient(135deg,#FF5E7D,#FF3B5C);color:#FFF;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,94,125,.35)">♥</button>
+            <button @click.stop="skip(user)" style="width:40px;height:40px;border-radius:50%;border:2px solid #E5E5EA;background:#FFF;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#AEAEB2">✕</button>
+            <button @click.stop="like(user)" style="width:40px;height:40px;border-radius:50%;border:none;background:linear-gradient(135deg,#FF5E7D,#FF3B5C);color:#FFF;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,94,125,.35)">♥</button>
           </div>
         </div>
       </div>

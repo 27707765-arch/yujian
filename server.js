@@ -171,6 +171,8 @@ const pushRoutes = require('./src/routes/push.routes');
 const giftRoutes = require('./src/routes/gift.routes');
 const walletRoutes = require('./src/routes/wallet.routes');
 const checkinRoutes = require('./src/routes/checkin.routes');
+const verificationRoutes = require('./src/routes/verification.routes');
+const callRoutes = require('./src/routes/call.routes');
 const feedbackController = require('./src/controllers/feedback.controller');
 const adminRoutes = require('./src/routes/admin.routes');
 
@@ -240,6 +242,12 @@ app.use('/api/wallet', walletRoutes);
 
 // 签到与任务路由
 app.use('/api/checkin', checkinRoutes);
+
+// 认证路由（实名/人脸/学历/车辆认证）
+app.use('/api/verification', verificationRoutes);
+
+// 通话路由（语音/视频通话）
+app.use('/api/call', callRoutes);
 
 // 管理后台路由（需管理员权限）
 app.post('/api/feedback', authMiddleware, feedbackController.submitFeedback);

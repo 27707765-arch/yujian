@@ -20,7 +20,7 @@ export default {
     async function unfollow(u) {
       if (!confirm('确定取消关注？')) return;
       try {
-        await api.post('/match/skip', { target_user_id: u.id });
+        await api.post('/match/unmatch', { target_user_id: u.id });
         toast.success('已取消关注');
         list.value = list.value.filter(item => item.id !== u.id);
       } catch (err) { toast.error(err.message); }

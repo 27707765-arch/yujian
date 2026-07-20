@@ -43,6 +43,10 @@ export default {
         if (res.code === 0) {
           codeSent.value = true; countdown.value = 60;
           timer = setInterval(() => { countdown.value--; if (countdown.value <= 0) { clearInterval(timer); codeSent.value = false; } }, 1000);
+          // 模拟模式下自动填充验证码，方便测试
+          if (res.data?.code) {
+            code.value = res.data.code;
+          }
           const hint = res.data?.channel === 'email' ? '验证码已发送到邮箱' : '验证码已发送';
           toast.success(hint);
         }
