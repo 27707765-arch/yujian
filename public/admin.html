@@ -471,7 +471,7 @@ async function adminLogin(){
   try {
     const resp = await fetch('/api/auth/login',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({phone,code})
+      body:JSON.stringify({login:phone,code})
     });
     const d = await resp.json();
     if (d.code === 0 && d.data) {
