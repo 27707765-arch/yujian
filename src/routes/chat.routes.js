@@ -37,4 +37,16 @@ router.put('/conversations/:id/pin', chatController.pinConversation);
 // 发送消息（HTTP回退，含图片消息支持）
 router.post('/messages', chatController.sendMessage);
 
+// 快捷回复
+router.get('/quick-replies', chatController.getQuickReplies);
+router.post('/quick-reply', chatController.addQuickReply);
+router.delete('/quick-reply/:id', chatController.deleteQuickReply);
+
+// 聊天背景
+router.put('/conversation/:id/background', chatController.setBackground);
+router.get('/conversation/:id/background', chatController.getBackground);
+
+// 消息搜索
+router.get('/search', chatController.searchMessages);
+
 module.exports = router;

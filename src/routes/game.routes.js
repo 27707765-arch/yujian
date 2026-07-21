@@ -1,0 +1,10 @@
+const express = require('express');
+const authMiddleware = require('../middleware/auth');
+const gc = require('../controllers/game.controller');
+const router = express.Router();
+router.use(authMiddleware);
+router.post('/create', gc.createGame);
+router.post('/record', gc.recordGame);
+router.get('/leaderboard', gc.getLeaderboard);
+router.get('/random-word', gc.getRandomWord);
+module.exports = router;

@@ -1,0 +1,11 @@
+const express = require('express');
+const authMiddleware = require('../middleware/auth');
+const vc = require('../controllers/vip.controller');
+const router = express.Router();
+router.use(authMiddleware);
+router.get('/noble-levels', vc.getNobleLevels);
+router.get('/dress-up/shop', vc.getDressUpShop);
+router.get('/dress-up/my', vc.getMyDressUps);
+router.post('/dress-up/purchase/:itemId', vc.purchaseDressUp);
+router.post('/dress-up/use/:itemId', vc.useDressUp);
+module.exports = router;

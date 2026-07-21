@@ -284,14 +284,64 @@ async function sendMessage(req, res) {
   }
 }
 
+// ====== 快捷回复 ======
+async function getQuickReplies(req, res) {
+  try {
+    const ChatEnhance = require('../models/ChatEnhance');
+    success(res, await ChatEnhance.getQuickReplies(req.user.id));
+  } catch (err) { serverError(res, err, '获取快捷回复失败'); }
+}
+async function addQuickReply(req, res) {
+  try {
+    const ChatEnhance = require('../models/ChatEnhance');
+    const r = await ChatEnhance.addQuickReply(req.user.id, req.body.content);
+    if (!r) return error(res, 400, '添加失败');
+    success(res, r, '添加成功');
+  } catch (err) { serverError(res, err, '添加快捷回复失败'); }
+}
+async function deleteQuickReply(req, res) {
+  try {
+    const ChatEnhance = require('../models/ChatEnhance');
+    await ChatEnhance.deleteQuickReply(parseInt(req.params.id), req.user.id);
+    success(res, null, '删除成功');
+  } catch (err) { serverError(res, err, '删除快捷回复失败'); }
+}
+
+// ====== 聊天背景 ======
+async function setBackground(req, res) {
+  try {
+    const { id } = req.user;
+    const convId = parseInt(req.params.id);
+    const ChatEnhance = require('../models/ChatEnhance');
+    await ChatEnhance.setBackground(id, convId, req.body.background_url);
+    success(res, null, '背景设置成功');
+  } catch (err) { serverError(res, err, '设置背景失败'); }
+}
+async function getBackground(req, res) {
+  try {
+    const { id } = req.user;
+    const convId = parseInt(req.params.id);
+    const ChatEnhance = require('../models/ChatEnhance');
+    const bg = await ChatEnhance.getBackground(id, convId);
+    success(res, bg);
+  } catch (err) { serverError(res, err, '获取背景失败'); }
+}
+
+// ====== 消息搜索 ======
+async function searchMessages(req, res) {
+  try {
+    const { id } = req.user;
+    const { keyword, conversation_id } = req.query;
+    if (!keyword) return error(res, 400, '搜索关键词不能为空');
+    const ChatEnhance = require('../models/ChatEnhance');
+    const msgs = await ChatEnhance.searchMessages(id, keyword, conversation_id ? parseInt(conversation_id) : null);
+    success(res, msgs);
+  } catch (err) { serverError(res, err, '搜索消息失败'); }
+}
+
 module.exports = {
-  getConversations,
-  getMessages,
-  markAsRead,
-  getUnreadCount,
-  createConversation,
-  recallMessage,
-  deleteConversation,
-  pinConversation,
-  sendMessage
+  getConversations, getMessages, markAsRead, getUnreadCount,
+  createConversation, recallMessage, deleteConversation, pinConversation, sendMessage,
+  getQuickReplies, addQuickReply, deleteQuickReply,
+  setBackground, getBackground, searchMessages
 };

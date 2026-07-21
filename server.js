@@ -270,6 +270,22 @@ app.post('/api/upload/voice', authMiddleware, uploadService.audioUploadMiddlewar
   res.json({ code: 0, message: '上传成功', data: { url, filename: req.file.filename } });
 });
 
+// 破冰话题路由
+const icebreakerRoutes = require('./src/routes/icebreaker.routes');
+app.use('/api/icebreaker', icebreakerRoutes);
+
+// 游戏路由
+const gameRoutes = require('./src/routes/game.routes');
+app.use('/api/game', gameRoutes);
+
+// 圈子路由
+const communityRoutes = require('./src/routes/community.routes');
+app.use('/api/community', communityRoutes);
+
+// VIP增强路由
+const vipRoutes = require('./src/routes/vip.routes');
+app.use('/api/vip', vipRoutes);
+
 // 健康检查接口（增强版：检查DB和Redis连接状态）
 app.get('/health', async (req, res) => {
   const health = {
