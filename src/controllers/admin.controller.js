@@ -8,18 +8,29 @@ const { success, error, serverError } = require('../utils/response');
 
 /**
  * 安全获取查询结果首行
- * 防止 executeQuery 返回 null 时访问 [0] 导致 TypeError
+ * pool.query() 返回 [rows, fields]，需解包第一维
  */
 function safeFirst(result, defaultValue = {}) {
-  if (!result || !Array.isArray(result) || result.length === 0) return defaultValue;
+  if (!result) return defaultValue;
+  // pool.query() 返回 [rows, fields]
+  if (Array.isArray(result) && result.length === 2 && Array.isArray(result[0])) {
+    result = result[0];
+  }
+  if (!Array.isArray(result) || result.length === 0) return defaultValue;
   return result[0] || defaultValue;
 }
 
 /**
  * 安全获取查询结果数组
+ * pool.query() 返回 [rows, fields]，需解包第一维
  */
 function safeRows(result) {
-  if (!result || !Array.isArray(result)) return [];
+  if (!result) return [];
+  // pool.query() 返回 [rows, fields]
+  if (Array.isArray(result) && result.length === 2 && Array.isArray(result[0])) {
+    return result[0];
+  }
+  if (!Array.isArray(result)) return [];
   return result;
 }
 
