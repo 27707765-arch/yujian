@@ -445,7 +445,7 @@ async function getUserProfile(req, res) {
       if (isDbAvailable()) {
         const [[pc]] = await executeQuery('SELECT COUNT(*) as cnt FROM posts WHERE user_id = ? AND status = 1', [userId]);
         postsCount = pc?.cnt || 0;
-        const [[fc]] = await executeQuery('SELECT COUNT(*) as cnt FROM likes WHERE liked_user_id = ?', [userId]);
+        const [[fc]] = await executeQuery('SELECT COUNT(*) as cnt FROM likes WHERE target_user_id = ?', [userId]);
         fansCount = fc?.cnt || 0;
       }
     } catch (e) { /* 静默 */ }

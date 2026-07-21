@@ -145,7 +145,7 @@ class User {
       if (isDbAvailable()) {
         const { phone, email, nickname, avatar, gender, age, height, occupation, location, lat, lng, bio, email_verified } = userData;
         const [result] = await executeQuery(
-          'INSERT INTO users (phone, email, nickname, avatar, gender, age, height, occupation, location, lat, lng, bio, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO users (phone, email, nickname, avatar, gender, age, height, occupation, location, lat, lng, bio, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [phone || null, email || null, nickname, avatar || null, gender || null, age || null, height || null, occupation || null, location || null, lat || null, lng || null, bio || null, email_verified || 0]
         );
         return this.findById(result.insertId);
