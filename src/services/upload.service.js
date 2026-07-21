@@ -114,6 +114,19 @@ const videoUpload = multer({ storage, limits: { fileSize: VIDEO_MAX_SIZE }, file
 // 封面上传 multer 实例（限制 10MB，复用图片限制）
 const coverUpload = multer({ storage, limits: { fileSize: parseInt(process.env.MAX_UPLOAD_SIZE || '10485760') }, fileFilter: coverFileFilter });
 
+// 语音文件大小限制（15MB）
+const AUDIO_MAX_SIZE = parseInt(process.env.AUDIO_MAX_SIZE || '15728640');
+const AUDIO_MIMES = ['audio/mpeg', 'audio/mp3', 'audio/aac', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a', 'audio/webm', 'audio/ogg'];
+
+// 语音上传过滤器
+const audioFileFilter = (req, file, cb) => {
+  if (AUDIO_MIMES.includes(file.mimetype)) { cb(null, true); }
+  else { cb(new Error('只允许上传音频文件（MP3/AAC/WAV/M4A/OGG）'), false); }
+};
+
+// 语音上传 multer 实例（限制 15MB）
+const audioUpload = multer({ storage, limits: { fileSize: AUDIO_MAX_SIZE }, fileFilter: audioFileFilter });
+
 /**
  * 单个文件上传中间件
  * @param {string} fieldName - 字段名
@@ -206,13 +219,28 @@ function handleMulterError(err, res) {
   });
 }
 
+/**
+ * 语音文件上传中间件
+ * @param {string} fieldName - 默认 'audio'
+ */
+function audioUploadMiddleware(fieldName) {
+  return (req, res, next) => {
+    audioUpload.single(fieldName || 'audio')(req, res, (err) => {
+      if (err) return handleMulterError(err, res);
+      next();
+    });
+  };
+}
+
 module.exports = {
   singleUpload,
   multipleUpload,
   mediaUpload,
   videoUploadMiddleware,
+  audioUploadMiddleware,
   validateMagicBytes,
   // 常量
   VIDEO_MAX_SIZE,
   VIDEO_MIMES,
+  AUDIO_MAX_SIZE,
 };

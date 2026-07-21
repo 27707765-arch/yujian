@@ -244,12 +244,23 @@ async function handleLike(user_id, target_user_id) {
       throw new Error('已经喜欢过该用户');
     }
 
+    // 每日配额检查
+    const UserDailyQuota = require('../models/UserDailyQuota');
+    const canLike = await UserDailyQuota.canLike(user_id);
+    if (!canLike) {
+      return { success: false, message: '今日喜欢次数已用完（20次/天），VIP无限制' };
+    }
+
     const matched = await Match.exists(user_id, target_user_id);
     if (matched) {
       throw new Error('已经匹配过该用户');
     }
 
     await Like.create(user_id, target_user_id);
+
+    // 递增配额 + 记录滑动撤销
+    UserDailyQuota.incrementLike(user_id).catch(() => {});
+    try { const rs = require('./redis.undo.service'); rs.recordSwipe(user_id, target_user_id, 'like').catch(() => {}); } catch (e) {}
 
     // 记录用户行为：喜欢
     MatchAlgorithm.recordBehavior(user_id, target_user_id, 'like');
@@ -268,6 +279,9 @@ async function handleLike(user_id, target_user_id) {
 
       // 创建会话
       const conversation = await Conversation.createOrGet(user_id, target_user_id);
+
+      // 初始化亲密关系（fire-and-forget）
+      try { const is = require('./intimacy.service'); is.onMatch(user_id, target_user_id).catch(() => {}); } catch (e) {}
 
       // 发送系统消息：互相喜欢
       await Message.create({
@@ -360,6 +374,9 @@ async function handleSkip(user_id, target_user_id) {
 
     await Skip.create(user_id, target_user_id);
 
+    // 记录滑动撤销
+    try { const rs = require('./redis.undo.service'); rs.recordSwipe(user_id, target_user_id, 'skip').catch(() => {}); } catch (e) {}
+
     // 记录用户行为：跳过
     MatchAlgorithm.recordBehavior(user_id, target_user_id, 'skip');
 
@@ -376,8 +393,78 @@ async function handleSkip(user_id, target_user_id) {
   }
 }
 
+/**
+ * 处理超级喜欢
+ */
+async function handleSuperLike(user_id, target_user_id) {
+  try {
+    const UserDailyQuota = require('../models/UserDailyQuota');
+    const Wallet = require('../models/Wallet');
+
+    const isBlocked = await Block.isMutualBlocked(user_id, target_user_id);
+    if (isBlocked) return { success: false, message: '无法操作，存在拉黑关系' };
+
+    const targetUser = await User.findById(target_user_id);
+    if (!targetUser) throw new Error('目标用户不存在');
+
+    const liked = await Like.exists(user_id, target_user_id);
+    if (liked) throw new Error('已经喜欢过该用户');
+
+    const canSL = await UserDailyQuota.canSuperLike(user_id);
+    if (!canSL) return { success: false, message: '今日超级喜欢次数已用完（5次/天）' };
+
+    // 扣10金币
+    const spendResult = await Wallet.spend(user_id, 10, 'super_like');
+    if (!spendResult || !spendResult.success) return { success: false, message: '金币不足，超级喜欢需要10金币' };
+
+    await Like.create(user_id, target_user_id, 2);
+    UserDailyQuota.incrementSuperLike(user_id).catch(() => {});
+    try { const rs = require('./redis.undo.service'); rs.recordSwipe(user_id, target_user_id, 'super_like').catch(() => {}); } catch (e) {}
+
+    MatchAlgorithm.recordBehavior(user_id, target_user_id, 'super_like');
+
+    // 通知目标用户
+    websocketService.sendToUser(target_user_id, {
+      type: 'super_like_received',
+      data: { user_id, timestamp: new Date().toISOString() }
+    });
+
+    return { success: true, message: '超级喜欢成功' };
+  } catch (err) {
+    console.error('超级喜欢失败:', err);
+    return { success: false, message: err.message };
+  }
+}
+
+/**
+ * 撤销最后一次滑动（3秒内有效）
+ */
+async function handleUndo(user_id) {
+  try {
+    const redisUndo = require('./redis.undo.service');
+    const lastSwipe = await redisUndo.getLastSwipe(user_id);
+    if (!lastSwipe) return { success: false, message: '无可撤销的滑动（仅3秒内有效）' };
+
+    const { action, target_user_id } = lastSwipe;
+    if (action === 'like' || action === 'super_like') {
+      // 从likes表删除
+      const { executeQuery } = require('../utils/database');
+      await executeQuery('DELETE FROM likes WHERE user_id = ? AND target_user_id = ? ORDER BY created_at DESC LIMIT 1', [user_id, target_user_id]);
+    } else if (action === 'skip') {
+      const { executeQuery } = require('../utils/database');
+      await executeQuery('DELETE FROM skips WHERE user_id = ? AND target_user_id = ? ORDER BY created_at DESC LIMIT 1', [user_id, target_user_id]);
+    }
+    await redisUndo.clearSwipe(user_id);
+    return { success: true, message: '撤销成功' };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
 module.exports = {
   recommendUsers,
   handleLike,
-  handleSkip
+  handleSkip,
+  handleSuperLike,
+  handleUndo
 };

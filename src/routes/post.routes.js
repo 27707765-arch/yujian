@@ -40,4 +40,14 @@ router.post('/:id/like', postController.toggleLike);
 
 // 点赞评论
 router.post('/comments/:id/like', postController.toggleCommentLike);
+
+// 收藏/取消收藏
+router.post('/:id/favorite', postController.toggleFavorite);
+
+// 我的收藏
+router.get('/favorites', postController.getFavorites);
+
+// 转发动态
+router.post('/:id/repost', contentAudit({ fields: ['repost_comment'] }), postController.createRepost);
+
 module.exports = router;

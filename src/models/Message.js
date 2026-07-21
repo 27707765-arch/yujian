@@ -15,41 +15,59 @@ class Message {
    */
   static async create(messageData) {
     const { conversation_id, sender_id, receiver_id, content, type } = messageData;
-    
+    const voice_url = messageData.voice_url || null;
+    const voice_duration = messageData.voice_duration || 0;
+    const video_url = messageData.video_url || null;
+    const video_duration = messageData.video_duration || 0;
+    const video_cover = messageData.video_cover || null;
+    const sticker_id = messageData.sticker_id || null;
+    const location_data = messageData.location_data ? JSON.stringify(messageData.location_data) : null;
+    const gift_data = messageData.gift_data ? JSON.stringify(messageData.gift_data) : null;
+
     try {
       if (isDbAvailable()) {
-        // 数据库可用时使用数据库
         const [result] = await executeQuery(
-          'INSERT INTO messages (conversation_id, sender_id, receiver_id, content, type) VALUES (?, ?, ?, ?, ?)',
-          [conversation_id, sender_id, receiver_id, content, type]
+          `INSERT INTO messages (conversation_id, sender_id, receiver_id, content, type,
+           voice_url, voice_duration, video_url, video_duration, video_cover,
+           sticker_id, location_data, gift_data)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [conversation_id, sender_id, receiver_id, content, type,
+           voice_url, voice_duration, video_url, video_duration, video_cover,
+           sticker_id, location_data, gift_data]
         );
-        
-        // 更新会话的最后消息，同时递增未读计数
+
+        // 更新会话最后消息
+        let lastText = content || '';
+        if (type === 2) lastText = '[语音]';
+        else if (type === 3) lastText = '[视频]';
+        else if (type === 4) lastText = '[贴纸]';
+        else if (type === 5) lastText = '[位置]';
+        else if (type === 6) lastText = '[礼物]';
         await executeQuery(
           'UPDATE conversations SET last_message = ?, last_message_time = ?, unread_count = COALESCE(unread_count, 0) + 1 WHERE id = ?',
-          [content, new Date(), conversation_id]
+          [lastText, new Date(), conversation_id]
         );
-        
+
         return this.findById(result.insertId);
       }
     } catch (error) {
       console.error('数据库操作失败，使用内存存储:', error.message);
     }
-    
-    // 数据库不可用时使用内存存储
+
+    // 内存降级
     const id = autoIncrementId++;
     const message = {
-      id,
-      conversation_id,
-      sender_id,
-      receiver_id,
-      content,
-      type,
-      status: 0,
-      created_at: new Date(),
-      updated_at: new Date()
+      id, conversation_id, sender_id, receiver_id, content, type, status: 0,
+      voice_url, voice_duration, video_url, video_duration, video_cover,
+      sticker_id, location_data: location_data ? JSON.parse(location_data) : null,
+      gift_data: gift_data ? JSON.parse(gift_data) : null,
+      created_at: new Date(), updated_at: new Date()
     };
     memoryStore.set(id, message);
+
+    // 更新亲密度（fire-and-forget）
+    try { const is = require('../services/intimacy.service'); is.onChatMessage(sender_id, receiver_id).catch(() => {}); } catch (e) {}
+
     return message;
   }
 
@@ -83,13 +101,23 @@ class Message {
     try {
       if (isDbAvailable()) {
         const [rows] = await executeQuery(
-          'SELECT *, CASE WHEN is_recalled = 1 THEN \'对方撤回了一条消息\' ELSE content END AS content FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+          `SELECT *, CASE WHEN is_recalled = 1 THEN '对方撤回了一条消息' ELSE content END AS content
+           FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
           [conversation_id, limit, offset]
         );
-        // 标记已撤回消息
+        // 标记已撤回消息，并为特定类型消息补充渲染文本
         rows.forEach(r => {
-          if (r.is_recalled) {
-            r._recalled = true;
+          if (r.is_recalled) { r._recalled = true; }
+          if (!r.is_recalled) {
+            if (r.type === 2 && r.voice_url) { r._render_text = '[语音 ' + (r.voice_duration || 0) + 's]'; }
+            else if (r.type === 3 && r.video_url) { r._render_text = '[视频]'; }
+            else if (r.type === 4) { r._render_text = '[贴纸]'; }
+            else if (r.type === 5 && r.location_data) {
+              try { const ld = typeof r.location_data === 'string' ? JSON.parse(r.location_data) : r.location_data; r._render_text = '[位置] ' + (ld.address || ld.name || ''); } catch(e) { r._render_text = '[位置]'; }
+            }
+            else if (r.type === 6 && r.gift_data) {
+              try { const gd = typeof r.gift_data === 'string' ? JSON.parse(r.gift_data) : r.gift_data; r._render_text = '[礼物] ' + (gd.gift_name || ''); } catch(e) { r._render_text = '[礼物]'; }
+            }
           }
         });
         return rows.reverse(); // 按时间正序返回

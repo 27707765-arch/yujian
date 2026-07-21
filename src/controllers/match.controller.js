@@ -172,11 +172,66 @@ async function getLikes(req, res) {
   }
 }
 
+/**
+ * 超级喜欢用户
+ */
+async function superLikeUser(req, res) {
+  try {
+    const { id } = req.user;
+    const { target_user_id } = req.body;
+    if (!target_user_id) return error(res, 400, '目标用户ID不能为空');
+    const result = await matchService.handleSuperLike(id, target_user_id);
+    if (!result.success) return error(res, 400, result.message);
+    success(res, null, result.message);
+  } catch (err) {
+    serverError(res, err, '超级喜欢失败');
+  }
+}
+
+/**
+ * 撤销上一次滑动
+ */
+async function undoSwipe(req, res) {
+  try {
+    const { id } = req.user;
+    const result = await matchService.handleUndo(id);
+    if (!result.success) return error(res, 400, result.message);
+    success(res, null, result.message);
+  } catch (err) {
+    serverError(res, err, '撤销滑动失败');
+  }
+}
+
+/**
+ * 获取今日配额
+ */
+async function getDailyQuota(req, res) {
+  try {
+    const { id } = req.user;
+    const UserDailyQuota = require('../models/UserDailyQuota');
+    const quota = await UserDailyQuota.getOrCreate(id);
+    const User = require('../models/User');
+    const user = await User.findById(id);
+    const isVip = user && (user.is_vip || (user.vip_level > 0 && user.vip_expire_time && new Date(user.vip_expire_time) > new Date()));
+    success(res, {
+      like_used: quota.like_used || 0,
+      like_limit: isVip ? -1 : 20,
+      super_like_used: quota.super_like_used || 0,
+      super_like_limit: isVip ? -1 : 5
+    });
+  } catch (err) {
+    serverError(res, err, '获取配额失败');
+  }
+}
+
 module.exports = {
   recommendUsers,
   likeUser,
   skipUser,
   getMatches,
   unmatch,
-  getLikes
+  getLikes,
+  superLikeUser,
+  undoSwipe,
+  getDailyQuota
 };

@@ -11,15 +11,35 @@ let autoIncrementId = 1;
 class Post {
   // ==================== 动态 ====================
 
-  static async create(user_id, { content, images, topics, video_url, video_duration, video_cover }) {
+  static async create(user_id, { content, images, topics, video_url, video_duration, video_cover, original_post_id, repost_comment }) {
     const imagesJson = images && images.length > 0 ? JSON.stringify(images) : null;
     const topicsJson = topics && topics.length > 0 ? JSON.stringify(topics) : null;
     try {
       if (isDbAvailable()) {
         const [result] = await executeQuery(
-          'INSERT INTO posts (user_id, content, images, topics, video_url, video_duration, video_cover) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [user_id, content || '', imagesJson, topicsJson, video_url || null, video_duration || null, video_cover || null]
+          `INSERT INTO posts (user_id, content, images, topics, video_url, video_duration, video_cover, original_post_id, repost_comment)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [user_id, content || '', imagesJson, topicsJson, video_url || null, video_duration || null, video_cover || null, original_post_id || null, repost_comment || null]
         );
+        // 提取话题并关联
+        if (content) {
+          const Topic = require('./Topic');
+          const hashtags = content.match(/#([^#\s]+)#/g);
+          if (hashtags) {
+            const topicIds = [];
+            for (const tag of hashtags) {
+              const tid = await Topic.findOrCreateByName(tag);
+              if (tid) { topicIds.push(tid); Topic.incrementPostCount(tid).catch(() => {}); }
+            }
+            if (topicIds.length > 0) { Topic.linkPost(result.insertId, topicIds).catch(() => {}); }
+          }
+        }
+        // 如果是转发，递增原帖转发数
+        if (original_post_id) {
+          executeQuery('UPDATE posts SET repost_count = repost_count + 1 WHERE id = ?', [original_post_id]).catch(() => {});
+        }
+        // 计算热度分
+        try { const hs = require('../services/hotScore.service'); hs.updatePostScore(result.insertId).catch(() => {}); } catch (e) {}
         return this.findById(result.insertId);
       }
     } catch (err) {
@@ -31,7 +51,8 @@ class Post {
       id, user_id, content: content || '',
       images: images || [], topics: topics || [],
       video_url: video_url || null, video_duration: video_duration || null, video_cover: video_cover || null,
-      like_count: 0, comment_count: 0,
+      like_count: 0, comment_count: 0, view_count: 0, hot_score: 0,
+      original_post_id: original_post_id || null, repost_comment: repost_comment || null, repost_count: 0,
       status: 1, created_at: new Date(), updated_at: new Date()
     };
     memoryStore.set(id, post);
@@ -59,43 +80,72 @@ class Post {
     return post && post.status === 1 ? post : null;
   }
 
-  static async getList({ limit = 20, offset = 0, user_id, topic, scope, currentUserId } = {}) {
+  static async getList({ limit = 20, offset = 0, user_id, topic, scope, currentUserId, sort = 'latest' } = {}) {
     try {
       if (isDbAvailable()) {
         let query = `SELECT p.*, u.nickname, u.avatar
           FROM posts p LEFT JOIN users u ON p.user_id = u.id
           WHERE p.status = 1`;
         const params = [];
-        if (user_id) {
-          query += ' AND p.user_id = ?';
-          params.push(user_id);
-        }
-        if (topic) {
-          query += ' AND JSON_CONTAINS(p.topics, ?, "$")';
-          params.push(JSON.stringify(topic));
-        }
-        // scope=following: 当前用户关注的人发布的帖子
+        if (user_id) { query += ' AND p.user_id = ?'; params.push(user_id); }
+        if (topic) { query += ' AND JSON_CONTAINS(p.topics, ?, "$")'; params.push(JSON.stringify(topic)); }
         if (scope === 'following' && currentUserId) {
-          query += ` AND p.user_id IN (SELECT matched_user_id FROM user_matches WHERE user_id = ?)`;
-          params.push(currentUserId);
+          query += ` AND p.user_id IN (SELECT user2_id AS matched_user_id FROM matches WHERE user1_id = ? UNION SELECT user1_id FROM matches WHERE user2_id = ?)`;
+          params.push(currentUserId, currentUserId);
         }
-        // scope=nearby: 就近排序（按帖子发布时间降序即可，距离排序由前端推荐接口处理）
-        query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
+        // 排序
+        if (sort === 'hot') query += ' ORDER BY p.hot_score DESC, p.created_at DESC';
+        else query += ' ORDER BY p.created_at DESC';
+        query += ' LIMIT ? OFFSET ?';
         params.push(parseInt(limit), parseInt(offset));
         const [rows] = await executeQuery(query, params);
-        rows.forEach(r => {
-          r.images = r.images ? JSON.parse(r.images) : [];
-          r.topics = r.topics ? JSON.parse(r.topics) : [];
-        });
+        rows.forEach(r => { r.images = r.images ? JSON.parse(r.images) : []; r.topics = r.topics ? JSON.parse(r.topics) : []; });
         return rows;
       }
-    } catch (err) {
-      console.error('数据库查询失败:', err.message);
-    }
+    } catch (err) { console.error('数据库查询失败:', err.message); }
     return Array.from(memoryStore.values())
       .filter(p => p.status === 1 && (!user_id || p.user_id === user_id) && (!topic || (p.topics || []).includes(topic)))
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(offset, offset + limit);
+  }
+
+  /** 收藏切换 */
+  static async toggleFavorite(postId, userId) {
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery('SELECT id FROM post_favorites WHERE post_id = ? AND user_id = ?', [postId, userId]);
+        if (rows[0]) {
+          await executeQuery('DELETE FROM post_favorites WHERE id = ?', [rows[0].id]);
+          return { favorited: false };
+        } else {
+          await executeQuery('INSERT INTO post_favorites (post_id, user_id) VALUES (?,?)', [postId, userId]);
+          return { favorited: true };
+        }
+      }
+    } catch (e) {}
+    return { favorited: false };
+  }
+
+  /** 获取用户收藏列表 */
+  static async getUserFavorites(userId, limit = 20, offset = 0) {
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery(
+          `SELECT p.*, u.nickname, u.avatar FROM post_favorites f
+           JOIN posts p ON f.post_id = p.id LEFT JOIN users u ON p.user_id = u.id
+           WHERE f.user_id = ? AND p.status = 1 ORDER BY f.created_at DESC LIMIT ? OFFSET ?`,
+          [userId, limit, offset]
+        );
+        rows.forEach(r => { r.images = r.images ? JSON.parse(r.images) : []; r.topics = r.topics ? JSON.parse(r.topics) : []; });
+        return rows;
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  /** 递增浏览量 */
+  static async incrementViewCount(postId) {
+    try { if (isDbAvailable()) await executeQuery('UPDATE posts SET view_count = view_count + 1 WHERE id = ?', [postId]); } catch (e) {}
   }
 
   // ==================== 点赞 ====================

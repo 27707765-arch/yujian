@@ -28,4 +28,13 @@ router.post('/unmatch', matchController.unmatch);
 // 获取喜欢列表
 router.get('/likes', matchController.getLikes);
 
+// 超级喜欢
+router.post('/super-like', matchController.superLikeUser);
+
+// 撤销滑动
+router.post('/undo', matchController.undoSwipe);
+
+// 今日配额
+router.get('/daily-quota', matchController.getDailyQuota);
+
 module.exports = router;

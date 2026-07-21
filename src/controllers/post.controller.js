@@ -222,4 +222,36 @@ async function toggleCommentLike(req, res) {
   }
 }
 
-module.exports = { createPost, getPosts, getPostDetail, addComment, toggleLike, toggleCommentLike, checkLikeStatus, updatePost, deletePost };
+module.exports = { createPost, getPosts, getPostDetail, addComment, toggleLike, toggleCommentLike, checkLikeStatus, updatePost, deletePost,
+  // Task2 新增方法
+  async toggleFavorite(req, res) {
+    try {
+      const { id } = req.user;
+      const postId = parseInt(req.params.id);
+      const result = await Post.toggleFavorite(postId, id);
+      success(res, result);
+    } catch (err) { serverError(res, err, '收藏操作失败'); }
+  },
+  async getFavorites(req, res) {
+    try {
+      const { id } = req.user;
+      const { limit, offset } = req.query;
+      const posts = await Post.getUserFavorites(id, parseInt(limit) || 20, parseInt(offset) || 0);
+      success(res, posts);
+    } catch (err) { serverError(res, err, '获取收藏列表失败'); }
+  },
+  async createRepost(req, res) {
+    try {
+      const { id } = req.user;
+      const postId = parseInt(req.params.id);
+      const originalPost = await Post.findById(postId);
+      if (!originalPost) return error(res, 404, '原动态不存在');
+      await Post.create(id, {
+        content: req.body.content || '',
+        original_post_id: postId,
+        repost_comment: req.body.repost_comment || null
+      });
+      success(res, null, '转发成功');
+    } catch (err) { serverError(res, err, '转发失败'); }
+  }
+};

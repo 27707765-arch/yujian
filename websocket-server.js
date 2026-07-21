@@ -204,44 +204,36 @@ function startWebSocketServer(server) {
  */
 async function handleSendMessage(userId, data) {
   const { receiver_id, content, type = 0 } = data;
+  const msgType = parseInt(type) || 0;
 
-  // 验证参数
-  if (!receiver_id || !content) {
-    return;
-  }
+  // 非文字/系统消息时允许 content 为空
+  if (!receiver_id) return;
+  if (msgType <= 1 && !content) return;
 
-  // 内容审核：检查敏感词
-  const auditResult = contentAuditService.checkSensitiveContent(content);
-  if (!auditResult.pass) {
-    // 通知发送者消息被拦截
-    websocketService.sendToUser(userId, {
-      type: 'message_blocked',
-      data: {
-        receiver_id,
-        reason: auditResult.message,
-        timestamp: new Date().toISOString()
-      }
-    });
-    console.log(`用户 ${userId} 的消息被拦截: ${auditResult.message}`);
-    return;
-  }
+  let filteredContent = content || '';
 
-  // 过滤敏感词后发送
-  const filteredContent = contentAuditService.filterSensitiveContent(content);
+  // 内容审核和反欺诈仅对文字消息执行
+  if (msgType <= 1 && content) {
+    const auditResult = contentAuditService.checkSensitiveContent(content);
+    if (!auditResult.pass) {
+      websocketService.sendToUser(userId, {
+        type: 'message_blocked',
+        data: { receiver_id, reason: auditResult.message, timestamp: new Date().toISOString() }
+      });
+      console.log(`用户 ${userId} 的消息被拦截: ${auditResult.message}`);
+      return;
+    }
+    filteredContent = contentAuditService.filterSensitiveContent(content);
 
-  // 反欺诈：检查消息发送行为
-  const msgRiskCheck = await antifraudService.checkMessageBehavior(userId, filteredContent);
-  if (msgRiskCheck.blocked) {
-    websocketService.sendToUser(userId, {
-      type: 'message_blocked',
-      data: {
-        receiver_id,
-        reason: '消息发送异常，已被系统拦截',
-        timestamp: new Date().toISOString()
-      }
-    });
-    console.log(`用户 ${userId} 的消息被反欺诈拦截: ${msgRiskCheck.reasons.join(', ')}`);
-    return;
+    const msgRiskCheck = await antifraudService.checkMessageBehavior(userId, filteredContent);
+    if (msgRiskCheck.blocked) {
+      websocketService.sendToUser(userId, {
+        type: 'message_blocked',
+        data: { receiver_id, reason: '消息发送异常，已被系统拦截', timestamp: new Date().toISOString() }
+      });
+      console.log(`用户 ${userId} 的消息被反欺诈拦截: ${msgRiskCheck.reasons.join(', ')}`);
+      return;
+    }
   }
 
   // 检查拉黑关系（双向）：存在拉黑则不能发消息
@@ -263,14 +255,22 @@ async function handleSendMessage(userId, data) {
     // 创建或获取会话
     const conversation = await Conversation.createOrGet(userId, receiver_id);
 
-    // 创建消息（使用过滤后的内容）
-    const message = await Message.create({
+    // 构建消息数据（支持多类型）
+    const msgData = {
       conversation_id: conversation.id,
       sender_id: userId,
       receiver_id,
       content: filteredContent,
-      type
-    });
+      type: msgType
+    };
+    if (msgType === 2) { msgData.voice_url = data.voice_url || null; msgData.voice_duration = parseInt(data.voice_duration) || 0; }
+    if (msgType === 3) { msgData.video_url = data.video_url || null; msgData.video_duration = parseInt(data.video_duration) || 0; msgData.video_cover = data.video_cover || null; }
+    if (msgType === 4) { msgData.sticker_id = parseInt(data.sticker_id) || null; }
+    if (msgType === 5) { msgData.location_data = data.location_data || null; }
+    if (msgType === 6) { msgData.gift_data = data.gift_data || null; }
+
+    // 创建消息
+    const message = await Message.create(msgData);
 
     // 构建消息对象
     const messageObj = {
@@ -283,7 +283,15 @@ async function handleSendMessage(userId, data) {
         content: message.content,
         type: message.type,
         status: message.status,
-        created_at: message.created_at
+        created_at: message.created_at,
+        voice_url: message.voice_url,
+        voice_duration: message.voice_duration,
+        video_url: message.video_url,
+        video_duration: message.video_duration,
+        video_cover: message.video_cover,
+        sticker_id: message.sticker_id,
+        location_data: message.location_data,
+        gift_data: message.gift_data
       }
     };
 

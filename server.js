@@ -253,6 +253,23 @@ app.use('/api/call', callRoutes);
 app.post('/api/feedback', authMiddleware, feedbackController.submitFeedback);
 app.use('/api/admin', adminRoutes);
 
+// 贴纸路由
+const stickerRoutes = require('./src/routes/sticker.routes');
+app.use('/api/stickers', stickerRoutes);
+
+// 亲密关系路由
+const intimacyRoutes = require('./src/routes/intimacy.routes');
+app.use('/api/intimacy', intimacyRoutes);
+
+// 语音上传路由
+app.post('/api/upload/voice', authMiddleware, uploadService.audioUploadMiddleware('audio'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ code: 400, message: '请选择音频文件' });
+  }
+  const url = '/' + req.file.filename;
+  res.json({ code: 0, message: '上传成功', data: { url, filename: req.file.filename } });
+});
+
 // 健康检查接口（增强版：检查DB和Redis连接状态）
 app.get('/health', async (req, res) => {
   const health = {

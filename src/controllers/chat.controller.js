@@ -233,19 +233,49 @@ async function sendMessage(req, res) {
     const { id } = req.user;
     const { conversation_id, content, type } = req.body;
     if (!conversation_id) return error(res, 400, '会话ID不能为空');
-    if (!content) return error(res, 400, '消息内容不能为空');
     const msgType = parseInt(type) || 0;
+    // 非文字/系统消息时，content可为空（由其他字段承载内容）
+    if (msgType <= 1 && !content) return error(res, 400, '消息内容不能为空');
+
     // 获取会话信息以确定接收者
     const conv = await Conversation.findById(conversation_id);
     if (!conv) return error(res, 404, '会话不存在');
     const receiverId = conv.user1_id === id ? conv.user2_id : conv.user1_id;
-    const msg = await Message.create({
-      conversation_id,
-      sender_id: id,
-      receiver_id: receiverId,
-      content,
-      type: msgType
-    });
+
+    // 构建消息数据
+    const msgData = {
+      conversation_id, sender_id: id, receiver_id: receiverId,
+      content: content || '', type: msgType
+    };
+
+    // 语音消息
+    if (msgType === 2) {
+      if (!req.body.voice_url) return error(res, 400, '语音文件URL不能为空');
+      msgData.voice_url = req.body.voice_url;
+      msgData.voice_duration = parseInt(req.body.voice_duration) || 0;
+    }
+    // 视频消息
+    if (msgType === 3) {
+      if (!req.body.video_url) return error(res, 400, '视频文件URL不能为空');
+      msgData.video_url = req.body.video_url;
+      msgData.video_duration = parseInt(req.body.video_duration) || 0;
+      msgData.video_cover = req.body.video_cover || null;
+    }
+    // 贴纸消息
+    if (msgType === 4) {
+      msgData.sticker_id = parseInt(req.body.sticker_id) || null;
+    }
+    // 位置消息
+    if (msgType === 5) {
+      if (!req.body.location_data) return error(res, 400, '位置数据不能为空');
+      msgData.location_data = req.body.location_data;
+    }
+    // 礼物消息
+    if (msgType === 6) {
+      msgData.gift_data = req.body.gift_data || null;
+    }
+
+    const msg = await Message.create(msgData);
     // WebSocket推送
     websocketService.sendToUser(receiverId, { type: 'message', data: msg });
     success(res, msg, '发送成功');
