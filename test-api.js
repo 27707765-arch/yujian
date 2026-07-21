@@ -4,7 +4,7 @@
  * 前提: server.js 已启动在 PORT 3001
  */
 
-const BASE = 'http://localhost:3001';
+const BASE = 'http://localhost:3000';
 let token = '';
 let fail = 0;
 let pass = 0;
@@ -50,7 +50,7 @@ async function api(method, path, body = null, useToken = true) {
 
   // 3. 登录获取 token
   await test('登录/注册', async () => {
-    const d = await api('POST', '/api/auth/login', { phone: '13800138000', code: '123456' }, false);
+    const d = await api('POST', '/api/auth/login', { login: '13800138000', code: '123456' }, false);
     if (!d.data?.token) throw new Error('未获取到 token');
     token = d.data.token;
     console.log('   Token: ' + token.slice(0, 30) + '...');
@@ -95,7 +95,7 @@ async function api(method, path, body = null, useToken = true) {
 
   // 9. 获取推荐用户
   await test('获取推荐用户', async () => {
-    const d = await api('GET', '/api/match/recommend?ageMin=18&ageMax=40&distance=50&limit=10');
+    const d = await api('GET', '/api/match/recommend?scope=city&ageMin=18&ageMax=40&distance=50&limit=10');
     console.log('   推荐人数: ' + (d.data?.length || 0));
   });
 

@@ -235,13 +235,19 @@ async function sendMessage(req, res) {
     if (!conversation_id) return error(res, 400, '会话ID不能为空');
     if (!content) return error(res, 400, '消息内容不能为空');
     const msgType = parseInt(type) || 0;
-    const msg = await Message.create(conversation_id, id, content, msgType);
-    // WebSocket推送
+    // 获取会话信息以确定接收者
     const conv = await Conversation.findById(conversation_id);
-    if (conv) {
-      const otherId = conv.user1_id === id ? conv.user2_id : conv.user1_id;
-      websocketService.sendToUser(otherId, { type: 'message', data: msg });
-    }
+    if (!conv) return error(res, 404, '会话不存在');
+    const receiverId = conv.user1_id === id ? conv.user2_id : conv.user1_id;
+    const msg = await Message.create({
+      conversation_id,
+      sender_id: id,
+      receiver_id: receiverId,
+      content,
+      type: msgType
+    });
+    // WebSocket推送
+    websocketService.sendToUser(receiverId, { type: 'message', data: msg });
     success(res, msg, '发送成功');
   } catch (err) {
     serverError(res, err, '发送消息失败');

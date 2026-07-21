@@ -124,7 +124,10 @@ async function updateUserInfo(req, res) {
       return error(res, 400, '标签最多选择10个');
     }
 
-    const updateData = { nickname, gender, age, height, occupation, location, lat, lng, bio };
+    const updateData = { nickname, gender, age, height, occupation, location, bio };
+    // lat/lng 单独处理：有值才传，防止前端传 undefined 覆盖数据库已有的坐标
+    if (lat != null) updateData.lat = parseFloat(lat);
+    if (lng != null) updateData.lng = parseFloat(lng);
     if (tags !== undefined) {
       updateData.tags = JSON.stringify(tags);
     }

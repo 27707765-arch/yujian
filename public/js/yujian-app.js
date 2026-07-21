@@ -57,7 +57,7 @@ var HomePage = {
           api("/user/location",{method:"POST",body:JSON.stringify({lat:lat,lng:lng})}).then(function(r){
             if(r.code===0&&r.data&&r.data.city)self.currentCity=r.data.city;
           }).catch(function(){}).then(function(){self.load()});
-        },function(){self.load()},{timeout:8000,enableHighAccuracy:false});
+        },function(){self.load()},{timeout:8000,enableHighAccuracy:true});
       }else{this.load()}
     },
     switchTab: function(t){this.tab=t;this.load()},
@@ -213,7 +213,7 @@ var UserProfilePage = {
   methods: {
     load: async function(){this.loading=true;try{var r=await api("/user/profile/"+this.$route.params.id);this.profile=r.data}catch(e){}this.loading=false},
     like: async function(){try{var r=await api("/match/like",{method:"POST",body:JSON.stringify({target_user_id:this.profile.id})});toast(r.data&&r.data.matched?"💕匹配成功！":"已喜欢","tok")}catch(e){toast(e.message,"terr")}},
-    chat: async function(){try{var r=await api("/chat/conversations",{method:"POST",body:JSON.stringify({target_user_id:this.profile.id})});if(r.data)this.$router.push("/chat/"+r.data.id)}catch(e){toast(e.message,"terr")}}
+    chat: async function(){try{var r=await api("/chat/conversations",{method:"POST",body:JSON.stringify({other_user_id:this.profile.id})});if(r.data)this.$router.push("/chat/"+r.data.id)}catch(e){toast(e.message,"terr")}}
   },
   mounted: function(){this.load()},
   template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px"><button class="btn bo" style="flex:1" @click="like">♥ 喜欢</button><button class="btn bp" style="flex:1" @click="chat">💬 发消息</button></div></div></div>`

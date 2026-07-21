@@ -67,8 +67,8 @@ async function executeQuery(query, params = []) {
   try {
     // 检查数据库是否可用
     if (dbAvailable) {
-      // 执行查询并返回结果
-      const result = await pool.execute(query, params);
+      // 执行查询并返回结果（使用 query 而非 execute 以兼容 mysql2 3.x）
+      const result = await pool.query(query, params);
       consecutiveFailures = 0; // 成功执行，重置失败计数
       return result;
     }

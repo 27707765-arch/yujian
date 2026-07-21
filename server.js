@@ -101,8 +101,8 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '1mb' })); // JSON 解析（限制大小防止攻击）
-app.use(express.urlencoded({ extended: true, limit: '1mb' })); // URL 编码解析
+app.use(express.json({ limit: '10mb' })); // JSON 解析（限制大小防止攻击）
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // URL 编码解析
 
 // 静态文件服务（添加缓存头）
 const staticOptions = {
