@@ -183,7 +183,7 @@ const contentAudit = require('./src/middleware/contentAudit');
 // 全局限流
 app.use(rateLimit({
   windowMs: 900000, // 15分钟
-  max: 100, // 每个IP最多100次请求
+  max: 500, // 每个IP最多500次请求（提高以适应测试环境）
   message: '请求过于频繁，请稍后再试',
   keyPrefix: 'rate_limit_global'
 }));

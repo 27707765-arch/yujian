@@ -54,10 +54,15 @@ var HomePage = {
       if(navigator.geolocation){
         navigator.geolocation.getCurrentPosition(function(pos){
           var lat=pos.coords.latitude,lng=pos.coords.longitude;
+          console.log('[定位] 获取到坐标:', lat, lng);
           api("/user/location",{method:"POST",body:JSON.stringify({lat:lat,lng:lng})}).then(function(r){
+            console.log('[定位] 上报成功:', r.code, r.data);
             if(r.code===0&&r.data&&r.data.city)self.currentCity=r.data.city;
-          }).catch(function(){}).then(function(){self.load()});
-        },function(){self.load()},{timeout:8000,enableHighAccuracy:true});
+          }).catch(function(e){console.log('[定位] 上报失败:', e.message)}).then(function(){self.load()});
+        },function(err){
+          console.log('[定位] GPS获取失败:', err.message);
+          self.load();
+        },{timeout:10000,enableHighAccuracy:true,maximumAge:0});
       }else{this.load()}
     },
     switchTab: function(t){this.tab=t;this.load()},
