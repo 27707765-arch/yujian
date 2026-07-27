@@ -81,6 +81,8 @@ async function getUserInfo(req, res) {
       province: user.province || null,
       city: user.city || null,
       district: user.district || null,
+      lat: user.lat || null,
+      lng: user.lng || null,
       tags: user.tags ? (typeof user.tags === 'string' ? JSON.parse(user.tags) : user.tags) : [],
       bio: user.bio,
       is_vip: user.is_vip,
@@ -658,3 +660,4 @@ module.exports = {
   getOnboardingStatus,
   completeOnboarding
 };
+

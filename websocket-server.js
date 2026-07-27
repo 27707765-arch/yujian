@@ -12,6 +12,7 @@ const websocketService = require('./src/services/websocket.service');
 const contentAuditService = require('./src/services/contentAudit.service');
 const antifraudService = require('./src/services/antifraud.service');
 const callService = require('./src/services/call.service');
+const offlineMessageService = require('./src/services/offlineMessage.service');
 
 // 心跳配置（针对移动网络优化）
 // 移动网络特点：4G/5G切换、信号波动可导致5-15秒无响应
@@ -101,6 +102,25 @@ function startWebSocketServer(server) {
           serverTime: new Date().toISOString()
         }
       }));
+
+      // 异步获取并发送离线消息
+      setTimeout(async () => {
+        try {
+          const offlineMessages = await offlineMessageService.getOfflineMessages(userId);
+          if (offlineMessages.length > 0) {
+            console.log(`[WS] 为用户 ${userId} 推送 ${offlineMessages.length} 条离线消息`);
+            for (const msg of offlineMessages) {
+              if (ws.readyState === 1) {
+                ws.send(JSON.stringify(msg));
+                // 每条消息间隔50ms，避免消息堆积
+                await new Promise(resolve => setTimeout(resolve, 50));
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[WS] 推送离线消息失败:', err.message);
+        }
+      }, 1000); // 延迟1秒，确保客户端已准备好接收
     } catch (err) {
       console.log(`[WS] 无效令牌: ${err.message}`);
       ws.close(4002, '无效的认证令牌');
@@ -295,17 +315,41 @@ async function handleSendMessage(userId, data) {
       }
     };
 
-    // 发送消息给接收者
-    websocketService.sendToUser(receiver_id, messageObj);
+    // 发送消息给接收者，检查是否成功
+    const sent = websocketService.sendToUser(receiver_id, messageObj);
+    
+    // 记录日志
+    console.log(`[WS] 用户${userId} -> 用户${receiver_id}: ${sent ? '已送达' : '对方不在线，消息已存储'}`);
 
-    // 发送消息确认给发送者
+    // 发送消息确认给发送者，包含送达状态
     websocketService.sendToUser(userId, {
       type: 'message_sent',
-      data: message
+      data: {
+        ...message,
+        delivered: sent,
+        receiver_online: sent
+      }
     });
+    
+    // 如果接收者不在线，存储离线消息
+    if (!sent) {
+      storeOfflineMessage(receiver_id, messageObj);
+    }
   } catch (err) {
     console.error('发送消息失败:', err);
   }
+}
+
+
+/**
+ * 存储离线消息
+ * @param {number} userId - 接收者用户ID
+ * @param {Object} messageObj - 消息对象
+ */
+function storeOfflineMessage(userId, messageObj) {
+  offlineMessageService.storeMessage(userId, messageObj).catch(err => {
+    console.error('[WS] 存储离线消息失败:', err.message);
+  });
 }
 
 /**
@@ -563,3 +607,6 @@ async function broadcastOnlineStatus(userId, online) {
 module.exports = {
   startWebSocketServer
 };
+
+
+

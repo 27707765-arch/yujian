@@ -42,7 +42,8 @@ const ALLOWED_UPDATE_COLUMNS = new Set([
   'tags', 'status', 'is_vip', 'vip_expire_time', 'onboarding_completed',
   'email', 'email_verified', 'password_hash',
   'is_real_name_verified', 'is_face_verified', 'is_education_verified',
-  'is_vehicle_verified', 'verification_level', 'verified_badges'
+  'is_vehicle_verified', 'verification_level', 'verified_badges',
+  'noble_level', 'noble_expire_time'
 ]);
 
 class User {
@@ -430,6 +431,115 @@ class User {
     memoryStore.set(userId, u);
     return true;
   }
+
+  /**
+   * 获取附近用户（基于经纬度）
+   * @param {number} userId - 当前用户ID
+   * @param {number} lat - 纬度
+   * @param {number} lng - 经度
+   * @param {number} distance - 距离(km)
+   * @param {number} limit - 限制数量
+   * @returns {Promise<Array>}
+   */
+  static async getNearbyUsers(userId, lat, lng, distance = 20, limit = 60) {
+    try {
+      if (isDbAvailable()) {
+        // 使用Haversine公式计算距离，按距离排序
+        const [rows] = await executeQuery(
+          `SELECT *, 
+            (6371 * acos(
+              cos(radians(?)) * cos(radians(lat)) * 
+              cos(radians(lng) - radians(?)) + 
+              sin(radians(?)) * sin(radians(lat))
+            )) AS distance
+           FROM users 
+           WHERE id != ? 
+             AND status = 1 
+             AND lat IS NOT NULL 
+             AND lng IS NOT NULL
+           HAVING distance <= ?
+           ORDER BY distance ASC
+           LIMIT ?`,
+          [lat, lng, lat, userId, distance, limit]
+        );
+        return rows || [];
+      }
+    } catch (err) {
+      console.error('查询附近用户失败，使用内存存储:', err.message);
+    }
+
+    // 内存降级：使用Haversine公式过滤
+    return Array.from(memoryStore.values())
+      .filter(user => {
+        if (user.id === userId || user.status !== 1) return false;
+        if (!user.lat || !user.lng) return false;
+        return isWithinDistance(lat, lng, user.lat, user.lng, distance);
+      })
+      .slice(0, limit);
+  }
+
+  /**
+   * 获取同城用户
+   * @param {number} userId - 当前用户ID
+   * @param {string} city - 城市名称
+   * @param {number} limit - 限制数量
+   * @returns {Promise<Array>}
+   */
+  static async getUsersByCity(userId, city, limit = 60) {
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery(
+          `SELECT * FROM users 
+           WHERE id != ? 
+             AND status = 1 
+             AND city = ?
+           ORDER BY last_active_at DESC, id DESC
+           LIMIT ?`,
+          [userId, city, limit]
+        );
+        return rows || [];
+      }
+    } catch (err) {
+      console.error('查询同城用户失败，使用内存存储:', err.message);
+    }
+
+    // 内存降级
+    return Array.from(memoryStore.values())
+      .filter(user => {
+        if (user.id === userId || user.status !== 1) return false;
+        return user.city === city;
+      })
+      .slice(0, limit);
+  }
+
+  /**
+   * 获取用户列表（分页）
+   * @param {number} page - 页码
+   * @param {number} pageSize - 每页数量
+   * @returns {Promise<Array>}
+   */
+  static async getList(page = 1, pageSize = 20) {
+    const offset = (page - 1) * pageSize;
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery(
+          'SELECT * FROM users WHERE status = 1 ORDER BY id DESC LIMIT ? OFFSET ?',
+          [pageSize, offset]
+        );
+        return rows || [];
+      }
+    } catch (err) {
+      console.error('查询用户列表失败:', err.message);
+    }
+
+    // 内存降级
+    return Array.from(memoryStore.values())
+      .filter(u => u.status === 1)
+      .sort((a, b) => b.id - a.id)
+      .slice(offset, offset + pageSize);
+  }
 }
 
 module.exports = User;
+
+

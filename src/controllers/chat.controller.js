@@ -276,9 +276,26 @@ async function sendMessage(req, res) {
     }
 
     const msg = await Message.create(msgData);
-    // WebSocket推送
-    websocketService.sendToUser(receiverId, { type: 'message', data: msg });
-    success(res, msg, '发送成功');
+    
+    // WebSocket推送，检查接收者是否在线
+    const receiverOnline = websocketService.isUserOnline(receiverId);
+    const sent = websocketService.sendToUser(receiverId, { type: 'message', data: msg });
+    
+    // 记录日志
+    console.log(`[Chat] 用户${id} -> 用户${receiverId}: ${sent ? '已送达' : '对方不在线'}`);
+    
+    // 记录亲密度（异步）
+    try {
+      const intimacyService = require('../services/intimacy.service');
+      intimacyService.onChatMessage(id, receiverId).catch(() => {});
+    } catch (e) {}
+    
+    // 返回消息给发送者，包含送达状态
+    success(res, { 
+      ...msg, 
+      delivered: sent,
+      receiver_online: receiverOnline
+    }, sent ? '发送成功' : '发送成功（对方不在线，上线后可收到）');
   } catch (err) {
     serverError(res, err, '发送消息失败');
   }
@@ -345,3 +362,5 @@ module.exports = {
   getQuickReplies, addQuickReply, deleteQuickReply,
   setBackground, getBackground, searchMessages
 };
+
+

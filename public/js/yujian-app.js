@@ -113,17 +113,30 @@ var HomePage = {
 };
 
 var DiscoverPage = {
-  data: function(){return {posts:[],loading:true,err:false,tab:"all"}},
+  data: function(){return {posts:[],loading:true,err:false,tab:"all",showPublish:false,pubText:"",pubImage:null,pubPreview:""}},
   methods: {
     load: async function(){this.loading=true;this.err=false;try{var r=await api("/posts?limit=20");this.posts=r.data||[]}catch(e){this.err=true}this.loading=false},
     toggleLike: async function(p){try{await api("/posts/"+p.id+"/like",{method:"POST"});p.liked=!p.liked;p.like_count+=p.liked?1:-1;if(p.like_count<0)p.like_count=0}catch(e){toast(e.message,"terr")}},
-    switchTab: function(t){this.tab=t;this.load()}
+    switchTab: function(t){this.tab=t;this.load()},
+    pubImageChange: function(e){var f=e.target.files[0];if(f){this.pubImage=f;this.pubPreview=URL.createObjectURL(f)}},
+    publish: async function(){var t=this.pubText.trim();if(!t&&!this.pubImage){toast("请输入内容或选择图片","tinfo");return}try{var fd=new FormData();if(t)fd.append("content",t);if(this.pubImage)fd.append("images",this.pubImage);var r=await api("/posts",{method:"POST",body:fd});if(r.code===0){toast("发布成功","tok");this.showPublish=false;this.pubText="";this.pubImage=null;this.pubPreview="";this.load()}else toast(r.message,"terr")}catch(e){toast(e.message,"terr")}}
   },
   mounted: function(){this.load()},
   template: `<div style="padding:12px 16px">
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn bs" :class="tab==='all'?'bp':'bo'" @click="switchTab('all')">全部</button>
     <button class="btn bs" :class="tab==='nearby'?'bp':'bo'" @click="switchTab('nearby')">附近</button>
+    <button class="btn bp bs" style="margin-left:auto" @click="showPublish=true">✏️ 发布</button>
+  </div>
+  <div v-if="showPublish" class="card" style="padding:16px;margin-bottom:12px">
+    <textarea v-model="pubText" placeholder="分享你的生活..." style="width:100%;min-height:80px;border:1px solid var(--b);border-radius:8px;padding:10px;font-size:15px;resize:vertical" maxlength="500"></textarea>
+    <div v-if="pubPreview" style="position:relative;display:inline-block;margin-top:8px"><img :src="pubPreview" style="max-width:200px;max-height:200px;border-radius:8px"><button @click="pubImage=null;pubPreview=''" style="position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;background:var(--e);color:#fff;border:none;cursor:pointer;font-size:14px">✕</button></div>
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+      <label style="cursor:pointer;font-size:24px">📷<input type="file" accept="image/*" style="display:none" @change="pubImageChange"></label>
+      <span style="font-size:12px;color:var(--tm);flex:1">{{pubText.length}}/500</span>
+      <button class="btn bp bs" @click="publish">发布</button>
+      <button class="btn bo bs" @click="showPublish=false;pubText='';pubImage=null;pubPreview=''">取消</button>
+    </div>
   </div>
   <div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div><p style="color:var(--tm);margin-top:12px">加载中...</p></div>
   <div v-else-if="err" class="empty" style="padding:48px 24px"><div style="font-size:48px">😵</div><p style="color:var(--ts);margin:12px 0">加载失败</p><button class="btn bp bs" @click="load">重试</button></div>

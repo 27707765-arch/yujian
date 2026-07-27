@@ -51,11 +51,13 @@ async function recommendUsers(user_id, filters = {}) {
       );
     } else if (scope === 'city' && currentUser.city) {
       // 同城：按 city 字段查同市用户
+      console.log(`[Match] 查询同城用户: userId=${user_id}, city=${currentUser.city}, limit=${limit * 3}`);
       users = await User.getUsersByCity(
         user_id,
         currentUser.city,
         limit * 3
       );
+      console.log(`[Match] 同城查询结果: ${users.length} 个用户`);
     } else {
       // 降级：当前用户没有 city 也没有坐标时，取全部用户
       try {
@@ -63,7 +65,8 @@ async function recommendUsers(user_id, filters = {}) {
           'SELECT * FROM users WHERE id != ? AND status = 1 LIMIT ?',
           [user_id, limit * 3]
         );
-        users = Array.isArray(result) ? result : (result && result[0]) || [];
+        // pool.query() 返回 [rows, fields]，需解包第一维
+        users = Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
       } catch (fallbackErr) {
         users = [];
       }
@@ -468,3 +471,4 @@ module.exports = {
   handleSuperLike,
   handleUndo
 };
+
