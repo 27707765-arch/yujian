@@ -67,6 +67,7 @@ async function sendVerificationCode(phone) {
       // 存储验证码到Redis，设置5分钟过期
       const client = redis.getClient();
       await client.set(`sms:code:${phone}`, code, { EX: 300 });
+      console.log(`[SMS] 验证码已存入Redis: phone=${phone}, code=${code}`);
     } else {
       // 使用内存存储（降级方案）
       cleanupExpiredCodes();
@@ -74,6 +75,7 @@ async function sendVerificationCode(phone) {
         code: code,
         expireTime: Date.now() + 5 * 60 * 1000 // 5分钟过期
       });
+      console.log(`[SMS] 验证码已存入内存: phone=${phone}, code=${code}`);
     }
 
     // 模拟短信发送（实际项目中需要调用真实的短信API）
@@ -108,6 +110,7 @@ async function verifyCode(phone, code) {
       const client = redis.getClient();
       const storedCode = await client.get(`sms:code:${phone}`);
 
+      console.log(`[SMS] 验证码比对: phone=${phone}, 输入=${code}, 存储=${storedCode || 'null'}, 结果=${storedCode === code}`);
       if (storedCode === code) {
         // 验证成功后删除验证码
         await client.del(`sms:code:${phone}`);
@@ -119,6 +122,7 @@ async function verifyCode(phone, code) {
       cleanupExpiredCodes();
       const record = memoryStore.get(phone);
 
+      console.log(`[SMS] 内存验证码比对: phone=${phone}, 输入=${code}, 存储=${record ? record.code : 'null'}, 结果=${record && record.code === code}`);
       if (record && record.code === code) {
         // 验证成功后删除验证码
         memoryStore.delete(phone);
@@ -136,3 +140,5 @@ module.exports = {
   sendVerificationCode,
   verifyCode
 };
+
+

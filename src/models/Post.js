@@ -287,7 +287,7 @@ class Post {
     if (!this._commentsMemory.has(post_id)) this._commentsMemory.set(post_id, []);
     const commentId = (this._commentAutoId = (this._commentAutoId || 0) + 1);
     const comment = {
-      id: commentId, post_id, user_id, content, parent_id, parent_id,
+      id: commentId, post_id, user_id, content, parent_id,
       status: 1, created_at: new Date(), updated_at: new Date(),
       nickname: null, avatar: null, replies: []
     };

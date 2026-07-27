@@ -226,6 +226,19 @@ async function handleSendMessage(userId, data) {
   const { receiver_id, content, type = 0 } = data;
   const msgType = parseInt(type) || 0;
 
+  // 校验发送者是否存在（防止外键约束失败）
+  try {
+    const User = require('./src/models/User');
+    const sender = await User.findById(userId);
+    if (!sender) {
+      websocketService.sendToUser(userId, {
+        type: 'error',
+        data: { message: '用户不存在，请重新登录' }
+      });
+      return;
+    }
+  } catch (e) { /* 校验失败则继续，不阻塞消息 */ }
+
   // 非文字/系统消息时允许 content 为空
   if (!receiver_id) return;
   if (msgType <= 1 && !content) return;

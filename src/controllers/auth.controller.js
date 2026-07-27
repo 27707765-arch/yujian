@@ -123,32 +123,34 @@ async function sendCode(req, res) {
  * login 可以是手机号或邮箱，自动识别
  */
 async function login(req, res) {
+      console.log('[Auth] login body:', JSON.stringify(req.body), 'ct:', req.headers['content-type']);
   try {
-    const { login, code } = req.body;
+    const { login, phone: phoneField, code } = req.body;
+      const loginAccount = login || phoneField; // 兼容前端发送 phone 或 login 字段
 
-    if (!login) return error(res, 400, '请输入手机号或邮箱');
+    if (!loginAccount) return error(res, 400, '请输入手机号或邮箱');
     if (!code || typeof code !== 'string' || code.length < 4) {
       return error(res, 400, '请输入验证码');
     }
 
     // 判断登录方式
-    const isEmail = login.includes('@');
+    const isEmail = loginAccount.includes('@');
     let user;
 
     if (isEmail) {
       // 邮箱登录
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login)) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginAccount)) {
         return error(res, 400, '邮箱格式错误');
       }
-      const isValid = await emailService.verifyCode(login, code);
+      const isValid = await emailService.verifyCode(loginAccount, code);
       if (!isValid) return error(res, 400, '验证码错误');
 
-      user = await User.findByEmail(login);
+      user = await User.findByEmail(loginAccount);
       if (!user) {
         // 自动注册
         const autoNickname = await generateUniqueNickname();
         user = await User.create({
-          email: login,
+          email: loginAccount,
           phone: null,
           nickname: autoNickname,
           email_verified: 1
@@ -156,23 +158,26 @@ async function login(req, res) {
       }
     } else {
       // 手机登录
-      if (!/^1[3-9]\d{9}$/.test(login)) {
+      if (!/^1[3-9]\d{9}$/.test(loginAccount)) {
         return error(res, 400, '手机号格式错误');
       }
-      const isValid = await smsService.verifyCode(login, code);
-      if (!isValid) return error(res, 400, '验证码错误');
+      const isValid = await smsService.verifyCode(loginAccount, code);
+      if (!isValid) {
+        console.warn(`[Auth] 验证码验证失败: phone=${loginAccount}, code=${code}`);
+        return error(res, 400, '验证码错误');
+      }
 
-      user = await User.findByPhone(login);
+      user = await User.findByPhone(loginAccount);
       if (!user) {
         const clientIp = req.ip || req.connection.remoteAddress;
-        const riskCheck = await antifraudService.checkRegistration(clientIp, login);
+        const riskCheck = await antifraudService.checkRegistration(clientIp, loginAccount);
         if (riskCheck.blocked) {
-          console.warn(`注册被反欺诈拦截: IP=${clientIp}, 手机=${login}`);
+          console.warn(`注册被反欺诈拦截: IP=${clientIp}, 手机=${loginAccount}`);
           return error(res, 403, '注册受限，请联系客服');
         }
         const autoNickname = await generateUniqueNickname();
         user = await User.create({
-          phone: login,
+          phone: loginAccount,
           email: null,
           nickname: autoNickname
         });
@@ -244,3 +249,13 @@ module.exports = {
   setPassword,
   bindEmail
 };
+
+
+
+
+
+
+
+
+
+

@@ -191,8 +191,8 @@ app.use(rateLimit({
 // 认证路由 - 登录限流（防止暴力破解验证码）
 const authRateLimit = rateLimit({
   windowMs: 60000,    // 1分钟窗口
-  max: 5,             // 最多5次登录尝试
-  message: '登录尝试过于频繁，请1分钟后再试',
+  max: 15,            // 最多15次登录尝试（防止误触被锁）
+  message: '登录尝试过于频繁，请稍后再试',
   keyPrefix: 'rate_limit_login'
 });
 app.use('/api/auth/login', authRateLimit);

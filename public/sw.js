@@ -1,5 +1,5 @@
 // 遇见APP Service Worker - v2 缓存策略优化
-const CACHE_VERSION = 'yujian-v2';
+const CACHE_VERSION = 'yujian-v3';
 const STATIC_PREFIX = '/js/';
 const UPLOAD_PREFIX = '/uploads/';
 
@@ -81,3 +81,4 @@ self.addEventListener('fetch', event => {
     )
   );
 });
+

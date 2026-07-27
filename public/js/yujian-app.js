@@ -14,7 +14,7 @@ var ws=null,wsTimer=null,wsCount=0,wsHooks={};
 function wsOn(type,fn){if(!wsHooks[type])wsHooks[type]=[];wsHooks[type].push(fn)}
 function wsOff(type,fn){if(!wsHooks[type])return;var i=wsHooks[type].indexOf(fn);if(i>-1)wsHooks[type].splice(i,1)}
 function wsSend(d){return ws&&ws.readyState===1&&!!ws.send(JSON.stringify(d))}
-function wsConnect(){var t=token();if(!t)return;if(ws)try{ws.close()}catch(e){}try{ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+"?token="+t);ws.onopen=function(){wsCount=0};ws.onmessage=function(e){try{var d=JSON.parse(e.data);if(d.type&&wsHooks[d.type])wsHooks[d.type].forEach(function(fn){fn(d)});if(wsHooks["*"])wsHooks["*"].forEach(function(fn){fn(d)})}catch(_){}};ws.onclose=function(){if(wsCount<10){wsCount++;wsTimer=setTimeout(wsConnect,5000)}}}catch(_){}}
+function wsConnect(){var t=token();if(!t)return;if(ws)try{ws.close()}catch(e){}try{ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+"?token="+t);ws.onopen=function(){wsCount=0;if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}wsTimer=setInterval(function(){if(ws&&ws.readyState===1){ws.send(JSON.stringify({type:"ping"}))}},30000)};ws.onmessage=function(e){try{var d=JSON.parse(e.data);if(d.type==="pong")return;if(d.type&&wsHooks[d.type])wsHooks[d.type].forEach(function(fn){fn(d)});if(wsHooks["*"])wsHooks["*"].forEach(function(fn){fn(d)})}catch(_){}};ws.onclose=function(){if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}if(wsCount<10){wsCount++;wsTimer=setTimeout(wsConnect,5000)}}}catch(_){}}
 
 // ==== 页面组件 ====
 var WelcomePage = {
