@@ -78,6 +78,10 @@ async function likeUser(req, res) {
       icebreakers: result.icebreakers || []
     }, result.message);
   } catch (err) {
+    const businessErrors = ['已经喜欢过该用户', '目标用户不存在', '无法操作，存在拉黑关系', '已经匹配过该用户'];
+    if (businessErrors.includes(err.message)) {
+      return error(res, 400, err.message);
+    }
     serverError(res, err, '喜欢用户失败');
   }
 }

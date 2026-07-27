@@ -72,8 +72,8 @@ async function executeQuery(query, params = []) {
       consecutiveFailures = 0; // 成功执行，重置失败计数
       return result;
     }
-    // 数据库不可用，返回null
-    return null;
+    // 数据库不可用，返回空结果而非 null，防止解构崩溃
+    return [[], []];
   } catch (error) {
     // 根据错误类型判断是否需要标记数据库不可用
     const fatalCodes = ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST', 'ER_SERVER_SHUTDOWN'];
@@ -90,7 +90,7 @@ async function executeQuery(query, params = []) {
       console.error(`[DB] 查询错误 (非致命, ${error.code || 'unknown'}): ${error.message}`);
     }
 
-    return null;
+    return [[], []];  // 返回空结果而非 null
   }
 }
 
