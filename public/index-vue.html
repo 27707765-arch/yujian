@@ -558,10 +558,10 @@ html,body{
 .pg{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .pg-nav{padding-bottom:calc(var(--nav-h) + var(--safe-b) + 8px)}
 .pg-nonav{padding-bottom:8px}
-.nav{height:var(--nav-h);background:rgba(255,255,255,.9);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-evenly;z-index:100;padding-bottom:var(--safe-b);flex-shrink:0;max-width:500px;margin:0 auto}
-.nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);text-decoration:none;cursor:pointer;gap:3px;padding:6px 0}
-.nav a.on{color:var(--primary)}
-.ni{font-size:24px;line-height:1}
+.nav{height:var(--nav-h);background:rgba(255,255,255,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-evenly;z-index:100;padding:4px 16px calc(4px + var(--safe-b));flex-shrink:0;position:fixed;bottom:0;left:0;right:0;width:100%;gap:4px}
+.nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);text-decoration:none;cursor:pointer;gap:2px;padding:8px 4px;border-radius:12px;transition:all .2s;max-width:80px;margin:0 auto}
+.nav a.on{color:var(--primary);background:var(--primary-bg)}
+.ni{font-size:22px;line-height:1}
 .nl{font-size:11px;font-weight:500}
 
 /* Toast aliases */
