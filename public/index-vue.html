@@ -546,6 +546,81 @@ html,body{
 .mb-12{margin-bottom:12px}
 .gap-8{gap:8px}
 .gap-12{gap:12px}
+
+/* ============ yujian-app.js Class Aliases ============ */
+/* The Vue app uses abbreviated class names; these aliases map them to the styles above */
+
+/* App Shell aliases */
+.app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;max-width:500px;margin:0 auto}
+.hdr{height:var(--header-h);background:rgba(255,255,255,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:center;padding:0 16px;z-index:100;flex-shrink:0;position:relative}
+.hdr .tt{font-size:17px;font-weight:700;color:var(--text)}
+.bk{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:none;background:none;font-size:20px;color:var(--primary);cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.pg{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.pg-nav{padding-bottom:calc(var(--nav-h) + var(--safe-b) + 8px)}
+.pg-nonav{padding-bottom:8px}
+.nav{height:var(--nav-h);background:rgba(255,255,255,.9);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-evenly;z-index:100;padding-bottom:var(--safe-b);flex-shrink:0;max-width:500px;margin:0 auto}
+.nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);text-decoration:none;cursor:pointer;gap:3px;padding:6px 0}
+.nav a.on{color:var(--primary)}
+.ni{font-size:24px;line-height:1}
+.nl{font-size:11px;font-weight:500}
+
+/* Toast aliases */
+.tc{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:calc(100% - 32px);max-width:360px}
+.tm{padding:12px 20px;border-radius:var(--radius-sm);font-size:14px;color:#fff;text-align:center;animation:toastIn .3s;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+
+/* Button aliases */
+
+.bp{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;box-shadow:0 4px 16px rgba(255,94,125,.3)}
+.bp:hover{box-shadow:0 6px 24px rgba(255,94,125,.45);transform:translateY(-1px)}
+.bo{background:transparent;border:2px solid var(--primary);color:var(--primary)}
+.bs{padding:7px 18px;font-size:13px;border-radius:20px}
+.bw{width:100%}
+.bl{padding:16px 36px;font-size:18px;border-radius:30px}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+
+/* Avatar aliases */
+.avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--border-light);overflow:hidden;flex-shrink:0;position:relative}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.av-sm{width:36px;height:36px;font-size:16px}
+.av-lg{width:64px;height:64px;font-size:28px}
+
+/* Loading alias */
+.spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin:16px auto}
+
+/* Welcome alias */
+.welcome{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#FF6B6B,#FF8E8E);color:#fff;text-align:center}
+
+/* Empty state aliases */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center}
+.ei{font-size:64px;margin-bottom:16px;opacity:.6}
+.et{font-size:17px;font-weight:600;margin-bottom:8px;color:var(--text)}
+.ed{font-size:14px;color:var(--text-muted);margin-bottom:20px}
+
+/* Input alias */
+.inp{display:flex;align-items:center;border:1px solid var(--border);border-radius:12px;padding:0 12px;background:var(--bg-white);gap:8px;transition:border-color .2s}
+.inp:focus-within{border-color:var(--primary)}
+.inp input{flex:1;border:none;outline:none;font-size:15px;padding:12px 0;background:transparent}
+.inp span{font-size:18px;flex-shrink:0}
+
+/* Tag alias */
+.tp{background:#FFF0F0;color:var(--primary)}
+
+/* Chat message aliases */
+.msg-sy{text-align:center;font-size:13px;color:var(--text-muted);padding:8px 0}
+.msg-b{max-width:75%;padding:10px 14px;border-radius:16px;line-height:1.5;word-break:break-word;font-size:14px;margin-bottom:12px}
+.msg-my{border-radius:16px 16px 4px 16px;background:var(--primary);color:#fff;margin-left:auto}
+.msg-ot{border-radius:16px 16px 16px 4px;background:var(--bg-white);color:var(--text);box-shadow:var(--shadow);margin-right:auto}
+
+/* Chat input alias */
+.ci{background:var(--bg-white);border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:flex-end;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+
+/* Transition alias (sl -> slide-left) */
+.sl-enter-active{animation:slideLeft .25s ease-out}
+.sl-leave-active{animation:fadeIn .15s ease-in reverse}
+
+/* Heart pop animation alias */
+@keyframes hp{0%{transform:scale(0)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+
 </style>
 </head>
 <body>
@@ -553,7 +628,7 @@ html,body{
 
 <script src="/js/vue.global.js"></script>
 <script src="/js/vue-router.global.js"></script>
-<script src="/js/yujian-app.js?v=20260728"></script>
+<script src="/js/yujian-app.js?v=202607281117"></script>
 </body>
 </html>
 

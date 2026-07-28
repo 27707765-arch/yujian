@@ -7,7 +7,27 @@ function toast(msg, cls) { var id = ++_tid; toasts.push({id:id, msg:msg, cls:cls
 function token() { return localStorage.getItem("token") || ""; }
 function timeAgo(t) { if(!t)return""; var d=Math.floor((Date.now()-new Date(t).getTime())/1000); if(d<60)return"刚刚"; if(d<3600)return Math.floor(d/60)+"分钟前"; if(d<86400)return Math.floor(d/3600)+"小时前"; return Math.floor(d/86400)+"天前"; }
 function timeStr(t) { if(!t)return""; var d=new Date(t); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
-async function api(url, opts) { opts=opts||{}; var h={"Content-Type":"application/json"}; var t=token(); if(t)h["Authorization"]="Bearer "+t; if(opts.body instanceof FormData)delete h["Content-Type"]; var r=await fetch("/api"+url, Object.assign({},opts,{headers:Object.assign({},h,opts.headers||{})})); var d=await r.json(); if(r.status===401){localStorage.clear();location.hash="#/login";throw new Error("login expired")} return d; }
+async function api(url, opts) {
+  opts=opts||{};
+  var h={"Content-Type":"application/json"};
+  var t=token();
+  if(t)h["Authorization"]="Bearer "+t;
+  if(opts.body instanceof FormData)delete h["Content-Type"];
+  var ctrl=new AbortController();
+  var timer=setTimeout(function(){ctrl.abort()},15000);
+  try{
+    var r=await fetch("/api"+url, Object.assign({},opts,{headers:Object.assign({},h,opts.headers||{}),signal:ctrl.signal}));
+    clearTimeout(timer);
+    var d=await r.json();
+    if(r.status===401){localStorage.clear();location.hash="#/login";throw new Error("登录已过期，请重新登录")}
+    if(d&&d.code!==undefined&&d.code!==0)throw new Error(d.message||"请求失败");
+    return d;
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==="AbortError")throw new Error("网络请求超时，请检查网络连接");
+    throw e;
+  }
+}
 
 // ==== WebSocket ====
 var ws=null,wsTimer=null,wsCount=0,wsHooks={};
@@ -48,7 +68,7 @@ var LoginPage = {
 var HomePage = {
   data: function(){ return {users:[],loading:true,err:false,errMsg:"",tab:"city",currentCity:"",showFilter:false,fAge:[18,35]}; },
   methods: {
-    load: async function(){ this.loading=true;this.err=false;try{var r=await api("/match/recommend?scope="+this.tab+"&ageMin="+this.fAge[0]+"&ageMax="+this.fAge[1]+"&limit=20");this.users=r.data||[]}catch(e){this.err=true;this.errMsg=e.message}this.loading=false; },
+    load: async function(){ this.loading=true;this.err=false;try{var r=await api("/match/recommend?scope="+this.tab+"&ageMin="+this.fAge[0]+"&ageMax="+this.fAge[1]+"&limit=20");this.users=r.data||[];if(this.users.length===0)this.errMsg="暂无推荐用户"}catch(e){this.err=true;this.errMsg=e.message||"加载失败，请稍后重试"}this.loading=false; },
     initLocation: function(){
       var self=this;
       if(navigator.geolocation){
@@ -70,7 +90,7 @@ var HomePage = {
     skip: function(u){if(!u)return;var s=this;api("/match/skip",{method:"POST",body:JSON.stringify({target_user_id:u.id})}).catch(function(){});s.users=s.users.filter(function(x){return x.id!==u.id})},
     parseTags: function(t){if(!t)return[];if(Array.isArray(t))return t;try{return JSON.parse(t)}catch(e){return[]}}
   },
-  mounted: function(){this.initLocation()},
+  mounted: function(){this.load();this.initLocation()},
   template: `<div style="padding:12px 16px">
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn bs" :class="tab==='city'?'bp':'bo'" @click="switchTab('city')">{{currentCity?'同城·'+currentCity:'同城'}}</button>
@@ -120,7 +140,7 @@ var HomePage = {
 var DiscoverPage = {
   data: function(){return {posts:[],loading:true,err:false,tab:"all",showPublish:false,pubText:"",pubImage:null,pubPreview:""}},
   methods: {
-    load: async function(){this.loading=true;this.err=false;try{var r=await api("/posts?limit=20");this.posts=r.data||[]}catch(e){this.err=true}this.loading=false},
+    load: async function(){this.loading=true;this.err=false;try{var r=await api("/posts?limit=20");this.posts=r.data||[];if(this.posts.length===0)this.errMsg="暂无动态"}catch(e){this.err=true;this.errMsg=e.message||"加载失败，请稍后重试"}this.loading=false},
     toggleLike: async function(p){try{await api("/posts/"+p.id+"/like",{method:"POST"});p.liked=!p.liked;p.like_count+=p.liked?1:-1;if(p.like_count<0)p.like_count=0}catch(e){toast(e.message,"terr")}},
     switchTab: function(t){this.tab=t;this.load()},
     pubImageChange: function(e){var f=e.target.files[0];if(f){this.pubImage=f;this.pubPreview=URL.createObjectURL(f)}},
