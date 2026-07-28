@@ -357,7 +357,7 @@ app.get('/health', async (req, res) => {
 
 // 根路径返回前端页面（Vue版本）
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index-vue.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // 管理后台页面

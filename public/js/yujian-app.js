@@ -217,21 +217,40 @@ var ChatListPage = {
 };
 
 var ChatDetailPage = {
-  data: function(){return {convId:0,msgs:[],text:"",loading:true,userId:parseInt(localStorage.getItem("userId"))}},
+  data: function(){return {convId:0,msgs:[],text:"",loading:true,err:false,errMsg:"",userId:parseInt(localStorage.getItem("userId")),hasMore:true,loadingMore:false,uploading:false,sending:false}},
   methods: {
-    load: async function(){
+    load: async function(isMore){
       var self=this;self.convId=parseInt(self.$route.params.id);
-      if(!self.convId){toast("会话ID无效","terr");self.loading=false;return}
-      self.loading=true;
+      if(!self.convId){toast("会话ID无效","terr");self.loading=false;self.err=true;self.errMsg="会话ID无效";return}
+      if(isMore){self.loadingMore=true}else{self.loading=true;self.err=false}
       try{
-        var r=await api("/chat/messages?conversation_id="+self.convId+"&limit=50");
-        self.msgs=(r.data||[]);
+        var url="/chat/messages?conversation_id="+self.convId+"&limit=50";
+        if(isMore&&self.msgs.length>0&&self.msgs[0].id)url+="&before="+self.msgs[0].id;
+        var r=await api(url);
+        var newMsgs=r.data||[];
+        if(isMore){
+          if(newMsgs.length===0){self.hasMore=false}
+          else{
+            var oldH=self.$refs.chat?self.$refs.chat.scrollHeight:0;
+            self.msgs=newMsgs.concat(self.msgs);
+            var s=this;Vue.nextTick(function(){if(s.$refs.chat)s.$refs.chat.scrollTop=s.$refs.chat.scrollHeight-oldH});
+          }
+        }else{
+          self.msgs=newMsgs;self.hasMore=newMsgs.length>=50;
+          var s2=this;Vue.nextTick(function(){s2.scrollBottom()});
+        }
         self.addTimeDividers();
-      }catch(e){toast("加载失败","terr")}
-      self.loading=false;
-      Vue.nextTick(function(){self.scrollBottom()});
+      }catch(e){
+        self.err=true;self.errMsg=e.message||"加载失败";
+        if(!isMore)toast("加载失败","terr");
+      }
+      if(isMore){self.loadingMore=false}else{self.loading=false}
     },
     scrollBottom: function(){var el=this.$refs.chat;if(el)el.scrollTop=el.scrollHeight},
+    onScroll: function(){
+      var self=this,el=self.$refs.chat;if(!el||self.loadingMore||!self.hasMore)return;
+      if(el.scrollTop<50){self.load(true)}
+    },
     addTimeDividers: function(){
       var ms=this.msgs;
       for(var i=ms.length-1;i>=0;i--){
@@ -290,11 +309,18 @@ var ChatDetailPage = {
     }
   },
   mounted: function(){
-    var self=this;self.load();wsOn("message",self.handleWs);
-    Vue.nextTick(function(){var el=self.$refs.chat;if(el)el.addEventListener("scroll",function(){if(self.loading||!self.hasMore)return;if(el.scrollTop<50)self.load(true)})});
+    var self=this;
+    // 保存 scroll 处理引用以便清理
+    self._scrollFn=function(){self.onScroll()};
+    self.load();
+    wsOn("message",function(d){self.handleWs(d)});
+    Vue.nextTick(function(){var el=self.$refs.chat;if(el){el.addEventListener("scroll",self._scrollFn)}});
   },
-  beforeUnmount: function(){wsOff("message",this.handleWs)},
-  template: '<div style="display:flex;flex-direction:column;height:100%"><div ref="chat" style="flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch"><div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div></div><div v-else-if="msgs.length===0" class="empty" style="padding:64px 24px"><div class="ei">💬</div><div class="et">开始聊天吧</div></div><div v-else><div v-for="m in msgs" :key="m.id||Math.random()"><div v-if="m._timeGroup" class="time-divider">{{m._timeGroup}}</div><div v-if="m.type===99" class="msg-sy">{{m.content}}</div><div v-else-if="m.type===1" :class="[\'msg-b\',m.sender_id===userId?\'msg-my\':\'msg-ot\']"><img :src="m.content" class="msg-img"><div :style="{fontSize:\'10px\',marginTop:\'2px\',textAlign:\'right\',opacity:.6}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer;margin-left:4px">❌</span></div></div><div v-else :class="[\'msg-b\',m.sender_id===userId?\'msg-my\':\'msg-ot\']"><div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div><div :style="{fontSize:\'10px\',marginTop:\'2px\',textAlign:\'right\',opacity:.6}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer;margin-left:4px">❌</span></div></div></div></div></div><div class="ci"><button class="btn" style="border:none;background:none;font-size:24px;padding:0 4px;flex-shrink:0;cursor:pointer" @click="onImagePick" :disabled="uploading">{{uploading?\'⏳\':\'📷\'}}</button><div class="inp" style="flex:1;border-radius:20px;background:var(--bg-page)"><textarea v-model="text" placeholder="说点什么..." @keydown="handleKey" rows="1" style="width:100%;border:none;outline:none;font-size:16px;padding:10px 14px;resize:none;background:transparent;max-height:120px;overflow-y:auto"></textarea></div><button class="btn bp" style="border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0" @click="sendMsg" :disabled="!text.trim()">➤</button></div></div>'
+  beforeUnmount: function(){
+    wsOff("message",this.handleWs);
+    var el=this.$refs.chat;if(el&&this._scrollFn)el.removeEventListener("scroll",this._scrollFn);
+  },
+  template: '<div style="display:flex;flex-direction:column;height:100%"><div ref="chat" style="flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch"><div v-if="loadingMore" style="text-align:center;padding:8px"><div class="spin" style="width:20px;height:20px;border-width:2px"></div></div><div v-if="!hasMore&&msgs.length>0" style="text-align:center;padding:8px;font-size:12px;color:var(--tm)">没有更多消息了</div><div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div></div><div v-else-if="err&&msgs.length===0" class="empty" style="padding:48px 24px"><div style="font-size:48px;margin-bottom:12px">😵</div><div style="color:var(--ts);margin-bottom:16px;font-size:14px">{{errMsg}}</div><button class="btn bp bs" @click="load()">重试</button></div><div v-else-if="msgs.length===0" class="empty" style="padding:64px 24px"><div class="ei">💬</div><div class="et">开始聊天吧</div><div class="ed">发送第一条消息，开启你们的对话</div></div><div v-else><div v-for="m in msgs" :key="m.id||Math.random()"><div v-if="m._timeGroup" class="time-divider">{{m._timeGroup}}</div><div v-if="m.type===99" class="msg-sy">{{m.content}}</div><div v-else-if="m.type===1" :class="[\'msg-b\',m.sender_id===userId?\'msg-my\':\'msg-ot\']"><img :src="m.content" class="msg-img"><div :style="{fontSize:\'10px\',marginTop:\'2px\',textAlign:\'right\',opacity:.6}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer;margin-left:4px">❌</span></div></div><div v-else :class="[\'msg-b\',m.sender_id===userId?\'msg-my\':\'msg-ot\']"><div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div><div :style="{fontSize:\'10px\',marginTop:\'2px\',textAlign:\'right\',opacity:.6}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer;margin-left:4px">❌</span></div></div></div></div></div><div class="ci"><button class="btn" style="border:none;background:none;font-size:24px;padding:0 4px;flex-shrink:0;cursor:pointer" @click="onImagePick" :disabled="uploading">{{uploading?\'⏳\':\'📷\'}}</button><div class="inp" style="flex:1;border-radius:20px;background:var(--bg-page)"><textarea v-model="text" placeholder="说点什么..." @keydown="handleKey" rows="1" style="width:100%;border:none;outline:none;font-size:16px;padding:10px 14px;resize:none;background:transparent;max-height:120px;overflow-y:auto"></textarea></div><button class="btn bp" style="border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0" @click="sendMsg" :disabled="!text.trim()">➤</button></div></div>'
 };
 
 var MyPage = {

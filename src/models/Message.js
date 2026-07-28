@@ -100,6 +100,29 @@ class Message {
   static async getByConversationId(conversation_id, limit = 20, offset = 0, beforeId = null) {
     try {
       if (isDbAvailable()) {
+        // beforeId: 加载指定消息之前的旧消息（用于上拉加载更多历史消息）
+        if (beforeId) {
+          const [rows] = await executeQuery(
+            `SELECT *, CASE WHEN is_recalled = 1 THEN '对方撤回了一条消息' ELSE content END AS content
+             FROM messages WHERE conversation_id = ? AND id < ? ORDER BY created_at DESC LIMIT ?`,
+            [conversation_id, beforeId, limit]
+          );
+          rows.forEach(r => {
+            if (r.is_recalled) { r._recalled = true; }
+            if (!r.is_recalled) {
+              if (r.type === 2 && r.voice_url) { r._render_text = '[语音 ' + (r.voice_duration || 0) + 's]'; }
+              else if (r.type === 3 && r.video_url) { r._render_text = '[视频]'; }
+              else if (r.type === 4) { r._render_text = '[贴纸]'; }
+              else if (r.type === 5 && r.location_data) {
+                try { const ld = typeof r.location_data === 'string' ? JSON.parse(r.location_data) : r.location_data; r._render_text = '[位置] ' + (ld.address || ld.name || ''); } catch(e) { r._render_text = '[位置]'; }
+              }
+              else if (r.type === 6 && r.gift_data) {
+                try { const gd = typeof r.gift_data === 'string' ? JSON.parse(r.gift_data) : r.gift_data; r._render_text = '[礼物] ' + (gd.gift_name || ''); } catch(e) { r._render_text = '[礼物]'; }
+              }
+            }
+          });
+          return rows.reverse(); // 按时间正序返回
+        }
         const [rows] = await executeQuery(
           `SELECT *, CASE WHEN is_recalled = 1 THEN '对方撤回了一条消息' ELSE content END AS content
            FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
@@ -127,7 +150,7 @@ class Message {
     }
 
     // 数据库不可用时使用内存存储
-    return Array.from(memoryStore.values())
+    let filtered = Array.from(memoryStore.values())
       .filter(message => message.conversation_id === conversation_id)
       .map(m => {
         if (m.is_recalled) {
@@ -135,8 +158,14 @@ class Message {
         }
         return m;
       })
-      .sort((a, b) => a.created_at - b.created_at)
-      .slice(offset, offset + limit);
+      .sort((a, b) => a.created_at - b.created_at);
+    if (beforeId) {
+      const beforeIdx = filtered.findIndex(m => m.id === beforeId);
+      if (beforeIdx > 0) filtered = filtered.slice(Math.max(0, beforeIdx - limit), beforeIdx);
+      else if (beforeIdx === 0) filtered = [];
+      else filtered = filtered.slice(0, limit);
+    }
+    return beforeId ? filtered : filtered.slice(offset, offset + limit);
   }
 
   /**
