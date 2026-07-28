@@ -217,22 +217,84 @@ var ChatListPage = {
 };
 
 var ChatDetailPage = {
-  data: function(){return {convId:0,msgs:[],text:"",loading:true,userId:parseInt(localStorage.getItem("userId")),hasMore:true,loadingMore:false,uploading:false,sending:false}},
+  data: function(){return {convId:0,msgs:[],text:"",loading:true,userId:parseInt(localStorage.getItem("userId"))}},
   methods: {
-    load: async function(isMore){this.convId=parseInt(this.$route.params.id);if(!this.convId){toast("会话ID无效","terr");return}if(isMore){this.loadingMore=true}else{this.loading=true}try{var oldestId=isMore&&this.msgs.length>0&&this.msgs[0].id?this.msgs[0].id:null;var url="/chat/messages?conversation_id="+this.convId+"&limit=50";if(isMore&&oldestId)url+="&before="+oldestId;var r=await api(url);var newMsgs=r.data||[];if(isMore){if(newMsgs.length===0){this.hasMore=false}else{var oldH=this.$refs.chat?this.$refs.chat.scrollHeight:0;this.msgs=newMsgs.reverse().concat(this.msgs);var s=this;this.$nextTick(function(){if(s.$refs.chat)s.$refs.chat.scrollTop=s.$refs.chat.scrollHeight-oldH})}}else{this.msgs=newMsgs.reverse();this.hasMore=newMsgs.length>=50;var s2=this;this.$nextTick(function(){s2.scrollBottom()})}this.addTimeDividers()}catch(e){toast("加载失败","terr")}if(isMore){this.loadingMore=false}else{this.loading=false}},
+    load: async function(){
+      var self=this;self.convId=parseInt(self.$route.params.id);
+      if(!self.convId){toast("会话ID无效","terr");self.loading=false;return}
+      self.loading=true;
+      try{
+        var r=await api("/chat/messages?conversation_id="+self.convId+"&limit=50");
+        self.msgs=(r.data||[]).reverse();
+        self.addTimeDividers();
+      }catch(e){toast("加载失败","terr")}
+      self.loading=false;
+      Vue.nextTick(function(){self.scrollBottom()});
+    },
     scrollBottom: function(){var el=this.$refs.chat;if(el)el.scrollTop=el.scrollHeight},
-    addTimeDividers: function(){var ms=this.msgs;for(var i=ms.length-1;i>=0;i--){if(i===0){ms[i]._timeGroup=this.fmtTimeDiv(ms[i].created_at);continue}var prev=new Date(ms[i-1].created_at).getTime();var curr=new Date(ms[i].created_at).getTime();if(curr-prev>300000||new Date(prev).toDateString()!==new Date(curr).toDateString()){ms[i]._timeGroup=this.fmtTimeDiv(ms[i].created_at)}else{ms[i]._timeGroup=null}}},
-    fmtTimeDiv: function(t){if(!t)return"";var d=new Date(t),now=new Date();var sameDay=d.toDateString()===now.toDateString();var yes=new Date(now);yes.setDate(yes.getDate()-1);var time=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);if(sameDay)return time;if(d.toDateString()===yes.toDateString())return"昨天 "+time;return (d.getFullYear())+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)+" "+time},
-    onScroll: function(){var el=this.$refs.chat;if(!el||this.loadingMore||!this.hasMore)return;if(el.scrollTop<50){this.load(true)}},
-    onImagePick: function(){var s=this;var inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=function(e){var f=e.target.files[0];if(!f)return;s.uploadImage(f)};inp.click()},
-    uploadImage: async function(file){this.uploading=true;try{var fd=new FormData();fd.append("image",file);var r=await api("/upload/image",{method:"POST",body:fd});if(r.code===0&&r.data){var imgUrl=r.data.url;var msg={conversation_id:this.convId,sender_id:this.userId,content:imgUrl,type:1,_local:true,_sending:true,created_at:new Date().toISOString()};this.msgs.push(msg);this.scrollBottom();var s=this;if(!wsSend({type:"message",data:{conversation_id:this.convId,content:imgUrl,type:1}})){await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:this.convId,content:imgUrl,type:1})})}msg._sending=false}else{toast("上传失败","terr")}}catch(e){toast("上传失败","terr")}this.uploading=false},
-    sendMsg: async function(){var t=this.text.trim();if(!t)return;var msg={conversation_id:this.convId,sender_id:this.userId,content:t,type:0,_local:true,_sending:true,created_at:new Date().toISOString()};this.msgs.push(msg);this.text="";this.$nextTick(function(){this.scrollBottom()});var s=this;var wsOk=wsSend({type:"send_message",receiver_id:null,content:t,type:0});if(!wsOk){try{await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:s.convId,content:t,type:0})})}catch(e){toast("发送失败","terr");msg._failed=true}}msg._sending=false},
+    addTimeDividers: function(){
+      var ms=this.msgs;
+      for(var i=ms.length-1;i>=0;i--){
+        if(i===0){ms[i]._timeGroup=this.fmtTimeDiv(ms[i].created_at);continue}
+        var p=new Date(ms[i-1].created_at).getTime(),c=new Date(ms[i].created_at).getTime();
+        ms[i]._timeGroup=(c-p>300000||new Date(p).toDateString()!==new Date(c).toDateString())?this.fmtTimeDiv(ms[i].created_at):null;
+      }
+    },
+    fmtTimeDiv: function(t){
+      if(!t)return"";var d=new Date(t),n=new Date();
+      var tm=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+      if(d.toDateString()===n.toDateString())return tm;
+      var y=new Date(n);y.setDate(y.getDate()-1);
+      if(d.toDateString()===y.toDateString())return"昨天 "+tm;
+      return("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)+" "+tm;
+    },
+    onImagePick: function(){
+      var self=this,inp=document.createElement("input");inp.type="file";inp.accept="image/*";
+      inp.onchange=function(e){var f=e.target.files[0];if(!f)return;self.uploadImage(f)};inp.click();
+    },
+    uploadImage: async function(file){
+      var self=this;self.uploading=true;
+      try{
+        var fd=new FormData();fd.append("image",file);
+        var r=await api("/upload/image",{method:"POST",body:fd});
+        if(r.code===0&&r.data){
+          var imgUrl=r.data.url;
+          var msg={conversation_id:self.convId,sender_id:self.userId,content:imgUrl,type:1,_local:true,_sending:true,created_at:new Date().toISOString()};
+          self.msgs.push(msg);Vue.nextTick(function(){self.scrollBottom()});
+          if(!wsSend({type:"message",data:{conversation_id:self.convId,content:imgUrl,type:1}})){
+            api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:imgUrl,type:1})}).catch(function(){});
+          }
+          msg._sending=false;
+        }else{toast("上传失败","terr")}
+      }catch(e){toast("上传失败","terr")}
+      self.uploading=false;
+    },
+    sendMsg: async function(){
+      var self=this,t=self.text.trim();if(!t)return;
+      var msg={conversation_id:self.convId,sender_id:self.userId,content:t,type:0,_local:true,_sending:true,created_at:new Date().toISOString()};
+      self.msgs.push(msg);self.text="";Vue.nextTick(function(){self.scrollBottom()});
+      if(!wsSend({type:"send_message",receiver_id:null,content:t,type:0})){
+        try{await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:t,type:0})})}catch(e){toast("发送失败","terr");msg._failed=true}
+      }
+      msg._sending=false;
+    },
     handleKey: function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();this.sendMsg()}},
-    handleWs: function(d){if(d.type==="message"&&d.data&&d.data.conversation_id===this.convId){if(!d.data.id&&!d.data._local)return;var exists=this.msgs.some(function(m){return m.id&&m.id===d.data.id});if(exists)return;this.msgs.push(d.data);var s=this;this.$nextTick(function(){s.scrollBottom()});api("/chat/mark-read",{method:"POST",body:JSON.stringify({conversation_id:this.convId})}).catch(function(){})}}
+    handleWs: function(d){
+      var self=this;
+      if(d.type==="message"&&d.data&&d.data.conversation_id===self.convId){
+        if(!d.data.id&&!d.data._local)return;
+        if(self.msgs.some(function(m){return m.id&&m.id===d.data.id}))return;
+        self.msgs.push(d.data);Vue.nextTick(function(){self.scrollBottom()});
+        api("/chat/mark-read",{method:"POST",body:JSON.stringify({conversation_id:self.convId})}).catch(function(){});
+      }
+    }
   },
-  mounted: function(){this.load();wsOn("message",this.handleWs);var s=this;this.$nextTick(function(){var el=s.$refs.chat;if(el)el.addEventListener("scroll",function(){s.onScroll()})})},
+  mounted: function(){
+    var self=this;self.load();wsOn("message",self.handleWs);
+    Vue.nextTick(function(){var el=self.$refs.chat;if(el)el.addEventListener("scroll",function(){if(self.loading||!self.hasMore)return;if(el.scrollTop<50)self.load(true)})});
+  },
   beforeUnmount: function(){wsOff("message",this.handleWs)},
-  template: `<div style="display:flex;flex-direction:column;height:100%"><div ref="chat" style="flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch"><div v-if="loadingMore" style="text-align:center;padding:8px"><div class="spin" style="width:20px;height:20px;border-width:2px"></div></div><div v-if="!hasMore&&msgs.length>0" style="text-align:center;padding:8px;font-size:12px;color:var(--tm)">没有更多消息了</div><div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div></div><div v-else-if="msgs.length===0" class="empty" style="padding:64px 24px"><div class="ei">💬</div><div class="et">开始聊天吧</div></div><div v-else><div v-for="m in msgs" :key="m.id||Math.random()"><div v-if="m._timeGroup" class="time-divider">{{m._timeGroup}}</div><div v-if="m.type===99" class="msg-sy">{{m.content}}</div><div v-else-if="m.type===1" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']"><img :src="m.content" class="msg-img" @click="window.open(m.content)"><div :style="{fontSize:'10px',marginTop:'2px',textAlign:'right',opacity:.6,display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'4px'}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm)">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer">❌</span></div></div><div v-else :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']"><div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div><div :style="{fontSize:'10px',marginTop:'2px',textAlign:'right',opacity:.6,display:'flex',alignItems:'center',justifyContent:'flex-end',gap:'4px'}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm)">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer">❌</span></div></div></div></div></div><div class="ci"><button class="btn" style="border:none;background:none;font-size:24px;padding:0 4px;flex-shrink:0;cursor:pointer" @click="onImagePick" :disabled="uploading">{{uploading?'⏳':'📷'}}</button><div class="inp" style="flex:1;border-radius:20px;background:var(--bg-page)"><textarea v-model="text" placeholder="说点什么..." @keydown="handleKey" rows="1" style="width:100%;border:none;outline:none;font-size:16px;padding:10px 14px;resize:none;background:transparent;max-height:120px;overflow-y:auto" ref="txtInput"></textarea></div><button class="btn bp" style="border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0" @click="sendMsg" :disabled="!text.trim()">➤</button></div></div>`
+  template: '<div style="display:flex;flex-direction:column;height:100%"><div ref="chat" style="flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch"><div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div></div><div v-else-if="msgs.length===0" class="empty" style="padding:64px 24px"><div class="ei">💬</div><div class="et">开始聊天吧</div></div><div v-else><div v-for="m in msgs" :key="m.id||Math.random()"><div v-if="m._timeGroup" class="time-divider">{{m._timeGroup}}</div><div v-if="m.type===99" class="msg-sy">{{m.content}}</div><div v-else-if="m.type===1" :class="[\'msg-b\',m.sender_id===userId?\'msg-my\':\'msg-ot\']"><img :src="m.content" class="msg-img"><div :style="{fontSize:\'10px\',marginTop:\'2px\',textAlign:\'right\',opacity:.6}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer;margin-left:4px">❌</span></div></div><div v-else :class="[\'msg-b\',m.sender_id===userId?\'msg-my\':\'msg-ot\']"><div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div><div :style="{fontSize:\'10px\',marginTop:\'2px\',textAlign:\'right\',opacity:.6}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer;margin-left:4px">❌</span></div></div></div></div></div><div class="ci"><button class="btn" style="border:none;background:none;font-size:24px;padding:0 4px;flex-shrink:0;cursor:pointer" @click="onImagePick" :disabled="uploading">{{uploading?\'⏳\':\'📷\'}}</button><div class="inp" style="flex:1;border-radius:20px;background:var(--bg-page)"><textarea v-model="text" placeholder="说点什么..." @keydown="handleKey" rows="1" style="width:100%;border:none;outline:none;font-size:16px;padding:10px 14px;resize:none;background:transparent;max-height:120px;overflow-y:auto"></textarea></div><button class="btn bp" style="border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0" @click="sendMsg" :disabled="!text.trim()">➤</button></div></div>'
 };
 
 var MyPage = {
