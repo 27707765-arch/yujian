@@ -608,11 +608,16 @@ html,body{
 /* Chat message aliases */
 .msg-sy{text-align:center;font-size:13px;color:var(--text-muted);padding:8px 0}
 .msg-b{max-width:75%;padding:10px 14px;border-radius:16px;line-height:1.5;word-break:break-word;font-size:14px;margin-bottom:12px}
-.msg-my{border-radius:16px 16px 4px 16px;background:var(--primary);color:#fff;margin-left:auto}
-.msg-ot{border-radius:16px 16px 16px 4px;background:var(--bg-white);color:var(--text);box-shadow:var(--shadow);margin-right:auto}
+.msg-my{border-radius:var(--radius) var(--radius) 4px var(--radius);background:var(--primary);color:#fff;margin-left:auto}
+.msg-ot{border-radius:var(--radius) var(--radius) var(--radius) 4px;background:var(--bg-white);color:var(--text);box-shadow:var(--shadow);margin-right:auto}
+.msg-img{max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;display:block}
+.time-divider{text-align:center;font-size:12px;color:var(--text-muted);padding:12px 0;opacity:.7}
+.msg-my .msg-img{margin-bottom:2px}
+.msg-ot .msg-img{margin-bottom:2px}
 
 /* Chat input alias */
 .ci{background:var(--bg-white);border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:flex-end;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.ci .inp{background:var(--bg-page)}
 
 /* Transition alias (sl -> slide-left) */
 .sl-enter-active{animation:slideLeft .25s ease-out}
