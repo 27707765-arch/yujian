@@ -44,8 +44,8 @@ class Message {
         else if (type === 5) lastText = '[位置]';
         else if (type === 6) lastText = '[礼物]';
         await executeQuery(
-          'UPDATE conversations SET last_message = ?, last_message_time = ?, unread_count = COALESCE(unread_count, 0) + 1 WHERE id = ?',
-          [lastText, new Date(), conversation_id]
+          'UPDATE conversations SET last_message = ?, last_message_time = ?, last_msg_type = ?, unread_count = COALESCE(unread_count, 0) + 1 WHERE id = ?',
+          [lastText, new Date(), type, conversation_id]
         );
 
         return this.findById(result.insertId);
@@ -97,7 +97,7 @@ class Message {
    * @param {number} offset - 偏移量
    * @returns {Promise<Array>}
    */
-  static async getByConversationId(conversation_id, limit = 20, offset = 0) {
+  static async getByConversationId(conversation_id, limit = 20, offset = 0, beforeId = null) {
     try {
       if (isDbAvailable()) {
         const [rows] = await executeQuery(

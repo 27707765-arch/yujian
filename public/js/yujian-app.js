@@ -225,7 +225,7 @@ var ChatDetailPage = {
       self.loading=true;
       try{
         var r=await api("/chat/messages?conversation_id="+self.convId+"&limit=50");
-        self.msgs=(r.data||[]).reverse();
+        self.msgs=(r.data||[]);
         self.addTimeDividers();
       }catch(e){toast("加载失败","terr")}
       self.loading=false;

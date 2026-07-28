@@ -34,7 +34,7 @@ async function getConversations(req, res) {
 async function getMessages(req, res) {
   try {
     const { id } = req.user;
-    const { conversation_id, limit = 20, offset = 0 } = req.query;
+    const { conversation_id, limit = 20, offset = 0, before } = req.query;
 
     if (!conversation_id) {
       return error(res, 400, '会话ID不能为空');
@@ -52,7 +52,8 @@ async function getMessages(req, res) {
     const messages = await Message.getByConversationId(
       conversation_id,
       parseInt(limit),
-      parseInt(offset)
+      parseInt(offset),
+      before ? parseInt(before) : null
     );
 
     await Message.markAllAsRead(conversation_id, id);
