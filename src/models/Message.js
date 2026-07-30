@@ -116,12 +116,13 @@ class Message {
         if (beforeId) {
           const [rows] = await executeQuery(
             `SELECT m.*, u.nickname AS sender_nickname, u.avatar AS sender_avatar,
-             CASE WHEN m.is_recalled = 1 THEN '对方撤回了一条消息' ELSE m.content END AS content
+             CASE WHEN m.is_recalled = 1 THEN '对方撤回了一条消息' ELSE m.content END AS display_content
              FROM messages m LEFT JOIN users u ON m.sender_id = u.id
              WHERE m.conversation_id = ? AND m.id < ? ORDER BY m.created_at DESC LIMIT ?`,
             [conversation_id, beforeId, limit]
           );
           rows.forEach(r => {
+            r.content = r.display_content; // 映射回 content 字段
             if (r.is_recalled) { r._recalled = true; }
             if (!r.is_recalled) {
               if (r.type === 2 && r.voice_url) { r._render_text = '[语音 ' + (r.voice_duration || 0) + 's]'; }
