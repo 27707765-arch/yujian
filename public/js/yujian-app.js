@@ -242,9 +242,9 @@ var ChatDetailPage = {
         var arr=r.data||[];
         if(isMore){
           if(arr.length===0){s.hasMore=false}
-          else{var oh=s.$refs.chat?s.$refs.chat.scrollHeight:0;s.msgs=arr.reverse().concat(s.msgs);s.$nextTick(function(){if(s.$refs.chat)s.$refs.chat.scrollTop=s.$refs.chat.scrollHeight-oh})}
+          else{var oh=s.$refs.chat?s.$refs.chat.scrollHeight:0;s.msgs=arr.concat(s.msgs);s.$nextTick(function(){if(s.$refs.chat)s.$refs.chat.scrollTop=s.$refs.chat.scrollHeight-oh})}
         }else{
-          s.msgs=arr.reverse();s.hasMore=arr.length>=50;s.$nextTick(function(){s.scrollBottom()})
+          s.msgs=arr;s.hasMore=arr.length>=50;s.$nextTick(function(){s.scrollBottom()})
         }
         s.addTimeDividers();
       }catch(e){s.err=true;s.errMsg=e.message||"加载失败";if(!isMore)toast("加载失败","terr")}
@@ -276,7 +276,7 @@ var ChatDetailPage = {
     sendMsg: async function(){
       var self=this,t=self.text.trim();if(!t)return;
       var msg={conversation_id:self.convId,sender_id:self.userId,content:t,type:0,_local:true,_sending:true,created_at:new Date().toISOString()};
-      self.msgs.push(msg);self.text="";Vue.nextTick(function(){self.scrollBottom()});
+      self.msgs.push(msg);self.text="";self.addTimeDividers();Vue.nextTick(function(){self.scrollBottom()});
       try{
         var r=await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:t,type:0})});
         if(r.code===0&&r.data){
@@ -303,11 +303,11 @@ var ChatDetailPage = {
         if(r.code===0&&r.data){
           var imgUrl=r.data.url;
           var msg={conversation_id:self.convId,sender_id:self.userId,content:imgUrl,type:1,_local:true,_sending:true,created_at:new Date().toISOString()};
-          self.msgs.push(msg);Vue.nextTick(function(){self.scrollBottom()});
-          if(!wsSend({type:"send_message",conversation_id:self.convId,content:imgUrl,type:1})){
-            api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:imgUrl,type:1})}).catch(function(){});
-          }
-          msg._sending=false;
+          self.msgs.push(msg);self.addTimeDividers();Vue.nextTick(function(){self.scrollBottom()});
+          var sr=await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:imgUrl,type:1})});
+          if(sr.code===0&&sr.data){
+            var idx=self.msgs.indexOf(msg);if(idx>-1){self.msgs[idx].id=sr.data.id;self.msgs[idx]._sending=false}
+          }else{msg._failed=true;msg._sending=false;toast(sr.message||"发送失败","terr")}
         }else{toast("上传失败","terr")}
       }catch(e){toast("上传失败","terr")}
       self.uploading=false;
@@ -332,17 +332,17 @@ var ChatDetailPage = {
     },
     sendVoice: async function(){
       var self=this;if(self.audioChunks.length===0)return;
-      var blob=new Blob(self.audioChunks,{type:"audio/webm"});
+      var blob=new Blob(self.audioChunks,{type:"audio/webm"});var dur=Math.round(blob.size/16000);
       try{
         var fd=new FormData();fd.append("voice",blob,"voice.webm");
         var r=await api("/upload/voice",{method:"POST",body:fd});
         if(r.code===0&&r.data){
-          var msg={conversation_id:self.convId,sender_id:self.userId,content:"[语音]",type:2,_local:true,_sending:true,voice_url:r.data.url,voice_duration:Math.round(blob.size/16000),created_at:new Date().toISOString()};
-          self.msgs.push(msg);Vue.nextTick(function(){self.scrollBottom()});
-          if(!wsSend({type:"send_message",conversation_id:self.convId,content:"[语音]",type:2,voice_url:r.data.url,voice_duration:msg.voice_duration})){
-            api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:"[语音]",type:2,voice_url:r.data.url,voice_duration:msg.voice_duration})}).catch(function(){});
-          }
-          msg._sending=false;
+          var msg={conversation_id:self.convId,sender_id:self.userId,content:"[语音]",type:2,_local:true,_sending:true,voice_url:r.data.url,voice_duration:dur,created_at:new Date().toISOString()};
+          self.msgs.push(msg);self.addTimeDividers();Vue.nextTick(function(){self.scrollBottom()});
+          var sr=await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:"[语音]",type:2,voice_url:r.data.url,voice_duration:dur})});
+          if(sr.code===0&&sr.data){
+            var idx=self.msgs.indexOf(msg);if(idx>-1){self.msgs[idx].id=sr.data.id;self.msgs[idx]._sending=false}
+          }else{msg._failed=true;msg._sending=false;toast(sr.message||"发送失败","terr")}
         }else{toast("语音上传失败","terr")}
       }catch(e){toast("语音上传失败","terr")}
     },
@@ -432,8 +432,21 @@ var ChatDetailPage = {
       if(d.type==="message"&&d.data&&d.data.conversation_id===self.convId){
         if(!d.data.id&&!d.data._local)return;
         if(self.msgs.some(function(m){return m.id&&m.id===d.data.id}))return;
-        self.msgs.push(d.data);Vue.nextTick(function(){self.scrollBottom()});
+        self.msgs.push(d.data);self.addTimeDividers();Vue.nextTick(function(){self.scrollBottom()});
         api("/chat/mark-read",{method:"POST",body:JSON.stringify({conversation_id:self.convId})}).catch(function(){});
+      }
+      if(d.type==="message_sent"&&d.data){
+        var idx=-1;for(var i=self.msgs.length-1;i>=0;i--){if(self.msgs[i]._local&&self.msgs[i]._sending&&self.msgs[i].content===d.data.content){idx=i;break}}
+        if(idx>-1){var m=self.msgs[idx];m.id=d.data.id;m._sending=false;m.delivered=!!d.data.delivered}
+      }
+      if(d.type==="message_recalled"&&d.data){
+        var recalled=self.msgs.find(function(m){return m.id===d.data.message_id});
+        if(recalled){recalled.content="对方撤回了一条消息";recalled._recalled=true;recalled.type=99}
+      }
+      if(d.type==="message_blocked"&&d.data){
+        var bm=self.msgs.find(function(m){return m._sending&&m._local&&!m.id});
+        if(bm){bm._failed=true;bm._sending=false}
+        toast(d.data.reason||"消息发送被拦截","terr");
       }
       if(d.type==="call_request"&&d.data){self.incomingCall=d.data;self.showCallDialog=true}
       if(d.type==="call_accepted"&&d.data){
@@ -444,6 +457,10 @@ var ChatDetailPage = {
       if(d.type==="call_rejected"||d.type==="call_user_offline"){
         if(self._callTimeout)clearTimeout(self._callTimeout);
         self.calling=false;self.callType="";toast(d.type==="call_user_offline"?"对方不在线":"对方已拒绝","terr");
+      }
+      if(d.type==="call_blocked"&&d.data){
+        if(self._callTimeout)clearTimeout(self._callTimeout);
+        self.calling=false;self.callType="";toast(d.data.reason||"无法发起通话","terr");
       }
       if(d.type==="call_ended"){
         if(self._callTimeout)clearTimeout(self._callTimeout);
@@ -456,22 +473,31 @@ var ChatDetailPage = {
   mounted: function(){
     var self=this;
     self._scrollFn=function(){self.onScroll()};
+    self._wsHandler=function(d){self.handleWs(d)};
     Vue.nextTick(function(){self.load()});
-    wsOn("message",function(d){self.handleWs(d)});
-    wsOn("call_request",function(d){self.handleWs(d)});
-    wsOn("call_accepted",function(d){self.handleWs(d)});
-    wsOn("call_rejected",function(d){self.handleWs(d)});
-    wsOn("call_user_offline",function(d){self.handleWs(d)});
-    wsOn("call_ended",function(d){self.handleWs(d)});
+    wsOn("message",self._wsHandler);
+    wsOn("message_sent",self._wsHandler);
+    wsOn("message_recalled",self._wsHandler);
+    wsOn("message_blocked",self._wsHandler);
+    wsOn("call_request",self._wsHandler);
+    wsOn("call_accepted",self._wsHandler);
+    wsOn("call_rejected",self._wsHandler);
+    wsOn("call_user_offline",self._wsHandler);
+    wsOn("call_blocked",self._wsHandler);
+    wsOn("call_ended",self._wsHandler);
     Vue.nextTick(function(){var el=self.$refs.chat;if(el){el.addEventListener("scroll",self._scrollFn)}});
   },
   beforeUnmount: function(){
-    wsOff("message",this.handleWs);
-    wsOff("call_request",this.handleWs);
-    wsOff("call_accepted",this.handleWs);
-    wsOff("call_rejected",this.handleWs);
-    wsOff("call_user_offline",this.handleWs);
-    wsOff("call_ended",this.handleWs);
+    wsOff("message",this._wsHandler);
+    wsOff("message_sent",this._wsHandler);
+    wsOff("message_recalled",this._wsHandler);
+    wsOff("message_blocked",this._wsHandler);
+    wsOff("call_request",this._wsHandler);
+    wsOff("call_accepted",this._wsHandler);
+    wsOff("call_rejected",this._wsHandler);
+    wsOff("call_user_offline",this._wsHandler);
+    wsOff("call_blocked",this._wsHandler);
+    wsOff("call_ended",this._wsHandler);
     if(this.callTimer)clearInterval(this.callTimer);
     if(this._callTimeout)clearTimeout(this._callTimeout);
     if(this._localStream){this._localStream.getTracks().forEach(function(t){t.stop()})}
@@ -674,7 +700,7 @@ router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",
 
 // ==== App ====
 var AppRoot = {
-  data: function(){return {toasts:toasts,appVersion:"v20260729-1"}},
+  data: function(){return {toasts:toasts,appVersion:"v20260730-2"}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
