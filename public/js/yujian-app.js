@@ -231,34 +231,24 @@ var ChatDetailPage = {
   }},
   methods: {
     load: async function(isMore){
-      var self=this;
-      try{self.convId=parseInt(self.$route.params.id)}catch(e){self.convId=0};
-      if(!self.convId){toast("会话ID无效","terr");self.loading=false;self.err=true;self.errMsg="会话ID无效";return}
-      if(isMore){self.loadingMore=true}else{self.loading=true;self.err=false}
+      var s=this;
+      try{s.convId=parseInt(s.$route.params.id)}catch(e){s.convId=0}
+      if(!s.convId){s.loading=false;s.err=true;s.errMsg="会话ID无效";return}
+      if(isMore){s.loadingMore=true}else{s.loading=true;s.err=false}
       try{
-        var url="/chat/messages?conversation_id="+self.convId+"&limit=50";
-        if(isMore&&self.msgs.length>0&&self.msgs[0].id)url+="&before="+self.msgs[0].id;
+        var url="/chat/messages?conversation_id="+s.convId+"&limit=50";
+        if(isMore&&s.msgs.length>0&&s.msgs[0].id)url+="&before="+s.msgs[0].id;
         var r=await api(url);
-        var newMsgs=r.data||[];
-        // 后端返回按created_at DESC，需要反转为正序显示
-        newMsgs=newMsgs.reverse();
+        var arr=r.data||[];
         if(isMore){
-          if(newMsgs.length===0){self.hasMore=false}
-          else{
-            var oldH=self.$refs.chat?self.$refs.chat.scrollHeight:0;
-            self.msgs=newMsgs.concat(self.msgs);
-            Vue.nextTick(function(){if(self.$refs.chat)self.$refs.chat.scrollTop=self.$refs.chat.scrollHeight-oldH});
-          }
+          if(arr.length===0){s.hasMore=false}
+          else{var oh=s.$refs.chat?s.$refs.chat.scrollHeight:0;s.msgs=arr.reverse().concat(s.msgs);s.$nextTick(function(){if(s.$refs.chat)s.$refs.chat.scrollTop=s.$refs.chat.scrollHeight-oh})}
         }else{
-          self.msgs=newMsgs;self.hasMore=newMsgs.length>=50;
-          Vue.nextTick(function(){self.scrollBottom()});
+          s.msgs=arr.reverse();s.hasMore=arr.length>=50;s.$nextTick(function(){s.scrollBottom()})
         }
-        self.addTimeDividers();
-      }catch(e){
-        self.err=true;self.errMsg=e.message||"加载失败";
-        if(!isMore)toast("加载失败","terr");
-      }
-      if(isMore){self.loadingMore=false}else{self.loading=false}
+        s.addTimeDividers();
+      }catch(e){s.err=true;s.errMsg=e.message||"加载失败";if(!isMore)toast("加载失败","terr")}
+      if(isMore){s.loadingMore=false}else{s.loading=false}
     },
     scrollBottom: function(){var el=this.$refs.chat;if(el)el.scrollTop=el.scrollHeight},
     onScroll: function(){
