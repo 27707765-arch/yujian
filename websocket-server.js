@@ -28,6 +28,18 @@ const CONNECTION_TIMEOUT = 45000;  // 客户端45秒内（1.5个心跳周期）�
 function startWebSocketServer(server) {
   const wss = new WebSocket.Server({ server });
 
+  // 全局异常捕获 - 防止未处理的异常导致进程退出
+  process.on('uncaughtException', (err) => {
+    console.error('[FATAL] 未捕获异常:', err.message);
+    console.error(err.stack);
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] 未处理的Promise拒绝:', reason);
+  });
+  wss.on('error', (err) => {
+    console.error('[WS] WebSocket Server错误:', err.message);
+  });
+
   let onlineCount = 0;
 
   // 定时心跳检测：清理僵死连接
@@ -223,8 +235,16 @@ function startWebSocketServer(server) {
  * @param {Object} data - 消息数据
  */
 async function handleSendMessage(userId, data) {
-  const { receiver_id, content, type = 0 } = data;
+  let { receiver_id, conversation_id, content, type = 0 } = data;
   const msgType = parseInt(type) || 0;
+
+  // 如果没有 receiver_id，从 conversation_id 推断
+  if (!receiver_id && conversation_id) {
+    try {
+      const conv = await Conversation.findById(conversation_id);
+      if (conv) receiver_id = conv.user1_id === userId ? conv.user2_id : conv.user1_id;
+    } catch(e) {}
+  }
 
   // 校验发送者是否存在（防止外键约束失败）
   try {
@@ -312,6 +332,8 @@ async function handleSendMessage(userId, data) {
         id: message.id,
         conversation_id: message.conversation_id,
         sender_id: message.sender_id,
+        sender_nickname: message.sender_nickname || null,
+        sender_avatar: message.sender_avatar || null,
         receiver_id: message.receiver_id,
         content: message.content,
         type: message.type,

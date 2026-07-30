@@ -1,12 +1,11 @@
-// 遇见APP Service Worker - v2 缓存策略优化
-const CACHE_VERSION = 'yujian-v3';
+// 遇见APP Service Worker - v4 修复缓存和离线支持
+const CACHE_VERSION = 'yujian-v4';
 const STATIC_PREFIX = '/js/';
 const UPLOAD_PREFIX = '/uploads/';
 
-// 核心HTML入口
+// 核心HTML入口（仅缓存存在的文件）
 const coreUrls = [
   '/',
-  '/index-vue.html',
   '/manifest.json',
   '/icon.png',
   '/icon.svg'
@@ -15,7 +14,7 @@ const coreUrls = [
 // 安装：缓存核心资源
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(coreUrls))
+    caches.open(CACHE_VERSION).then(cache => cache.addAll(coreUrls).catch(e => console.warn('SW install: some coreUrls failed', e)))
   );
   self.skipWaiting();
 });
@@ -41,10 +40,14 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // JS静态资源：Cache First（v2版本号升级时自动清理旧缓存）
+  // JS静态资源：Network First 确保获取最新版本
   if (url.pathname.startsWith(STATIC_PREFIX)) {
     event.respondWith(
-      caches.match(event.request).then(cached => cached || fetch(event.request))
+      fetch(event.request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_VERSION).then(cache => cache.put(event.request, clone));
+        return response;
+      }).catch(() => caches.match(event.request))
     );
     return;
   }
@@ -70,7 +73,7 @@ self.addEventListener('fetch', event => {
         if (cached) return cached;
         // 导航请求回退：返回缓存的首页或离线提示
         if (event.request.mode === 'navigate') {
-          return caches.match('/index-vue.html') || caches.match('/') ||
+          return caches.match('/') ||
             new Response(
               '<html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center"><div><h2>📡 网络不可用</h2><p>请检查网络连接后重试</p></div></body></html>',
               { headers: { 'Content-Type': 'text/html' } }
@@ -81,4 +84,3 @@ self.addEventListener('fetch', event => {
     )
   );
 });
-

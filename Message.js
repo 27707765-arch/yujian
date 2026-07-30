@@ -91,7 +91,7 @@ class Message {
   static async findById(id) {
     try {
       if (isDbAvailable()) {
-        const [rows] = await executeQuery('SELECT * FROM messages WHERE id = ?', [id]);
+        const [rows] = await executeQuery('SELECT m.*, u.nickname AS sender_nickname, u.avatar AS sender_avatar FROM messages m LEFT JOIN users u ON m.sender_id = u.id WHERE m.id = ?', [id]);
         return rows[0] || null;
       }
     } catch (error) {

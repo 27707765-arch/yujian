@@ -104,6 +104,19 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' })); // JSON 解析（限制大小防止攻击）
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // URL 编码解析
 
+// JSON解析错误友好处理（解决 {phone:13800...} 无引号格式问题）
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.parse.failed') {
+    console.log('[HTTP] JSON解析失败: ' + req.method + ' ' + req.url);
+    return res.status(400).json({
+      code: 400,
+      message: '请求格式错误，请使用有效的JSON格式（属性名需用双引号包裹）',
+      data: null
+    });
+  }
+  next(err);
+});
+
 // 静态文件服务（添加缓存头）
 const staticOptions = {
   maxAge: process.env.NODE_ENV === 'production' ? '7d' : 0,  // 生产环境缓存7天

@@ -143,17 +143,13 @@ class Conversation {
            CASE 
              WHEN c.user1_id = ? THEN u2.nickname ELSE u1.nickname END as nickname,
            CASE 
-             WHEN c.user1_id = ? THEN u2.nickname ELSE u1.nickname END as other_nickname,
-           CASE 
-             WHEN c.user1_id = ? THEN u2.avatar ELSE u1.avatar END as other_user_avatar,
-           CASE 
-             WHEN c.user1_id = ? THEN u2.avatar ELSE u1.avatar END as other_avatar
+             WHEN c.user1_id = ? THEN u2.avatar ELSE u1.avatar END as other_user_avatar
            FROM conversations c
            LEFT JOIN users u1 ON c.user1_id = u1.id
            LEFT JOIN users u2 ON c.user2_id = u2.id
            WHERE c.user1_id = ? OR c.user2_id = ?
            ORDER BY c.last_message_time IS NULL ASC, c.last_message_time DESC`,
-          [user_id, user_id, user_id, user_id, user_id, user_id, user_id, user_id]
+          [user_id, user_id, user_id, user_id, user_id, user_id]
         );
         // 批量附加对方在线状态
         try {

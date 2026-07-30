@@ -39,7 +39,7 @@ async function recommendUsers(user_id, filters = {}) {
     // 清理24h前过期跳过记录
     await Skip.cleanExpiredSkips(user_id);
 
-    const { scope = 'city', ageMin = 18, ageMax = 35, distance = 20, limit = 50 } = filters;
+    const { scope = 'city', ageMin = 18, ageMax = 35, distance = 20, limit = 20 } = filters;
 
     // 根据查询模式获取候选用户
     let users = [];
@@ -50,15 +50,15 @@ async function recommendUsers(user_id, filters = {}) {
         currentUser.lat,
         currentUser.lng,
         distance,
-        limit * 2 // 多取一些，因为需要多层过滤
+        limit * 3 // 多取一些，因为需要多层过滤
       );
     } else if (scope === 'city' && currentUser.city) {
       // 同城：按 city 字段查同市用户
-      console.log(`[Match] 查询同城用户: userId=${user_id}, city=${currentUser.city}, limit=${limit * 2}`);
+      console.log(`[Match] 查询同城用户: userId=${user_id}, city=${currentUser.city}, limit=${limit * 3}`);
       users = await User.getUsersByCity(
         user_id,
         currentUser.city,
-        limit * 2
+        limit * 3
       );
       console.log(`[Match] 同城查询结果: ${users.length} 个用户`);
     } else {
@@ -66,7 +66,7 @@ async function recommendUsers(user_id, filters = {}) {
       try {
         const result = await executeQuery(
           'SELECT * FROM users WHERE id != ? AND status = 1 LIMIT ?',
-          [user_id, limit * 2]
+          [user_id, limit * 3]
         );
         // pool.query() 返回 [rows, fields]，需解包第一维
         users = Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
@@ -111,7 +111,9 @@ async function recommendUsers(user_id, filters = {}) {
     let excludedSet = excludedIds; // 已包含 skippedIds + blockedIds + blockedByOthers
 
     // 一次性批量查询：已喜欢列表、已匹配列表、隐私设置
-    const [settingsMap] = await Promise.all([
+    const [likedSet, matchedSet, settingsMap] = await Promise.all([
+      Like.batchExists(user_id, candidateIds),
+      Match.batchExists(user_id, candidateIds),
       UserSettings.batchGet(candidateIds)
     ]);
 
@@ -123,6 +125,12 @@ async function recommendUsers(user_id, filters = {}) {
     for (const user of ageFiltered) {
       // 排除已跳过和拉黑相关
       if (excludedSet.has(user.id)) continue;
+
+      // 内存判断：是否已喜欢（Set.has 查找 O(1)）
+      if (likedSet.has(user.id)) continue;
+
+      // 内存判断：是否已匹配
+      if (matchedSet.has(user.id)) continue;
 
       // 用 Map 读取隐私设置，替换逐条查询
       const settings = settingsMap.get(user.id);
@@ -146,7 +154,7 @@ async function recommendUsers(user_id, filters = {}) {
     Promise.allSettled(viewPromises).catch(() => {});
 
     // 结果不足5人时降级扩大搜索范围
-    if (recommendedUsers.length === 0) {
+    if (recommendedUsers.length < 5) {
       let fallbackUsers = [];
       if (scope === 'nearby' && currentUser.city) {
         // nearby无结果 → 降级到同城
@@ -155,12 +163,11 @@ async function recommendUsers(user_id, filters = {}) {
         // 同城无结果 → 降级到全国活跃用户
         fallbackUsers = await User.getActiveUsers(user_id, limit * 2);
       }
-      var addedIds = new Set(recommendedUsers.map(u => u.id));
       for (const user of fallbackUsers) {
         if (excludedSet.has(user.id)) continue;
-        if (addedIds.has(user.id)) continue;
+        if (likedSet.has(user.id)) continue;
+        if (matchedSet.has(user.id)) continue;
         if (recommendedUsers.length >= limit) break;
-        addedIds.add(user.id);
         recommendedUsers.push(user);
       }
     }

@@ -216,11 +216,23 @@ var ChatListPage = {
   template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="convs.length===0" class="empty"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" @click="open(c)" class="conv-item"><div class="conv-avatar-wrap"><div class="conv-avatar"><img v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span class="conv-time">{{fmtTime(c.last_message_time)}}</span></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div></div></div></div>`
 };
 
+
 var ChatDetailPage = {
-  data: function(){return {convId:0,msgs:[],text:"",loading:true,err:false,errMsg:"",userId:parseInt(localStorage.getItem("userId")),hasMore:true,loadingMore:false,uploading:false,sending:false}},
+  data: function(){return {
+    convId:0,msgs:[],text:"",loading:true,err:false,errMsg:"",
+    userId:parseInt(localStorage.getItem("userId")),hasMore:true,
+    loadingMore:false,uploading:false,sending:false,
+    voiceMode:false,showEmojiPanel:false,showPlusPanel:false,
+    recording:false,mediaRecorder:null,audioChunks:[],
+    showGiftPanel:false,gifts:[],giftLoading:false,
+    calling:false,callType:"",callPartnerId:0,callPartnerName:"",
+    showCallDialog:false,incomingCall:null,callDuration:0,callTimer:null,
+    emojis:["😀","😁","😂","🤣","😃","😄","😅","😆","😉","😊","😋","😎","😍","😘","😗","😙","😚","🙂","🤗","🤩","🤔","🤨","😐","😑","😶","🙄","😏","😣","😥","😮","🤐","😯","😪","😫","😴","😌","😛","😜","😝","😒","😓","😔","😕","🙃","🤑","😲","🙁","😖","😞","😟","😤","😢","😭","😦","😧","😨","😩","🤯","😬","😰","😱","🥵","🥶","😳","🤪","😵","🥴","😠","😡","🤬","😷","🤒","🤕","🤢","🤮","🥳","🥺","🤠","😇","🤡","🤥","🤫","🤭","🧐","🤓","😈","👻","💀","👽","🤖","💩","❤️","🧡","💛","💚","💙","💜","🖤","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","👍","👎","👊","✊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✌️","🤞","🤟","🤘","👌","🤌","🤏","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","🎉","🎊","🎈","🎁","🎀","🌹","💐","🌸","💯","🔥","⭐","🌟","✨","⚡","💥","💫","🎵","🎶","🍺","🍻","🥂","🍷","🍰","🎂","🍜","🍔","🍟","🌙","☀️","🌈","⛄","🏆","🥇","🏅","🎯","🎮","🎲","🎰","🧧","💰","💵","💴","💶","💷","💸","🪙"]
+  }},
   methods: {
     load: async function(isMore){
-      var self=this;self.convId=parseInt(self.$route.params.id);
+      var self=this;
+      try{self.convId=parseInt(self.$route.params.id)}catch(e){self.convId=0};
       if(!self.convId){toast("会话ID无效","terr");self.loading=false;self.err=true;self.errMsg="会话ID无效";return}
       if(isMore){self.loadingMore=true}else{self.loading=true;self.err=false}
       try{
@@ -228,16 +240,18 @@ var ChatDetailPage = {
         if(isMore&&self.msgs.length>0&&self.msgs[0].id)url+="&before="+self.msgs[0].id;
         var r=await api(url);
         var newMsgs=r.data||[];
+        // 后端返回按created_at DESC，需要反转为正序显示
+        newMsgs=newMsgs.reverse();
         if(isMore){
           if(newMsgs.length===0){self.hasMore=false}
           else{
             var oldH=self.$refs.chat?self.$refs.chat.scrollHeight:0;
             self.msgs=newMsgs.concat(self.msgs);
-            var s=this;Vue.nextTick(function(){if(s.$refs.chat)s.$refs.chat.scrollTop=s.$refs.chat.scrollHeight-oldH});
+            Vue.nextTick(function(){if(self.$refs.chat)self.$refs.chat.scrollTop=self.$refs.chat.scrollHeight-oldH});
           }
         }else{
           self.msgs=newMsgs;self.hasMore=newMsgs.length>=50;
-          var s2=this;Vue.nextTick(function(){s2.scrollBottom()});
+          Vue.nextTick(function(){self.scrollBottom()});
         }
         self.addTimeDividers();
       }catch(e){
@@ -248,15 +262,17 @@ var ChatDetailPage = {
     },
     scrollBottom: function(){var el=this.$refs.chat;if(el)el.scrollTop=el.scrollHeight},
     onScroll: function(){
-      var self=this,el=self.$refs.chat;if(!el||self.loadingMore||!self.hasMore)return;
+      var self=this,el=self.$refs.chat;
+      if(!el||self.loadingMore||!self.hasMore)return;
       if(el.scrollTop<50){self.load(true)}
     },
     addTimeDividers: function(){
       var ms=this.msgs;
       for(var i=ms.length-1;i>=0;i--){
         if(i===0){ms[i]._timeGroup=this.fmtTimeDiv(ms[i].created_at);continue}
-        var p=new Date(ms[i-1].created_at).getTime(),c=new Date(ms[i].created_at).getTime();
-        ms[i]._timeGroup=(c-p>300000||new Date(p).toDateString()!==new Date(c).toDateString())?this.fmtTimeDiv(ms[i].created_at):null;
+        var prev=new Date(ms[i-1].created_at).getTime();
+        var cur=new Date(ms[i].created_at).getTime();
+        ms[i]._timeGroup=(cur-prev>300000||new Date(prev).toDateString()!==new Date(cur).toDateString())?this.fmtTimeDiv(ms[i].created_at):null;
       }
     },
     fmtTimeDiv: function(t){
@@ -267,9 +283,27 @@ var ChatDetailPage = {
       if(d.toDateString()===y.toDateString())return"昨天 "+tm;
       return("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)+" "+tm;
     },
+    sendMsg: async function(){
+      var self=this,t=self.text.trim();if(!t)return;
+      var msg={conversation_id:self.convId,sender_id:self.userId,content:t,type:0,_local:true,_sending:true,created_at:new Date().toISOString()};
+      self.msgs.push(msg);self.text="";Vue.nextTick(function(){self.scrollBottom()});
+      try{
+        if(!wsSend({type:"send_message",conversation_id:self.convId,content:t,type:0})){
+          var r=await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:t,type:0})});
+          if(r.data){var idx=self.msgs.indexOf(msg);if(idx>-1)self.msgs.splice(idx,1,r.data)}
+        }
+      }catch(e){msg._sending=false;toast("发送失败","terr")}
+    },
     onImagePick: function(){
       var self=this,inp=document.createElement("input");inp.type="file";inp.accept="image/*";
       inp.onchange=function(e){var f=e.target.files[0];if(!f)return;self.uploadImage(f)};inp.click();
+      self.showPlusPanel=false;
+    },
+    onCameraCapture: function(){
+      var self=this,inp=document.createElement("input");
+      inp.type="file";inp.accept="image/*";inp.capture="environment";
+      inp.onchange=function(e){var f=e.target.files[0];if(!f)return;self.uploadImage(f)};inp.click();
+      self.showPlusPanel=false;
     },
     uploadImage: async function(file){
       var self=this;self.uploading=true;
@@ -280,7 +314,7 @@ var ChatDetailPage = {
           var imgUrl=r.data.url;
           var msg={conversation_id:self.convId,sender_id:self.userId,content:imgUrl,type:1,_local:true,_sending:true,created_at:new Date().toISOString()};
           self.msgs.push(msg);Vue.nextTick(function(){self.scrollBottom()});
-          if(!wsSend({type:"message",data:{conversation_id:self.convId,content:imgUrl,type:1}})){
+          if(!wsSend({type:"send_message",conversation_id:self.convId,content:imgUrl,type:1})){
             api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:imgUrl,type:1})}).catch(function(){});
           }
           msg._sending=false;
@@ -288,16 +322,121 @@ var ChatDetailPage = {
       }catch(e){toast("上传失败","terr")}
       self.uploading=false;
     },
-    sendMsg: async function(){
-      var self=this,t=self.text.trim();if(!t)return;
-      var msg={conversation_id:self.convId,sender_id:self.userId,content:t,type:0,_local:true,_sending:true,created_at:new Date().toISOString()};
-      self.msgs.push(msg);self.text="";Vue.nextTick(function(){self.scrollBottom()});
-      if(!wsSend({type:"send_message",receiver_id:null,content:t,type:0})){
-        try{await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:t,type:0})})}catch(e){toast("发送失败","terr");msg._failed=true}
-      }
-      msg._sending=false;
+    toggleVoiceMode: function(){this.voiceMode=!this.voiceMode;this.showEmojiPanel=false;this.showPlusPanel=false},
+    insertEmoji: function(e){this.text+=e},
+    togglePlus: function(){this.showPlusPanel=!this.showPlusPanel;this.showEmojiPanel=false;this.showGiftPanel=false},
+    toggleEmoji: function(){this.showEmojiPanel=!this.showEmojiPanel;this.showPlusPanel=false;this.showGiftPanel=false},
+    startRecording: async function(){
+      var self=this;
+      try{
+        var stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        self.mediaRecorder=new MediaRecorder(stream);self.audioChunks=[];
+        self.mediaRecorder.ondataavailable=function(e){if(e.data.size>0)self.audioChunks.push(e.data)};
+        self.mediaRecorder.onstop=function(){self.sendVoice()};
+        self.mediaRecorder.start();self.recording=true;
+      }catch(e){toast("无法访问麦克风","terr")}
     },
-    handleKey: function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();this.sendMsg()}},
+    stopRecording: function(){
+      var self=this;if(self.mediaRecorder&&self.recording){self.mediaRecorder.stop();self.recording=false;
+        self.mediaRecorder.stream.getTracks().forEach(function(t){t.stop()})}
+    },
+    sendVoice: async function(){
+      var self=this;if(self.audioChunks.length===0)return;
+      var blob=new Blob(self.audioChunks,{type:"audio/webm"});
+      try{
+        var fd=new FormData();fd.append("voice",blob,"voice.webm");
+        var r=await api("/upload/voice",{method:"POST",body:fd});
+        if(r.code===0&&r.data){
+          var msg={conversation_id:self.convId,sender_id:self.userId,content:"[语音]",type:2,_local:true,_sending:true,voice_url:r.data.url,voice_duration:Math.round(blob.size/16000),created_at:new Date().toISOString()};
+          self.msgs.push(msg);Vue.nextTick(function(){self.scrollBottom()});
+          if(!wsSend({type:"send_message",conversation_id:self.convId,content:"[语音]",type:2,voice_url:r.data.url,voice_duration:msg.voice_duration})){
+            api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:"[语音]",type:2,voice_url:r.data.url,voice_duration:msg.voice_duration})}).catch(function(){});
+          }
+          msg._sending=false;
+        }else{toast("语音上传失败","terr")}
+      }catch(e){toast("语音上传失败","terr")}
+    },
+    onVoiceCall: function(){
+      var self=this;self.callType="voice";self.showPlusPanel=false;
+      api("/chat/conversations").then(function(r){
+        var convs=r.data||[];
+        var c=convs.find(function(x){return x.id===self.convId});
+        if(c){self.callPartnerId=c.other_user_id;self.callPartnerName=c.other_nickname||"";self.doCall()}
+        else{toast("无法获取对方信息","terr")}
+      }).catch(function(){toast("网络错误","terr")});
+    },
+    onVideoCall: function(){
+      var self=this;self.callType="video";self.showPlusPanel=false;
+      api("/chat/conversations").then(function(r){
+        var convs=r.data||[];
+        var c=convs.find(function(x){return x.id===self.convId});
+        if(c){self.callPartnerId=c.other_user_id;self.callPartnerName=c.other_nickname||"";self.doCall()}
+        else{toast("无法获取对方信息","terr")}
+      }).catch(function(){toast("网络错误","terr")});
+    },
+    doCall: function(){
+      var self=this;
+      if(!self.callPartnerId){toast("无法获取对方ID","terr");return}
+      self.calling=true;
+      wsSend({type:"call_request",receiver_id:self.callPartnerId,call_type:self.callType});
+      self._callTimeout=setTimeout(function(){self.calling=false;toast("对方无应答","terr")},30000);
+    },
+    acceptCall: function(){
+      var self=this,d=self.incomingCall;
+      if(!d)return;
+      self.showCallDialog=false;
+      wsSend({type:"call_accept",caller_id:d.caller_id,call_id:d.call_id,channel_name:d.channel_name});
+      self.calling=true;self.callType=d.call_type;
+      self.startCallMedia();
+    },
+    rejectCall: function(){
+      var self=this,d=self.incomingCall;
+      if(!d)return;
+      self.showCallDialog=false;
+      wsSend({type:"call_reject",caller_id:d.caller_id,call_id:d.call_id});
+      self.incomingCall=null;
+    },
+    startCallMedia: function(){
+      var self=this;
+      var constraints={audio:true,video:self.callType==="video"};
+      navigator.mediaDevices.getUserMedia(constraints).then(function(stream){
+        self._localStream=stream;
+        self.callDuration=0;
+        self.callTimer=setInterval(function(){self.callDuration++},1000);
+      }).catch(function(){toast("无法访问摄像头/麦克风","terr");self.endCall()});
+    },
+    endCall: function(){
+      var self=this;
+      if(self._callTimeout){clearTimeout(self._callTimeout)}
+      if(self.callTimer){clearInterval(self.callTimer)}
+      if(self._localStream){self._localStream.getTracks().forEach(function(t){t.stop()})}
+      wsSend({type:"call_end",peer_id:self.callPartnerId,call_id:self.incomingCall?self.incomingCall.call_id:null,end_reason:"hangup"});
+      self.calling=false;self.callType="";self.callPartnerId=0;self.showCallDialog=false;self.incomingCall=null;
+    },
+    openGiftPanel: function(){
+      var self=this;self.showPlusPanel=false;self.showGiftPanel=true;
+      if(self.gifts.length===0){
+        self.giftLoading=true;
+        api("/gifts/list").then(function(r){self.gifts=r.data||[]}).catch(function(){}).finally(function(){self.giftLoading=false});
+      }
+    },
+    sendGift: async function(gift){
+      var self=this;
+      try{
+        if(!self.callPartnerId){
+          var cr=await api("/chat/conversations");
+          var convs=cr.data||[];
+          var c=convs.find(function(x){return x.id===self.convId});
+          if(c)self.callPartnerId=c.other_user_id;
+        }
+        var r=await api("/gifts/send",{method:"POST",body:JSON.stringify({to_user_id:self.callPartnerId,gift_id:gift.id,conversation_id:self.convId})});
+        if(r.code===0){
+          var msg={conversation_id:self.convId,sender_id:self.userId,content:"[礼物] "+gift.name,type:6,_local:true,gift_data:JSON.stringify(gift),created_at:new Date().toISOString()};
+          self.msgs.push(msg);Vue.nextTick(function(){self.scrollBottom()});
+          self.showGiftPanel=false;toast("礼物已发送","tok");
+        }else{toast(r.message||"发送失败","terr")}
+      }catch(e){toast("发送失败","terr")}
+    },
     handleWs: function(d){
       var self=this;
       if(d.type==="message"&&d.data&&d.data.conversation_id===self.convId){
@@ -306,21 +445,150 @@ var ChatDetailPage = {
         self.msgs.push(d.data);Vue.nextTick(function(){self.scrollBottom()});
         api("/chat/mark-read",{method:"POST",body:JSON.stringify({conversation_id:self.convId})}).catch(function(){});
       }
+      if(d.type==="call_request"&&d.data){self.incomingCall=d.data;self.showCallDialog=true}
+      if(d.type==="call_accepted"&&d.data){
+        if(self._callTimeout)clearTimeout(self._callTimeout);
+        self.callType=d.data.call_type||self.callType;
+        self.startCallMedia();
+      }
+      if(d.type==="call_rejected"||d.type==="call_user_offline"){
+        if(self._callTimeout)clearTimeout(self._callTimeout);
+        self.calling=false;self.callType="";toast(d.type==="call_user_offline"?"对方不在线":"对方已拒绝","terr");
+      }
+      if(d.type==="call_ended"){
+        if(self._callTimeout)clearTimeout(self._callTimeout);
+        if(self.callTimer)clearInterval(self.callTimer);
+        if(self._localStream){self._localStream.getTracks().forEach(function(t){t.stop()})}
+        self.calling=false;self.callType="";self.callPartnerId=0;self.showCallDialog=false;self.incomingCall=null;
+      }
     }
   },
   mounted: function(){
     var self=this;
-    // 保存 scroll 处理引用以便清理
     self._scrollFn=function(){self.onScroll()};
-    self.load();
+    Vue.nextTick(function(){self.load()});
     wsOn("message",function(d){self.handleWs(d)});
+    wsOn("call_request",function(d){self.handleWs(d)});
+    wsOn("call_accepted",function(d){self.handleWs(d)});
+    wsOn("call_rejected",function(d){self.handleWs(d)});
+    wsOn("call_user_offline",function(d){self.handleWs(d)});
+    wsOn("call_ended",function(d){self.handleWs(d)});
     Vue.nextTick(function(){var el=self.$refs.chat;if(el){el.addEventListener("scroll",self._scrollFn)}});
   },
   beforeUnmount: function(){
     wsOff("message",this.handleWs);
+    wsOff("call_request",this.handleWs);
+    wsOff("call_accepted",this.handleWs);
+    wsOff("call_rejected",this.handleWs);
+    wsOff("call_user_offline",this.handleWs);
+    wsOff("call_ended",this.handleWs);
+    if(this.callTimer)clearInterval(this.callTimer);
+    if(this._callTimeout)clearTimeout(this._callTimeout);
+    if(this._localStream){this._localStream.getTracks().forEach(function(t){t.stop()})}
     var el=this.$refs.chat;if(el&&this._scrollFn)el.removeEventListener("scroll",this._scrollFn);
   },
-  template: '<div style="display:flex;flex-direction:column;height:100%"><div ref="chat" style="flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch"><div v-if="loadingMore" style="text-align:center;padding:8px"><div class="spin" style="width:20px;height:20px;border-width:2px"></div></div><div v-if="!hasMore&&msgs.length>0" style="text-align:center;padding:8px;font-size:12px;color:var(--tm)">没有更多消息了</div><div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div></div><div v-else-if="err&&msgs.length===0" class="empty" style="padding:48px 24px"><div style="font-size:48px;margin-bottom:12px">😵</div><div style="color:var(--ts);margin-bottom:16px;font-size:14px">{{errMsg}}</div><button class="btn bp bs" @click="load()">重试</button></div><div v-else-if="msgs.length===0" class="empty" style="padding:64px 24px"><div class="ei">💬</div><div class="et">开始聊天吧</div><div class="ed">发送第一条消息，开启你们的对话</div></div><div v-else><div v-for="m in msgs" :key="m.id||Math.random()"><div v-if="m._timeGroup" class="time-divider">{{m._timeGroup}}</div><div v-if="m.type===99" class="msg-sy">{{m.content}}</div><div v-else-if="m.type===1" :class="[\'msg-b\',m.sender_id===userId?\'msg-my\':\'msg-ot\']"><img :src="m.content" class="msg-img"><div :style="{fontSize:\'10px\',marginTop:\'2px\',textAlign:\'right\',opacity:.6}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer;margin-left:4px">❌</span></div></div><div v-else :class="[\'msg-b\',m.sender_id===userId?\'msg-my\':\'msg-ot\']"><div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div><div :style="{fontSize:\'10px\',marginTop:\'2px\',textAlign:\'right\',opacity:.6}"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span><span v-else-if="m._failed" style="color:var(--e);cursor:pointer;margin-left:4px">❌</span></div></div></div></div></div><div class="ci"><button class="btn" style="border:none;background:none;font-size:24px;padding:0 4px;flex-shrink:0;cursor:pointer" @click="onImagePick" :disabled="uploading">{{uploading?\'⏳\':\'📷\'}}</button><div class="inp" style="flex:1;border-radius:20px;background:var(--bg-page)"><textarea v-model="text" placeholder="说点什么..." @keydown="handleKey" rows="1" style="width:100%;border:none;outline:none;font-size:16px;padding:10px 14px;resize:none;background:transparent;max-height:120px;overflow-y:auto"></textarea></div><button class="btn bp" style="border-radius:50%;width:40px;height:40px;padding:0;flex-shrink:0" @click="sendMsg" :disabled="!text.trim()">➤</button></div></div>'
+  template: `<div style="display:flex;flex-direction:column;height:100%;background:var(--bg-page)">
+    <div v-if="calling" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(160deg,#1a1a2e,#16213e);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff">
+      <div style="width:88px;height:88px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:16px">{{callType==="video"?"📹":"📞"}}</div>
+      <div style="font-size:22px;font-weight:600;margin-bottom:6px">{{callPartnerName||"通话中"}}</div>
+      <div style="font-size:14px;opacity:.65;margin-bottom:40px">{{Math.floor(callDuration/60)}}:{{("0"+(callDuration%60)).slice(-2)}}</div>
+      <button @click="endCall" style="width:64px;height:64px;border-radius:50%;background:#ff4757;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(255,71,87,.4)">📞</button>
+    </div>
+    <div v-if="showCallDialog" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:100;display:flex;align-items:center;justify-content:center">
+      <div style="background:#fff;border-radius:20px;padding:32px 28px;width:280px;text-align:center">
+        <div style="font-size:56px;margin-bottom:12px">{{incomingCall&&incomingCall.call_type==="video"?"📹":"📞"}}</div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:4px">{{incomingCall&&incomingCall.call_type==="video"?"视频通话":"语音通话"}}</div>
+        <div style="font-size:13px;color:var(--tm);margin-bottom:28px">对方邀请你通话</div>
+        <div style="display:flex;gap:24px;justify-content:center">
+          <button @click="rejectCall" style="width:60px;height:60px;border-radius:50%;background:#ff4757;border:none;font-size:24px;cursor:pointer">📞</button>
+          <button @click="acceptCall" style="width:60px;height:60px;border-radius:50%;background:#2ed573;border:none;font-size:24px;cursor:pointer">📞</button>
+        </div>
+      </div>
+    </div>
+    <div ref="chat" style="flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch">
+      <div v-if="loadingMore" style="text-align:center;padding:8px"><div class="spin" style="width:20px;height:20px;border-width:2px"></div></div>
+      <div v-if="!hasMore&&msgs.length>0" style="text-align:center;padding:8px;font-size:12px;color:var(--tm)">没有更多消息了</div>
+      <div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div></div>
+      <div v-else-if="err&&msgs.length===0" class="empty" style="padding:48px 24px"><div style="font-size:48px;margin-bottom:12px">😵</div><div style="color:var(--ts);margin-bottom:16px;font-size:14px">{{errMsg}}</div><button class="btn bp bs" @click="load()">重试</button></div>
+      <div v-else-if="msgs.length===0" class="empty" style="padding:64px 24px"><div class="ei">💬</div><div class="et">开始聊天吧</div><div class="ed">发送第一条消息，开启你们的对话</div></div>
+      <div v-else>
+        <div v-for="m in msgs" :key="m.id?m.id:('k'+Math.random())">
+          <div v-if="m._timeGroup" class="time-divider">{{m._timeGroup}}</div>
+          <div v-if="m.type===99" class="msg-sy">{{m.content}}</div>
+          <div v-else-if="m.type===1" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
+            <img :src="m.content" class="msg-img" style="max-width:200px;border-radius:8px;display:block">
+            <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+          </div>
+          <div v-else-if="m.type===2" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
+            <div style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:20px">🔊</span><span style="font-size:13px">{{m.voice_duration||0}}″ 语音</span></div>
+            <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+          </div>
+          <div v-else-if="m.type===6" class="msg-sy">
+            <div style="font-size:14px">🎁 {{m.content}}</div>
+            <div style="font-size:10px;opacity:.6">{{timeStr(m.created_at)}}</div>
+          </div>
+          <div v-else :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
+            <div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div>
+            <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="showGiftPanel" style="background:#fff;border-top:1px solid var(--b);padding:12px;max-height:220px;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:600">送礼物</span>
+        <button @click="showGiftPanel=false" style="border:none;background:none;font-size:16px;cursor:pointer;color:var(--tm)">✕</button>
+      </div>
+      <div v-if="giftLoading" style="text-align:center;padding:16px"><div class="spin" style="width:20px;height:20px;border-width:2px"></div></div>
+      <div v-else-if="gifts.length===0" style="text-align:center;padding:16px;color:var(--tm);font-size:13px">暂无礼物</div>
+      <div v-else style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+        <div v-for="g in gifts" :key="g.id" @click="sendGift(g)" style="display:flex;flex-direction:column;align-items:center;padding:10px 4px;background:var(--bg-page);border-radius:12px;cursor:pointer">
+          <span style="font-size:28px">{{g.icon||"🎁"}}</span>
+          <span style="font-size:12px;margin-top:4px">{{g.name}}</span>
+          <span style="font-size:10px;color:var(--tm)">{{g.price}}币</span>
+        </div>
+      </div>
+    </div>
+    <div v-if="showEmojiPanel" style="background:#f7f7f7;border-top:1px solid var(--b);padding:10px 8px;height:220px;overflow-y:auto">
+      <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px">
+        <button v-for="e in emojis" :key="e" @click="insertEmoji(e)" style="border:none;background:none;font-size:22px;padding:6px 0;cursor:pointer;border-radius:6px">{{e}}</button>
+      </div>
+    </div>
+    <div v-if="showPlusPanel" style="background:#f7f7f7;border-top:1px solid var(--b);padding:16px 8px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px">
+        <div @click="onImagePick" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">🖼️</div>
+          <span style="font-size:11px;color:#666">相册</span>
+        </div>
+        <div @click="onCameraCapture" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">📸</div>
+          <span style="font-size:11px;color:#666">拍摄</span>
+        </div>
+        <div @click="onVideoCall" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer" :style="{opacity:calling?0.4:1,pointerEvents:calling?'none':'auto'}">
+          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">📹</div>
+          <span style="font-size:11px;color:#666">视频通话</span>
+        </div>
+        <div @click="onVoiceCall" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer" :style="{opacity:calling?0.4:1,pointerEvents:calling?'none':'auto'}">
+          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">📞</div>
+          <span style="font-size:11px;color:#666">语音通话</span>
+        </div>
+        <div @click="openGiftPanel" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">🎁</div>
+          <span style="font-size:11px;color:#666">礼物</span>
+        </div>
+      </div>
+    </div>
+    <div style="background:#f7f7f7;border-top:1px solid var(--b);padding:8px 10px;display:flex;align-items:center;gap:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))">
+      <button @click="toggleVoiceMode" style="border:none;background:none;font-size:24px;padding:0 2px;flex-shrink:0;cursor:pointer;width:32px">{{voiceMode?"⌨️":"🎙️"}}</button>
+      <button v-if="voiceMode" @mousedown="startRecording" @mouseup="stopRecording" @touchstart.prevent="startRecording" @touchend.prevent="stopRecording" :style="{background:recording?'#c8c8c8':'#fff'}" style="flex:1;height:40px;border-radius:6px;border:1px solid #ddd;font-size:15px;cursor:pointer;color:#333;transition:background .15s">{{recording?'松开发送':'按住说话'}}</button>
+      <div v-else class="inp" style="flex:1;border-radius:20px;display:flex;align-items:center">
+        <input v-model="text" placeholder="输入消息..." @keydown.enter="sendMsg" style="flex:1;border:none;background:none;outline:none;padding:8px 12px;font-size:15px">
+      </div>
+      <button v-if="!voiceMode&&text.trim()" @click="sendMsg" class="btn bp" style="border-radius:20px;padding:8px 16px;font-size:14px;flex-shrink:0">发送</button>
+      <button v-if="!voiceMode&&!text.trim()" @click="toggleEmoji" style="border:none;background:none;font-size:24px;flex-shrink:0;cursor:pointer;width:32px">😊</button>
+      <button v-if="!voiceMode&&!text.trim()" @click="togglePlus" style="border:none;background:none;font-size:24px;flex-shrink:0;cursor:pointer;width:32px">➕</button>
+    </div>
+  </div>`
 };
 
 var MyPage = {
@@ -416,14 +684,14 @@ router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",
 
 // ==== App ====
 var AppRoot = {
-  data: function(){return {toasts:toasts}},
+  data: function(){return {toasts:toasts,appVersion:"v20260729-1"}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
     showBack: function(){var p=this.$route.path;return p!=="/"&&p!=="/home"&&p!=="/login"}
   },
   methods: {goBack:function(){this.$router.back()}},
-  template: `<div class="app"><header class="hdr" v-if="pageTitle"><button class="bk" v-if="showBack" @click="goBack">←</button><span class="tt">{{pageTitle}}</span></header><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><component :is=\"Component\" :key=\"route.fullPath\"/></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\"><div class=\"ni\">💬</div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div></div>`
+  template: `<div class="app"><header class="hdr" v-if="pageTitle"><button class="bk" v-if="showBack" @click="goBack">←</button><span class="tt">{{pageTitle}}</span></header><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><component :is=\"Component\" :key=\"route.fullPath\"/></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\"><div class=\"ni\">💬</div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div></div>`
 };
 
 var app = Vue.createApp(AppRoot);
