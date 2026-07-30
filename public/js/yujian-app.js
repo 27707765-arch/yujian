@@ -288,11 +288,11 @@ var ChatDetailPage = {
       var msg={conversation_id:self.convId,sender_id:self.userId,content:t,type:0,_local:true,_sending:true,created_at:new Date().toISOString()};
       self.msgs.push(msg);self.text="";Vue.nextTick(function(){self.scrollBottom()});
       try{
-        if(!wsSend({type:"send_message",conversation_id:self.convId,content:t,type:0})){
-          var r=await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:t,type:0})});
-          if(r.data){var idx=self.msgs.indexOf(msg);if(idx>-1)self.msgs.splice(idx,1,r.data)}
-        }
-      }catch(e){msg._sending=false;toast("发送失败","terr")}
+        var r=await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:t,type:0})});
+        if(r.code===0&&r.data){
+          var idx=self.msgs.indexOf(msg);if(idx>-1){self.msgs[idx].id=r.data.id;self.msgs[idx]._sending=false}
+        }else{msg._failed=true;msg._sending=false;toast(r.message||"发送失败","terr")}
+      }catch(e){msg._failed=true;msg._sending=false;toast("发送失败","terr")}
     },
     onImagePick: function(){
       var self=this,inp=document.createElement("input");inp.type="file";inp.accept="image/*";
