@@ -2,6 +2,7 @@
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
+var uiState = Vue.reactive({hideHdr:false}); // 全局UI状态（聊天详情页隐藏顶部导航头）
 var _tid = 0;
 function toast(msg, cls) { var id = ++_tid; toasts.push({id:id, msg:msg, cls:cls}); setTimeout(function(){ var i=toasts.findIndex(function(t){return t.id===id}); if(i>-1)toasts.splice(i,1); }, 3000); }
 function token() { return localStorage.getItem("token") || ""; }
@@ -53,7 +54,7 @@ var LoginPage = {
     doLogin: async function(){
       if(!this.phone||!this.code){toast("请输入手机号和验证码","terr");return}
       this.loading=true;
-      try{var r=await api("/auth/login",{method:"POST",body:JSON.stringify({login:this.phone,code:this.code})});if(r.code===0&&r.data){localStorage.setItem("token",r.data.token);localStorage.setItem("userId",r.data.user.id);if(r.data.user.nickname)localStorage.setItem("uname",r.data.user.nickname);wsConnect();toast("登录成功","tok");this.$router.replace("/home")}else toast(r.message||"登录失败","terr")}catch(e){toast("网络错误","terr")}
+      try{var r=await api("/auth/login",{method:"POST",body:JSON.stringify({login:this.phone,code:this.code})});if(r.code===0&&r.data){localStorage.setItem("token",r.data.token);localStorage.setItem("userId",r.data.user.id);if(r.data.user.nickname)localStorage.setItem("uname",r.data.user.nickname);if(r.data.user.avatar)localStorage.setItem("uavatar",r.data.user.avatar);wsConnect();toast("登录成功","tok");this.$router.replace("/home")}else toast(r.message||"登录失败","terr")}catch(e){toast("网络错误","terr")}
       this.loading=false;
     }
   },
@@ -262,10 +263,30 @@ var ChatDetailPage = {
     showGiftPanel:false,gifts:[],giftLoading:false,
     calling:false,callType:"",callPartnerId:0,callPartnerName:"",
     showCallDialog:false,incomingCall:null,callDuration:0,callTimer:null,
+    partner:{nickname:"",avatar:null,online:false},partnerId:0,myAvatar:"",
     emojis:["😀","😁","😂","🤣","😃","😄","😅","😆","😉","😊","😋","😎","😍","😘","😗","😙","😚","🙂","🤗","🤩","🤔","🤨","😐","😑","😶","🙄","😏","😣","😥","😮","🤐","😯","😪","😫","😴","😌","😛","😜","😝","😒","😓","😔","😕","🙃","🤑","😲","🙁","😖","😞","😟","😤","😢","😭","😦","😧","😨","😩","🤯","😬","😰","😱","🥵","🥶","😳","🤪","😵","🥴","😠","😡","🤬","😷","🤒","🤕","🤢","🤮","🥳","🥺","🤠","😇","🤡","🤥","🤫","🤭","🧐","🤓","😈","👻","💀","👽","🤖","💩","❤️","🧡","💛","💚","💙","💜","🖤","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","👍","👎","👊","✊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✌️","🤞","🤟","🤘","👌","🤌","🤏","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","🎉","🎊","🎈","🎁","🎀","🌹","💐","🌸","💯","🔥","⭐","🌟","✨","⚡","💥","💫","🎵","🎶","🍺","🍻","🥂","🍷","🍰","🎂","🍜","🍔","🍟","🌙","☀️","🌈","⛄","🏆","🥇","🏅","🎯","🎮","🎲","🎰","🧧","💰","💵","💴","💶","💷","💸","🪙"]
   }},
   methods: {
     timeStr: function(t){if(!t)return"";var d=new Date(t);return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)},
+    avatarOf: function(m){
+      if(m.sender_id===this.userId)return this.myAvatar||null;
+      return m.sender_avatar||this.partner.avatar||null;
+    },
+    loadPartner: async function(){
+      var s=this;
+      try{
+        var r=await api("/chat/conversations");
+        var list=r.data||[];
+        for(var i=0;i<list.length;i++){
+          if(list[i].id===s.convId){
+            var c=list[i];
+            s.partner={nickname:c.other_nickname||"用户",avatar:c.other_avatar||null,online:!!c.other_user_online};
+            s.partnerId=c.other_user_id||0;
+            break;
+          }
+        }
+      }catch(e){}
+    },
     load: async function(isMore){
       var s=this;
       try{s.convId=parseInt(s.$route.params.id)}catch(e){s.convId=0}
@@ -510,6 +531,10 @@ var ChatDetailPage = {
     var self=this;
     self._scrollFn=function(){self.onScroll()};
     self._wsHandler=function(d){self.handleWs(d)};
+    uiState.hideHdr=true;
+    self.myAvatar=localStorage.getItem("uavatar")||"";
+    if(!self.myAvatar){api("/user/info").then(function(r){if(r.data&&r.data.avatar){self.myAvatar=r.data.avatar;localStorage.setItem("uavatar",r.data.avatar)}}).catch(function(){})}
+    self.loadPartner();
     Vue.nextTick(function(){self.load()});
     wsOn("message",self._wsHandler);
     wsOn("message_sent",self._wsHandler);
@@ -524,6 +549,7 @@ var ChatDetailPage = {
     Vue.nextTick(function(){var el=self.$refs.chat;if(el){el.addEventListener("scroll",self._scrollFn)}});
   },
   beforeUnmount: function(){
+    uiState.hideHdr=false;
     wsOff("message",this._wsHandler);
     wsOff("message_sent",this._wsHandler);
     wsOff("message_recalled",this._wsHandler);
@@ -540,6 +566,16 @@ var ChatDetailPage = {
     var el=this.$refs.chat;if(el&&this._scrollFn)el.removeEventListener("scroll",this._scrollFn);
   },
   template: `<div style="display:flex;flex-direction:column;height:100%;background:var(--bg-page)">
+    <div class="chat-hdr">
+      <button class="bk" @click="$router.back()">←</button>
+      <div class="avatar av-sm pavatar" style="position:relative;cursor:pointer" @click="partnerId&&$router.push('/user/'+partnerId)"><img v-if="partner.avatar" :src="partner.avatar"><span v-else>👤</span><span v-if="partner.online" class="online-dot"></span></div>
+      <div style="flex:1;min-width:0;cursor:pointer" @click="partnerId&&$router.push('/user/'+partnerId)">
+        <div class="nm">{{partner.nickname||"加载中..."}}</div>
+        <div class="st" :class="{on:partner.online}">{{partner.online?"● 在线":"离线"}}</div>
+      </div>
+      <button class="act" @click="onVoiceCall" :style="{opacity:calling?0.4:1,pointerEvents:calling?'none':'auto'}" title="语音通话">📞</button>
+      <button class="act" @click="onVideoCall" :style="{opacity:calling?0.4:1,pointerEvents:calling?'none':'auto'}" title="视频通话">📹</button>
+    </div>
     <div v-if="calling" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(160deg,#1a1a2e,#16213e);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff">
       <div style="width:88px;height:88px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:16px">{{callType==="video"?"📹":"📞"}}</div>
       <div style="font-size:22px;font-weight:600;margin-bottom:6px">{{callPartnerName||"通话中"}}</div>
@@ -567,21 +603,24 @@ var ChatDetailPage = {
         <div v-for="m in msgs" :key="m.id?m.id:('k'+Math.random())">
           <div v-if="m._timeGroup" class="time-divider">{{m._timeGroup}}</div>
           <div v-if="m.type===99" class="msg-sy">{{m.content}}</div>
-          <div v-else-if="m.type===1" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
-            <img :src="m.content" class="msg-img" style="max-width:200px;border-radius:8px;display:block">
-            <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
-          </div>
-          <div v-else-if="m.type===2" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
-            <div style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:20px">🔊</span><span style="font-size:13px">{{m.voice_duration||0}}″ 语音</span></div>
-            <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
-          </div>
           <div v-else-if="m.type===6" class="msg-sy">
             <div style="font-size:14px">🎁 {{m.content}}</div>
             <div style="font-size:10px;opacity:.6">{{timeStr(m.created_at)}}</div>
           </div>
-          <div v-else :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
-            <div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div>
-            <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+          <div v-else class="msg-row" :style="{flexDirection:m.sender_id===userId?'row-reverse':'row'}">
+            <div class="avatar"><img v-if="avatarOf(m)" :src="avatarOf(m)"><span v-else>👤</span></div>
+            <div v-if="m.type===1" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
+              <img :src="m.content" class="msg-img" style="max-width:200px;border-radius:8px;display:block">
+              <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+            </div>
+            <div v-else-if="m.type===2" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
+              <div style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:20px">🔊</span><span style="font-size:13px">{{m.voice_duration||0}}″ 语音</span></div>
+              <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+            </div>
+            <div v-else :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
+              <div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div>
+              <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+            </div>
           </div>
         </div>
       </div>
@@ -738,7 +777,7 @@ router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",
 // 简短提示音（Web Audio API，无需外部文件）
 function _playBeep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=800;o.type="sine";g.gain.setValueAtTime(0.25,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);}catch(e){}}
 var AppRoot = {
-  data: function(){return {toasts:toasts,appVersion:"v20260731-2",_unreadCount:0}},
+  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260731-3",_unreadCount:0}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
@@ -773,7 +812,7 @@ var AppRoot = {
   beforeUnmount: function(){
     wsOff("message",this._gMsgFn);
   },
-  template: `<div class="app"><header class="hdr" v-if="pageTitle"><button class="bk" v-if="showBack" @click="goBack">←</button><span class="tt">{{pageTitle}}</span></header><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><component :is=\"Component\" :key=\"route.fullPath\"/></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\"><div class=\"ni\">💬</div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div></div>`
+  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">←</button><span class="tt">{{pageTitle}}</span></header><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><component :is=\"Component\" :key=\"route.fullPath\"/></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\"><div class=\"ni\">💬</div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div></div>`
 };
 
 var app = Vue.createApp(AppRoot);

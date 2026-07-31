@@ -615,6 +615,27 @@ html,body{
 .msg-my .msg-img{margin-bottom:2px}
 .msg-ot .msg-img{margin-bottom:2px}
 
+/* Chat detail header + message row with avatar */
+.chat-hdr{height:var(--header-h);flex-shrink:0;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border-light);display:flex;align-items:center;padding:0 8px 0 4px;gap:10px;z-index:50;box-shadow:0 1px 8px rgba(255,94,125,.06);animation:hdrIn .3s ease-out}
+@keyframes hdrIn{from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.chat-hdr .bk{position:static;transform:none}
+.chat-hdr .act{border:none;background:none;font-size:19px;cursor:pointer;padding:7px;border-radius:50%;transition:background .15s,transform .15s;flex-shrink:0;line-height:1}
+.chat-hdr .act:hover{background:var(--primary-bg);transform:scale(1.1)}
+.chat-hdr .act:active{transform:scale(.92)}
+.chat-hdr .pavatar{transition:transform .18s}
+.chat-hdr .pavatar:hover{transform:scale(1.07)}
+.chat-hdr .nm{font-size:16px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25;letter-spacing:.2px}
+.chat-hdr .st{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;margin-top:1px}
+.chat-hdr .st.on{color:var(--success);font-weight:500}
+.msg-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:4px;animation:msgIn .28s ease-out}
+@keyframes msgIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+.msg-row .avatar{width:32px;height:32px;font-size:14px;box-shadow:0 1px 5px rgba(0,0,0,.1);transition:transform .18s;cursor:pointer}
+.msg-row .avatar:hover{transform:scale(1.12)}
+.msg-row .msg-b{margin-bottom:4px;transition:box-shadow .2s}
+.msg-row .msg-ot:hover{box-shadow:0 3px 12px rgba(0,0,0,.1)}
+.online-dot{position:absolute;bottom:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--success);border:2px solid #fff;animation:onlinePulse 2.4s ease-in-out infinite}
+@keyframes onlinePulse{0%,100%{box-shadow:0 0 0 0 rgba(52,199,89,.45)}50%{box-shadow:0 0 0 4px rgba(52,199,89,0)}}
+
 /* Chat input alias */
 .ci{background:var(--bg-white);border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:flex-end;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 .ci .inp{background:var(--bg-page)}
@@ -633,7 +654,7 @@ html,body{
 
 <script src="/js/vue.global.js"></script>
 <script src="/js/vue-router.global.js"></script>
-<script src="/js/yujian-app.js?v=202607311400"></script>
+<script src="/js/yujian-app.js?v=202607311600"></script>
 </body>
 </html>
 
