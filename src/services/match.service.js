@@ -110,9 +110,10 @@ async function recommendUsers(user_id, filters = {}) {
     const candidateIds = ageFiltered.map(u => u.id);
     let excludedSet = excludedIds; // 已包含 skippedIds + blockedIds + blockedByOthers
 
-    // 一次性批量查询：已喜欢列表、已匹配列表、隐私设置
-    const [settingsMap] = await Promise.all([
-      UserSettings.batchGet(candidateIds)
+    // 一次性批量查询：隐私设置、已有会话
+    const [settingsMap, conversationSet] = await Promise.all([
+      UserSettings.batchGet(candidateIds),
+      Conversation.batchExists(user_id, candidateIds)
     ]);
 
     // 收集待记录的浏览，在循环外批量处理
@@ -129,6 +130,11 @@ async function recommendUsers(user_id, filters = {}) {
       let userForRecommend = { ...user };
       if (settings && settings.hide_distance) {
         userForRecommend._distance_hidden = true;
+      }
+
+      // 标记是否已有会话（前端用于区分"打招呼"/"发消息"）
+      if (conversationSet.has(user.id)) {
+        userForRecommend._has_conversation = true;
       }
 
       // 浏览记录异步写入（收集 Promise，不阻塞推荐返回）
