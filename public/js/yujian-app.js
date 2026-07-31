@@ -620,8 +620,19 @@ var ChatDetailPage = {
         }
         var r=await api("/gifts/send",{method:"POST",body:JSON.stringify({to_user_id:self.callPartnerId,gift_id:gift.id,conversation_id:self.convId})});
         if(r.code===0){
-          var msg={conversation_id:self.convId,sender_id:self.userId,content:"[礼物] "+gift.name,type:6,_local:true,gift_data:JSON.stringify(gift),created_at:new Date().toISOString()};
-          self.msgs.push(msg);Vue.nextTick(function(){self.scrollBottom()});
+          // 落库为 type=6 礼物消息，接收方实时可见（经 /chat/messages + WS 推送）
+          var sendMsg;
+          try{
+            sendMsg=await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:self.convId,content:"[礼物] "+gift.name,type:6,gift_data:JSON.stringify({gift_id:gift.id,name:gift.name,image:gift.image,price:gift.price})})});
+          }catch(msgErr){}
+          if(sendMsg&&sendMsg.data&&sendMsg.data.id){
+            // 服务端已落库，直接展示返回消息
+            self.msgs.push(sendMsg.data);self.addTimeDividers();Vue.nextTick(function(){self.scrollBottom()});
+          }else{
+            // 落库失败：降级为本地假消息（_local 标记，与旧行为一致）
+            var msg={conversation_id:self.convId,sender_id:self.userId,content:"[礼物] "+gift.name,type:6,_local:true,gift_data:JSON.stringify(gift),created_at:new Date().toISOString()};
+            self.msgs.push(msg);Vue.nextTick(function(){self.scrollBottom()});
+          }
           self.showGiftPanel=false;toast("礼物已发送","tok");
         }else{toast(r.message||"发送失败","terr")}
       }catch(e){toast("发送失败","terr")}
@@ -772,7 +783,7 @@ var ChatDetailPage = {
       <div v-else-if="gifts.length===0" style="text-align:center;padding:16px;color:var(--tm);font-size:13px">暂无礼物</div>
       <div v-else style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
         <div v-for="g in gifts" :key="g.id" @click="sendGift(g)" style="display:flex;flex-direction:column;align-items:center;padding:10px 4px;background:var(--bg-page);border-radius:12px;cursor:pointer">
-          <span style="font-size:28px">{{g.icon||"🎁"}}</span>
+          <span style="font-size:28px">{{g.image||"🎁"}}</span>
           <span style="font-size:12px;margin-top:4px">{{g.name}}</span>
           <span style="font-size:10px;color:var(--tm)">{{g.price}}币</span>
         </div>
@@ -936,7 +947,7 @@ router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",
 // 简短提示音（Web Audio API，无需外部文件）
 function _playBeep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=800;o.type="sine";g.gain.setValueAtTime(0.25,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);}catch(e){}}
 var AppRoot = {
-  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260801",unreadCount:0}},
+  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260802-1",unreadCount:0}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
