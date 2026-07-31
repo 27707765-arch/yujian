@@ -34,7 +34,7 @@ var ws=null,wsTimer=null,wsCount=0,wsHooks={};
 function wsOn(type,fn){if(!wsHooks[type])wsHooks[type]=[];wsHooks[type].push(fn)}
 function wsOff(type,fn){if(!wsHooks[type])return;var i=wsHooks[type].indexOf(fn);if(i>-1)wsHooks[type].splice(i,1)}
 function wsSend(d){return ws&&ws.readyState===1&&!!ws.send(JSON.stringify(d))}
-function wsConnect(){var t=token();if(!t)return;if(ws)try{ws.close()}catch(e){}try{ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+"?token="+t);ws.onopen=function(){wsCount=0;if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}wsTimer=setInterval(function(){if(ws&&ws.readyState===1){ws.send(JSON.stringify({type:"ping"}))}},30000)};ws.onmessage=function(e){try{var d=JSON.parse(e.data);if(d.type==="pong")return;if(d.type&&wsHooks[d.type])wsHooks[d.type].forEach(function(fn){fn(d)});if(wsHooks["*"])wsHooks["*"].forEach(function(fn){fn(d)})}catch(_){}};ws.onclose=function(){if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}if(wsCount<10){wsCount++;wsTimer=setTimeout(wsConnect,5000)}}}catch(_){}}
+function wsConnect(){var t=token();if(!t)return;if(ws)try{ws.close()}catch(e){}try{ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+"/api/ws?token="+t);ws.onopen=function(){wsCount=0;if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}wsTimer=setInterval(function(){if(ws&&ws.readyState===1){ws.send(JSON.stringify({type:"ping"}))}},30000)};ws.onmessage=function(e){try{var d=JSON.parse(e.data);if(d.type==="pong")return;if(d.type&&wsHooks[d.type])wsHooks[d.type].forEach(function(fn){fn(d)});if(wsHooks["*"])wsHooks["*"].forEach(function(fn){fn(d)})}catch(_){}};ws.onclose=function(){if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}if(wsCount<10){wsCount++;wsTimer=setTimeout(wsConnect,5000)}}}catch(_){}}
 
 // ==== 页面组件 ====
 var WelcomePage = {
@@ -211,9 +211,43 @@ var ChatListPage = {
     load:async function(){this.loading=true;try{var r=await api("/chat/conversations");this.convs=r.data||[]}catch(e){}this.loading=false},
     open:function(c){this.$router.push("/chat/"+c.id)},
     fmtTime:function(t){if(!t)return"";var d=new Date(t),now=new Date();var sameDay=d.toDateString()===now.toDateString();if(sameDay)return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);var yes=new Date(now);yes.setDate(yes.getDate()-1);if(d.toDateString()===yes.toDateString())return"昨天";return ("0"+(d.getMonth()+1)).slice(-2)+"/"+("0"+d.getDate()).slice(-2)},
-    fmtLastMsg:function(c){if(!c.last_message)return"暂无消息";if(c.last_msg_type===1)return"[图片]";if(c.last_msg_type===2)return"[语音]";if(c.last_msg_type===99)return c.last_message;return c.last_message}
+    fmtLastMsg:function(c){if(!c.last_message)return"暂无消息";if(c.last_msg_type===1)return"[图片]";if(c.last_msg_type===2)return"[语音]";if(c.last_msg_type===99)return c.last_message;return c.last_message},
+    onWsMsg:function(d){
+      if(d.type!=="message"||!d.data)return;
+      var cid=d.data.conversation_id;if(!cid)return;
+      var s=this;
+      // 忽略自己发送的消息（可能是多设备同步）
+      var myId=parseInt(localStorage.getItem("userId"));
+      if(d.data.sender_id===myId)return;
+      // 找会话是否在列表中
+      for(var i=0;i<s.convs.length;i++){
+        if(s.convs[i].id===cid){
+          var c=s.convs[i];
+          c.last_message=d.data.content||"";
+          c.last_message_time=d.data.created_at;
+          c.last_msg_type=d.data.type||0;
+          // 不在当前聊天详情时 +1 未读
+          if(!s.$route.path.startsWith("/chat/"+cid)){
+            c.unread_count=(c.unread_count||0)+1;
+          }
+          // 移到列表最前
+          s.convs.splice(i,1);s.convs.unshift(c);return;
+        }
+      }
+      // 新会话：重新拉列表
+      s.load();
+    }
   },
-  mounted: function(){this.load()},
+  mounted: function(){
+    var s=this;s.load();
+    s._clWsFn=function(d){s.onWsMsg(d)};
+    wsOn("message",s._clWsFn);
+    wsOn("message_sent",s._clWsFn);
+  },
+  beforeUnmount: function(){
+    wsOff("message",this._clWsFn);
+    wsOff("message_sent",this._clWsFn);
+  },
   template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="convs.length===0" class="empty"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" @click="open(c)" class="conv-item"><div class="conv-avatar-wrap"><div class="conv-avatar"><img v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span class="conv-time">{{fmtTime(c.last_message_time)}}</span></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div></div></div></div>`
 };
 
@@ -701,14 +735,44 @@ var router = VueRouter.createRouter({history:VueRouter.createWebHashHistory(),ro
 router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";next()});
 
 // ==== App ====
+// 简短提示音（Web Audio API，无需外部文件）
+function _playBeep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=800;o.type="sine";g.gain.setValueAtTime(0.25,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);}catch(e){}}
 var AppRoot = {
-  data: function(){return {toasts:toasts,appVersion:"v20260731-1"}},
+  data: function(){return {toasts:toasts,appVersion:"v20260731-2",_unreadCount:0}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
     showBack: function(){var p=this.$route.path;return p!=="/"&&p!=="/home"&&p!=="/login"}
   },
-  methods: {goBack:function(){this.$router.back()}},
+  methods: {
+    goBack:function(){this.$router.back()},
+    onGlobalMsg: function(d){
+      if(d.type!=="message"||!d.data)return;
+      var self=this;
+      // 不在聊天详情页时提示
+      if(!self.$route.path.startsWith("/chat/")){
+        var nick=d.data.sender_nickname||"用户";
+        _playBeep();
+        toast("💬 "+nick+": "+((d.data.content||"").slice(0,20)),"tok");
+        // 桌面通知
+        try{
+          if(window.Notification&&window.Notification.permission==="granted"){
+            new window.Notification("遇见 - 新消息",{body:nick+": "+((d.data.content||"").slice(0,60)),icon:"/icon.png"});
+          }
+        }catch(e){}
+      }
+    }
+  },
+  mounted: function(){
+    var self=this;
+    self._gMsgFn=function(d){self.onGlobalMsg(d)};
+    wsOn("message",self._gMsgFn);
+    // 请求桌面通知权限
+    try{window.Notification&&window.Notification.requestPermission()}catch(e){}
+  },
+  beforeUnmount: function(){
+    wsOff("message",this._gMsgFn);
+  },
   template: `<div class="app"><header class="hdr" v-if="pageTitle"><button class="bk" v-if="showBack" @click="goBack">←</button><span class="tt">{{pageTitle}}</span></header><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><component :is=\"Component\" :key=\"route.fullPath\"/></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\"><div class=\"ni\">💬</div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div></div>`
 };
 
