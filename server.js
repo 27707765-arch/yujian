@@ -163,9 +163,15 @@ const uploadService = require('./src/services/upload.service');
 const authMiddleware = require('./src/middleware/auth');
 
 // 通用图片上传路由（聊天/动态等共用）
-app.post('/api/upload/image', authMiddleware, uploadService.singleUpload('image').bind(uploadService), (req, res) => {
+app.post('/api/upload/image', authMiddleware, uploadService.singleUpload('image').bind(uploadService), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ code: 400, message: '请选择图片文件' });
+  }
+  // Magic Byte 校验：防止 MIME 类型伪装（伪图片/恶意文件）
+  const filePath = path.resolve(req.file.path);
+  const isValid = await uploadService.validateMagicBytes(filePath);
+  if (!isValid) {
+    return res.status(400).json({ code: 400, message: '文件类型不合法，仅支持 JPG/PNG/GIF/WEBP 格式' });
   }
   const url = '/' + req.file.filename;
   res.json({ code: 0, message: '上传成功', data: { url, filename: req.file.filename } });
@@ -275,9 +281,15 @@ const intimacyRoutes = require('./src/routes/intimacy.routes');
 app.use('/api/intimacy', intimacyRoutes);
 
 // 语音上传路由
-app.post('/api/upload/voice', authMiddleware, uploadService.audioUploadMiddleware('audio'), (req, res) => {
+app.post('/api/upload/voice', authMiddleware, uploadService.audioUploadMiddleware('audio'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ code: 400, message: '请选择音频文件' });
+  }
+  // 音频 Magic Byte 校验：防止伪装音频的恶意文件（MP3/WAV/OGG/FLAC/M4A/WebM）
+  const filePath = path.resolve(req.file.path);
+  const isValid = await uploadService.validateAudioMagicBytes(filePath);
+  if (!isValid) {
+    return res.status(400).json({ code: 400, message: '文件类型不合法，仅支持 MP3/AAC/WAV/M4A/OGG 格式' });
   }
   const url = '/' + req.file.filename;
   res.json({ code: 0, message: '上传成功', data: { url, filename: req.file.filename } });

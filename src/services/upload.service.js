@@ -75,6 +75,60 @@ async function validateMagicBytes(filePath) {
   });
 }
 
+/**
+ * 校验音频文件 magic bytes，防止伪装音频的恶意文件
+ * 支持: MP3(ID3/MPEG帧) WAV OGG FLAC WebM(MKV) MP4/M4A(ftyp)
+ * @param {string} filePath - 文件路径
+ * @returns {Promise<boolean>}
+ */
+async function validateAudioMagicBytes(filePath) {
+  const fs = require('fs');
+  return new Promise((resolve) => {
+    let fd;
+    try {
+      fd = fs.openSync(filePath, 'r');
+      const buffer = Buffer.alloc(12);
+      fs.readSync(fd, buffer, 0, 12, 0);
+
+      let matched = false;
+      // MP3 (ID3 tag: "ID3")
+      if (buffer.toString('hex', 0, 3) === '494433') matched = true;
+      // MP3 (MPEG frame sync: 0xFF 0xEx)
+      else if (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0) matched = true;
+      // WAV (RIFF....WAVE)
+      else if (buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WAVE') matched = true;
+      // OGG ("OggS")
+      else if (buffer.toString('ascii', 0, 4) === 'OggS') matched = true;
+      // FLAC ("fLaC")
+      else if (buffer.toString('ascii', 0, 4) === 'fLaC') matched = true;
+      // WebM/Matroska (EBML 1A 45 DF A3)
+      else if (buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) matched = true;
+      // MP4/M4A ("ftyp" at offset 4)
+      else if (buffer.toString('ascii', 4, 8) === 'ftyp') matched = true;
+
+      if (!matched) {
+        // 删除不合规文件
+        try {
+          fs.unlinkSync(filePath);
+        } catch (unlinkErr) {
+          console.error('删除不合规音频文件失败:', unlinkErr.message);
+        }
+      }
+      resolve(matched);
+    } catch (err) {
+      // 文件不存在、权限不足等异常情况，视为校验失败
+      console.error('音频文件 magic bytes 校验失败:', err.message);
+      resolve(false);
+    } finally {
+      try {
+        if (fd !== undefined) fs.closeSync(fd);
+      } catch (closeErr) {
+        // 忽略关闭文件时的错误
+      }
+    }
+  });
+}
+
 // 配置multer
 const upload = multer({
   storage: storage,
@@ -259,6 +313,7 @@ module.exports = {
   videoUploadMiddleware,
   audioUploadMiddleware,
   validateMagicBytes,
+  validateAudioMagicBytes,
   // 常量
   VIDEO_MAX_SIZE,
   VIDEO_MIMES,
