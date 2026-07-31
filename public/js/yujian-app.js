@@ -180,6 +180,7 @@ var DiscoverPage = {
 var PostDetailPage = {
   data: function(){return {post:null,comments:[],text:"",loading:true,pid:0}},
   methods: {
+    timeAgo: function(t){if(!t)return"";var d=Math.floor((Date.now()-new Date(t).getTime())/1000);if(d<60)return"刚刚";if(d<3600)return Math.floor(d/60)+"分钟前";if(d<86400)return Math.floor(d/3600)+"小时前";return Math.floor(d/86400)+"天前"},
     load: async function(){this.pid=parseInt(this.$route.params.id);this.loading=true;try{var r=await api("/posts/"+this.pid);this.post=(r.data&&r.data.post)||r.data;this.comments=(r.data&&r.data.comments)||[]}catch(e){}this.loading=false},
     toggleLike: async function(){try{await api("/posts/"+this.pid+"/like",{method:"POST"});this.post.liked=!this.post.liked;this.post.like_count+=this.post.liked?1:-1;if(this.post.like_count<0)this.post.like_count=0}catch(e){toast(e.message,"terr")}},
     addComment: async function(){var t=this.text.trim();if(!t)return;try{await api("/posts/"+this.pid+"/comment",{method:"POST",body:JSON.stringify({content:t})});this.text="";var uname=localStorage.getItem("uname")||"我";this.comments.push({content:t,nickname:uname,created_at:new Date().toISOString(),_local:true});if(this.post)this.post.comment_count=(this.post.comment_count||0)+1;toast("评论成功","tok")}catch(e){toast(e.message,"terr")}}
@@ -230,6 +231,7 @@ var ChatDetailPage = {
     emojis:["😀","😁","😂","🤣","😃","😄","😅","😆","😉","😊","😋","😎","😍","😘","😗","😙","😚","🙂","🤗","🤩","🤔","🤨","😐","😑","😶","🙄","😏","😣","😥","😮","🤐","😯","😪","😫","😴","😌","😛","😜","😝","😒","😓","😔","😕","🙃","🤑","😲","🙁","😖","😞","😟","😤","😢","😭","😦","😧","😨","😩","🤯","😬","😰","😱","🥵","🥶","😳","🤪","😵","🥴","😠","😡","🤬","😷","🤒","🤕","🤢","🤮","🥳","🥺","🤠","😇","🤡","🤥","🤫","🤭","🧐","🤓","😈","👻","💀","👽","🤖","💩","❤️","🧡","💛","💚","💙","💜","🖤","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","👍","👎","👊","✊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✌️","🤞","🤟","🤘","👌","🤌","🤏","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","🎉","🎊","🎈","🎁","🎀","🌹","💐","🌸","💯","🔥","⭐","🌟","✨","⚡","💥","💫","🎵","🎶","🍺","🍻","🥂","🍷","🍰","🎂","🍜","🍔","🍟","🌙","☀️","🌈","⛄","🏆","🥇","🏅","🎯","🎮","🎲","🎰","🧧","💰","💵","💴","💶","💷","💸","🪙"]
   }},
   methods: {
+    timeStr: function(t){if(!t)return"";var d=new Date(t);return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)},
     load: async function(isMore){
       var s=this;
       try{s.convId=parseInt(s.$route.params.id)}catch(e){s.convId=0}
@@ -700,7 +702,7 @@ router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",
 
 // ==== App ====
 var AppRoot = {
-  data: function(){return {toasts:toasts,appVersion:"v20260730-2"}},
+  data: function(){return {toasts:toasts,appVersion:"v20260731-1"}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
@@ -712,5 +714,8 @@ var AppRoot = {
 
 var app = Vue.createApp(AppRoot);
 app.use(router);
+// 注册全局工具函数，供模板直接调用（Vue3 不会自动暴露 window 上的全局函数）
+app.config.globalProperties.timeStr = function(t) { if(!t)return""; var d=new Date(t); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); };
+app.config.globalProperties.timeAgo = function(t) { if(!t)return""; var d=Math.floor((Date.now()-new Date(t).getTime())/1000); if(d<60)return"刚刚"; if(d<3600)return Math.floor(d/60)+"分钟前"; if(d<86400)return Math.floor(d/3600)+"小时前"; return Math.floor(d/86400)+"天前"; };
 app.mount("#app");
 if(localStorage.getItem("token"))wsConnect();
