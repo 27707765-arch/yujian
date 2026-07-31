@@ -50,7 +50,7 @@ var ws=null,wsTimer=null,wsCount=0,wsHooks={};
 function wsOn(type,fn){if(!wsHooks[type])wsHooks[type]=[];wsHooks[type].push(fn)}
 function wsOff(type,fn){if(!wsHooks[type])return;var i=wsHooks[type].indexOf(fn);if(i>-1)wsHooks[type].splice(i,1)}
 function wsSend(d){return ws&&ws.readyState===1&&!!ws.send(JSON.stringify(d))}
-function wsConnect(){var t=token();if(!t)return;if(ws)try{ws.close()}catch(e){}try{ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+"/api/ws?token="+t);ws.onopen=function(){wsCount=0;if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}wsTimer=setInterval(function(){if(ws&&ws.readyState===1){ws.send(JSON.stringify({type:"ping"}))}},30000)};ws.onmessage=function(e){try{var d=JSON.parse(e.data);if(d.type==="pong")return;if(d.type&&wsHooks[d.type])wsHooks[d.type].forEach(function(fn){fn(d)});if(wsHooks["*"])wsHooks["*"].forEach(function(fn){fn(d)})}catch(_){}};ws.onclose=function(){if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}if(wsCount<10){wsCount++;wsTimer=setTimeout(wsConnect,5000)}}}catch(_){}}
+function wsConnect(){var t=token();if(!t)return;if(ws)try{ws.close()}catch(e){}try{ws=new WebSocket((location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+"/api/ws?token="+t);ws.onopen=function(){wsCount=0;if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}wsTimer=setInterval(function(){if(ws&&ws.readyState===1){ws.send(JSON.stringify({type:"pong"}))}},30000)};ws.onmessage=function(e){try{var d=JSON.parse(e.data);if(d.type==="pong")return;if(d.type&&wsHooks[d.type])wsHooks[d.type].forEach(function(fn){fn(d)});if(wsHooks["*"])wsHooks["*"].forEach(function(fn){fn(d)})}catch(_){}};ws.onclose=function(){if(wsTimer){clearInterval(wsTimer);clearTimeout(wsTimer);wsTimer=null}if(wsCount<10){wsCount++;wsTimer=setTimeout(wsConnect,5000)}}}catch(_){}}
 
 // ==== 页面组件 ====
 var WelcomePage = {
@@ -947,7 +947,7 @@ router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",
 // 简短提示音（Web Audio API，无需外部文件）
 function _playBeep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=800;o.type="sine";g.gain.setValueAtTime(0.25,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);}catch(e){}}
 var AppRoot = {
-  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260802-1",unreadCount:0}},
+  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260802-2",unreadCount:0}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
