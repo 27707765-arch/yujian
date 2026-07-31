@@ -6,12 +6,23 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# 环境变量
+# 环境变量（凭据只存本地 .env 与 ECS 服务器，永不入库）
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+.env.prod
+*.env
+!*.env.example
+
+# 密钥/凭据（严禁入库）
+*.pem
+*.key
+*.p12
+*.pfx
+deploy-fix.sh
 
 # 日志
 logs/
