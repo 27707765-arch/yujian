@@ -69,7 +69,7 @@ class Message {
     // 内存降级
     const id = autoIncrementId++;
     const message = {
-      id, conversation_id, sender_id, receiver_id, content, type, status: 0,
+      id, conversation_id: parseInt(conversation_id, 10), sender_id, receiver_id, content, type, status: 0,
       voice_url, voice_duration, video_url, video_duration, video_cover,
       sticker_id, location_data: location_data ? JSON.parse(location_data) : null,
       gift_data: gift_data ? JSON.parse(gift_data) : null,
@@ -168,8 +168,10 @@ class Message {
     }
 
     // 数据库不可用时使用内存存储
+    // 注意：query 参数为字符串，内存 id 为数字，需统一转数字比较
+    const targetConvId = parseInt(conversation_id, 10);
     let filtered = Array.from(memoryStore.values())
-      .filter(message => message.conversation_id === conversation_id)
+      .filter(message => message.conversation_id === targetConvId)
       .map(m => {
         if (m.is_recalled) {
           return { ...m, content: '对方撤回了一条消息', _recalled: true };
@@ -324,10 +326,11 @@ class Message {
     }
     
     // 数据库不可用时使用内存存储
+    const targetConvId = parseInt(conversation_id, 10);
     Array.from(memoryStore.values())
-      .filter(message => 
-        message.conversation_id === conversation_id && 
-        message.receiver_id === user_id && 
+      .filter(message =>
+        message.conversation_id === targetConvId &&
+        message.receiver_id === user_id &&
         message.status === 0
       )
       .forEach(message => {

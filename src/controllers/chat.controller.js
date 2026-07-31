@@ -7,7 +7,6 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const Checkin = require('../models/Checkin');
 const { success, error, serverError } = require('../utils/response');
-const websocketService = require('../services/websocket.service');
 
 /**
  * 获取会话列表
@@ -144,6 +143,7 @@ async function createConversation(req, res) {
 /**
  * 撤回消息（发送后2分钟内有效）
  * POST /api/chat/messages/:id/recall
+ * 实现收敛：转调 chat.service.recallMessage（唯一实现，含 WS 推送）
  * @param {Object} req - Express请求对象
  * @param {Object} res - Express响应对象
  */
@@ -156,38 +156,14 @@ async function recallMessage(req, res) {
       return error(res, 400, '消息ID无效');
     }
 
-    // 调用模型执行撤回（含归属校验、时效校验、防重复）
-    const result = await Message.recall(messageId, id);
+    const chatService = require('../services/chat.service');
+    const result = await chatService.recallMessage(messageId, id);
 
     if (!result.success) {
-      // 业务级失败：消息不存在、非本人、超时、已撤回
       return error(res, 400, result.message);
     }
 
-    // 通过 WebSocket 向接收者推送撤回事件
-    const { data } = result;
-    websocketService.sendToUser(data.receiver_id, {
-      type: 'message_recalled',
-      data: {
-        message_id: data.id,
-        conversation_id: data.conversation_id,
-        sender_id: data.sender_id,
-        recalled_at: new Date().toISOString()
-      }
-    });
-
-    // 同时告知发送者撤回成功（多设备同步）
-    websocketService.sendToUser(id, {
-      type: 'message_recalled',
-      data: {
-        message_id: data.id,
-        conversation_id: data.conversation_id,
-        sender_id: data.sender_id,
-        recalled_at: new Date().toISOString()
-      }
-    });
-
-    success(res, data, '消息已撤回');
+    success(res, result.data, '消息已撤回');
   } catch (err) {
     serverError(res, err, '撤回消息失败');
   }
@@ -228,75 +204,40 @@ async function pinConversation(req, res) {
 /**
  * 发送消息（HTTP回退）
  * POST /api/chat/messages
+ * 实现收敛：转调 chat.service.sendMessage（唯一实现，含审核/反欺诈/拉黑/WS推送/离线）
  */
 async function sendMessage(req, res) {
   try {
     const { id } = req.user;
     const { conversation_id, content, type } = req.body;
-    if (!conversation_id) return error(res, 400, '会话ID不能为空');
-    const msgType = parseInt(type) || 0;
-    // 非文字/系统消息时，content可为空（由其他字段承载内容）
-    if (msgType <= 1 && !content) return error(res, 400, '消息内容不能为空');
 
-    // 获取会话信息以确定接收者
-    const conv = await Conversation.findById(conversation_id);
-    if (!conv) return error(res, 404, '会话不存在');
-    const receiverId = conv.user1_id === id ? conv.user2_id : conv.user1_id;
+    const chatService = require('../services/chat.service');
+    const result = await chatService.sendMessage({
+      sender_id: id,
+      conversation_id,
+      content,
+      type,
+      // 类型专属字段透传
+      voice_url: req.body.voice_url,
+      voice_duration: req.body.voice_duration,
+      video_url: req.body.video_url,
+      video_duration: req.body.video_duration,
+      video_cover: req.body.video_cover,
+      sticker_id: req.body.sticker_id,
+      location_data: req.body.location_data,
+      gift_data: req.body.gift_data
+    });
 
-    // 构建消息数据
-    const msgData = {
-      conversation_id, sender_id: id, receiver_id: receiverId,
-      content: content || '', type: msgType
-    };
-
-    // 语音消息
-    if (msgType === 2) {
-      if (!req.body.voice_url) return error(res, 400, '语音文件URL不能为空');
-      msgData.voice_url = req.body.voice_url;
-      msgData.voice_duration = parseInt(req.body.voice_duration) || 0;
+    // 参数/业务错误
+    if (!result.success && !result.blocked) {
+      return error(res, 400, result.message);
     }
-    // 视频消息
-    if (msgType === 3) {
-      if (!req.body.video_url) return error(res, 400, '视频文件URL不能为空');
-      msgData.video_url = req.body.video_url;
-      msgData.video_duration = parseInt(req.body.video_duration) || 0;
-      msgData.video_cover = req.body.video_cover || null;
-    }
-    // 贴纸消息
-    if (msgType === 4) {
-      msgData.sticker_id = parseInt(req.body.sticker_id) || null;
-    }
-    // 位置消息
-    if (msgType === 5) {
-      if (!req.body.location_data) return error(res, 400, '位置数据不能为空');
-      msgData.location_data = req.body.location_data;
-    }
-    // 礼物消息
-    if (msgType === 6) {
-      msgData.gift_data = req.body.gift_data || null;
+    // 被拦截（审核/反欺诈/拉黑）
+    if (result.blocked) {
+      return error(res, 400, result.reason);
     }
 
-    const msg = await Message.create(msgData);
-    
-    // WebSocket推送，检查接收者是否在线
-    const receiverOnline = websocketService.isUserOnline(receiverId);
-    const sent = websocketService.sendToUser(receiverId, { type: 'message', data: msg });
-    
-    // 记录日志
-    console.log(`[Chat] 用户${id} -> 用户${receiverId}: ${sent ? '已送达' : '对方不在线'}`);
-    
-    // 记录亲密度（异步）
-    try {
-      const intimacyService = require('../services/intimacy.service');
-      intimacyService.onChatMessage(id, receiverId).catch(() => {});
-    } catch (e) {}
-    
-    // 返回消息给发送者，包含送达状态
-    success(res, { 
-      ...msg, 
-      delivered: sent,
-      receiver_online: receiverOnline
-    }, sent ? '发送成功' : '发送成功（对方不在线，上线后可收到）');
+    success(res, result.data, result.message);
   } catch (err) {
     serverError(res, err, '发送消息失败');
   }

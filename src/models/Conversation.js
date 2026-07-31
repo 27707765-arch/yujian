@@ -87,7 +87,8 @@ class Conversation {
     }
     
     // 数据库不可用时使用内存存储
-    return memoryStore.get(id) || null;
+    // 注意：query 参数为字符串，内存 id 为数字，需统一转数字比较
+    return memoryStore.get(parseInt(id, 10)) || null;
   }
 
   /**
@@ -199,11 +200,11 @@ class Conversation {
     }
     
     // 数据库不可用时使用内存存储
-    const conversation = memoryStore.get(id);
+    const conversation = memoryStore.get(parseInt(id, 10));
     if (conversation) {
       conversation.unread_count = count;
       conversation.updated_at = new Date();
-      memoryStore.set(id, conversation);
+      memoryStore.set(conversation.id, conversation);
       return conversation;
     }
     return null;

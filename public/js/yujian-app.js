@@ -82,7 +82,7 @@ var LoginPage = {
 };
 
 var HomePage = {
-  data: function(){ return {users:[],loading:true,err:false,errMsg:"",tab:"city",currentCity:"",showFilter:false,fAge:[18,35]}; },
+  data: function(){ return {users:[],loading:true,err:false,errMsg:"",tab:"city",currentCity:"",showFilter:false,fAge:[18,35],quota:{like_used:0,like_limit:20,super_like_used:0,super_like_limit:5},matchModal:null}; },
   methods: {
     load: async function(){ this.loading=true;this.err=false;try{var r=await api("/match/recommend?scope="+this.tab+"&ageMin="+this.fAge[0]+"&ageMax="+this.fAge[1]+"&limit=20");this.users=r.data||[];if(this.users.length===0)this.errMsg="暂无推荐用户"}catch(e){this.err=true;this.errMsg=e.message||"加载失败，请稍后重试"}this.loading=false; },
     initLocation: function(){
@@ -102,6 +102,80 @@ var HomePage = {
       }else{this.load()}
     },
     switchTab: function(t){this.tab=t;this.load()},
+    loadQuota: async function(){
+      var self=this;
+      try{var r=await api("/match/daily-quota");if(r.data)self.quota=r.data}catch(e){}
+    },
+    likeUser: async function(u){
+      var self=this;
+      try{
+        var r=await api("/match/like",{method:"POST",body:JSON.stringify({target_user_id:u.id})});
+        if(r.code===0){
+          self.removeUser(u);
+          self.loadQuota();
+          if(r.data&&r.data.matched){
+            // 匹配成功：弹出匹配弹窗
+            self.matchModal={partner:r.data.partner||u,conversation_id:r.data.conversation_id,common_tags:r.data.common_tags||[],icebreakers:r.data.icebreakers||[]};
+            if(window.NotificationUtils){
+              window.NotificationUtils.showToast('💕 匹配成功！','match');
+            } else { toast("💕 匹配成功！","tok"); }
+          }else{
+            if(window.NotificationUtils){
+              window.NotificationUtils.showToast(r.message||'已喜欢','like');
+            } else { toast(r.message||"已喜欢","tok"); }
+          }
+        }else{toast(r.message||"操作失败","terr")}
+      }catch(e){toast(e.message||"操作失败","terr")}
+    },
+    skipUser: async function(u){
+      var self=this;
+      try{
+        var r=await api("/match/skip",{method:"POST",body:JSON.stringify({target_user_id:u.id})});
+        if(r.code===0){
+          self.removeUser(u);
+          if(window.NotificationUtils){
+            window.NotificationUtils.showToast('已跳过','info');
+          } else { toast("已跳过","tinfo"); }
+        }else{toast(r.message||"操作失败","terr")}
+      }catch(e){toast(e.message||"操作失败","terr")}
+    },
+    superLikeUser: async function(u){
+      var self=this;
+      try{
+        var r=await api("/match/super-like",{method:"POST",body:JSON.stringify({target_user_id:u.id})});
+        if(r.code===0){
+          self.removeUser(u);
+          self.loadQuota();
+          if(window.NotificationUtils){
+            window.NotificationUtils.showToast('⭐ 超级喜欢成功','like');
+          } else { toast("⭐ 超级喜欢成功","tok"); }
+        }else{toast(r.message||"操作失败","terr")}
+      }catch(e){toast(e.message||"操作失败","terr")}
+    },
+    undoSwipe: async function(){
+      var self=this;
+      try{
+        var r=await api("/match/undo",{method:"POST",body:"{}"});
+        if(r.code===0){
+          self.loadQuota();
+          if(window.NotificationUtils){
+            window.NotificationUtils.showToast('已撤销上一步操作','info');
+          } else { toast("已撤销上一步操作","tinfo"); }
+          self.load();
+        }else{toast(r.message||"撤销失败","terr")}
+      }catch(e){toast(e.message||"撤销失败","terr")}
+    },
+    removeUser: function(u){
+      var self=this;
+      self.users=self.users.filter(function(x){return x.id!==u.id});
+      if(self.users.length===0)self.load();
+    },
+    closeMatchModal: function(){this.matchModal=null},
+    goChat: function(convId){
+      var self=this;
+      self.matchModal=null;
+      if(convId)self.$router.push("/chat/"+convId);
+    },
     chatUp: async function(u){
       if(!u)return;
       var s=this;
@@ -136,12 +210,18 @@ var HomePage = {
     },
     parseTags: function(t){if(!t)return[];if(Array.isArray(t))return t;try{return JSON.parse(t)}catch(e){return[]}}
   },
-  mounted: function(){this.load();this.initLocation()},
+  mounted: function(){this.load();this.initLocation();this.loadQuota()},
   template: `<div style="padding:12px 16px">
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn bs" :class="tab==='city'?'bp':'bo'" @click="switchTab('city')">{{currentCity?'同城·'+currentCity:'同城'}}</button>
     <button class="btn bs" :class="tab==='nearby'?'bp':'bo'" @click="switchTab('nearby')">附近</button>
     <button class="btn bs bo" style="margin-left:auto" @click="showFilter=!showFilter">🔍</button>
+    <button class="btn bs bo" @click="undoSwipe" title="撤销上一步">↩️</button>
+  </div>
+  <div v-if="quota.like_limit" style="display:flex;gap:12px;align-items:center;background:var(--w);border-radius:var(--rs);padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--ts);box-shadow:var(--sh)">
+    <span>❤️ 喜欢 {{quota.like_used||0}}/{{quota.like_limit===-1?'∞':quota.like_limit}}</span>
+    <span>⭐ 超级喜欢 {{quota.super_like_used||0}}/{{quota.super_like_limit===-1?'∞':quota.super_like_limit}}</span>
+    <span style="margin-left:auto;color:var(--tm)"><a href="javascript:void(0)" @click="$router.push('/recharge')" style="color:var(--p)">金币充值</a></span>
   </div>
   <div v-if="showFilter" style="background:var(--w);padding:14px;border-radius:var(--r);margin-bottom:12px;box-shadow:var(--sh)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px">
@@ -176,8 +256,26 @@ var HomePage = {
         <div v-if="parseTags(u.tags).length" style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in parseTags(u.tags).slice(0,3)" class="tag tp">{{t}}</span></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;flex-shrink:0">
-        <button @click.stop="chatUp(u)" :title="u._has_conversation?'发消息':'打招呼'" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,107,107,.35)" :style="{background:u._has_conversation?'linear-gradient(135deg,#667eea,#764ba2)':'linear-gradient(135deg,#FF6B9D,#FF8E53)'}">{{u._has_conversation?'发消息':'打招呼'}}</button>
+        <button @click.stop="likeUser(u)" title="喜欢" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,107,107,.35);background:linear-gradient(135deg,#FF6B9D,#FF8E53)">❤️</button>
+        <button @click.stop="skipUser(u)" title="跳过" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(150,160,180,.3);background:linear-gradient(135deg,#8e9eab,#9aa7b5)">✕</button>
+        <button @click.stop="superLikeUser(u)" title="超级喜欢(10金币)" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,200,80,.4);background:linear-gradient(135deg,#F6D365,#FDA085)">⭐</button>
+        <button @click.stop="chatUp(u)" :title="u._has_conversation?'发消息':'打招呼'" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(102,126,234,.35)" :style="{background:u._has_conversation?'linear-gradient(135deg,#667eea,#764ba2)':'linear-gradient(135deg,#FF6B9D,#FF8E53)'}">{{u._has_conversation?'💬':'👋'}}</button>
       </div>
+    </div>
+  </div>
+  <div v-if="matchModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:20px;padding:28px 24px;width:300px;text-align:center;position:relative">
+      <button @click="closeMatchModal" style="position:absolute;top:10px;right:14px;border:none;background:none;font-size:18px;cursor:pointer;color:var(--tm)">✕</button>
+      <div style="font-size:40px">💕</div>
+      <h2 style="margin:10px 0 4px">匹配成功！</h2>
+      <p style="color:var(--tm);font-size:13px;margin-bottom:14px">你和{{matchModal.partner.nickname||'TA'}}互相喜欢</p>
+      <div class="avatar av-lg" style="margin:0 auto 14px"><img v-if="matchModal.partner.avatar" :src="matchModal.partner.avatar"><span v-else>👤</span></div>
+      <div v-if="matchModal.common_tags&&matchModal.common_tags.length" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:14px"><span v-for="t in matchModal.common_tags" class="tag tp">{{t}}</span></div>
+      <div v-if="matchModal.icebreakers&&matchModal.icebreakers.length" style="text-align:left;background:var(--bg-page);border-radius:12px;padding:12px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">💬 破冰话题</div>
+        <div v-for="ib in matchModal.icebreakers" style="font-size:13px;color:var(--ts);margin-bottom:4px">{{ib.content}}</div>
+      </div>
+      <button class="btn bp bw bl" @click="goChat(matchModal.conversation_id)">💬 打个招呼</button>
     </div>
   </div></div>`
 };
@@ -378,6 +476,17 @@ var ChatListPage = {
       }
       // 新会话：重新拉列表
       s.load();
+    },
+    // 对方在线/离线状态实时更新
+    onWsOnlineStatus:function(d){
+      if(!d.data)return;
+      var s=this,uid=d.data.user_id,online=!!d.data.online;
+      for(var i=0;i<s.convs.length;i++){
+        if(s.convs[i].other_user_id===uid){
+          s.convs[i].other_online=online;
+          return;
+        }
+      }
     }
   },
   mounted: function(){
@@ -385,11 +494,14 @@ var ChatListPage = {
     s.load();
     s._clWsFn=function(d){s.onWsMsg(d)};
     wsOn("message",s._clWsFn);
+    s._clOnlineFn=function(d){s.onWsOnlineStatus(d)};
+    wsOn("online_status",s._clOnlineFn);
     // 进入聊天列表时清除全局未读计数
     if(s.$root)s.$root.unreadCount=0;
   },
   beforeUnmount: function(){
     wsOff("message",this._clWsFn);
+    wsOff("online_status",this._clOnlineFn);
   },
   template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="convs.length===0" class="empty"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" @click="open(c)" class="conv-item"><div class="conv-avatar-wrap"><div class="conv-avatar"><img v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span class="conv-time">{{fmtTime(c.last_message_time)}}</span></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div></div></div></div>`
 };
@@ -406,6 +518,7 @@ var ChatDetailPage = {
     calling:false,callType:"",callPartnerId:0,callPartnerName:"",
     showCallDialog:false,incomingCall:null,callDuration:0,callTimer:null,
     partner:{nickname:"",avatar:null,online:false},partnerId:0,myAvatar:"",
+    partnerTyping:false,_typingTimer:null,
     emojis:["😀","😁","😂","🤣","😃","😄","😅","😆","😉","😊","😋","😎","😍","😘","😗","😙","😚","🙂","🤗","🤩","🤔","🤨","😐","😑","😶","🙄","😏","😣","😥","😮","🤐","😯","😪","😫","😴","😌","😛","😜","😝","😒","😓","😔","😕","🙃","🤑","😲","🙁","😖","😞","😟","😤","😢","😭","😦","😧","😨","😩","🤯","😬","😰","😱","🥵","🥶","😳","🤪","😵","🥴","😠","😡","🤬","😷","🤒","🤕","🤢","🤮","🥳","🥺","🤠","😇","🤡","🤥","🤫","🤭","🧐","🤓","😈","👻","💀","👽","🤖","💩","❤️","🧡","💛","💚","💙","💜","🖤","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","👍","👎","👊","✊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✌️","🤞","🤟","🤘","👌","🤌","🤏","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","🎉","🎊","🎈","🎁","🎀","🌹","💐","🌸","💯","🔥","⭐","🌟","✨","⚡","💥","💫","🎵","🎶","🍺","🍻","🥂","🍷","🍰","🎂","🍜","🍔","🍟","🌙","☀️","🌈","⛄","🏆","🥇","🏅","🎯","🎮","🎲","🎰","🧧","💰","💵","💴","💶","💷","💸","🪙"]
   }},
   methods: {
@@ -483,6 +596,27 @@ var ChatDetailPage = {
         }else{msg._failed=true;msg._sending=false;toast(r.message||"发送失败","terr")}
       }catch(e){msg._failed=true;msg._sending=false;toast("发送失败","terr")}
     },
+    // 发送"正在输入"状态（节流：5秒内不重复发）
+    sendTyping: function(){
+      var self=this;
+      if(!self.partnerId||!wsSend)return;
+      var now=Date.now();
+      if(self._lastTypingTs&&now-self._lastTypingTs<5000)return;
+      self._lastTypingTs=now;
+      wsSend({type:"typing",receiver_id:self.partnerId});
+    },
+    // 发送"停止输入"状态
+    sendStopTyping: function(){
+      var self=this;
+      if(!self.partnerId)return;
+      wsSend({type:"stop_typing",receiver_id:self.partnerId});
+    },
+    // 发送已读回执
+    sendReadReceipt: function(){
+      var self=this;
+      if(!self.partnerId)return;
+      wsSend({type:"read_receipt",conversation_id:self.convId,receiver_id:self.partnerId});
+    },
     onImagePick: function(){
       var self=this,inp=document.createElement("input");inp.type="file";inp.accept="image/*";
       inp.onchange=function(e){var f=e.target.files[0];if(!f)return;self.uploadImage(f)};inp.click();
@@ -546,22 +680,18 @@ var ChatDetailPage = {
       }catch(e){toast("语音上传失败","terr")}
     },
     onVoiceCall: function(){
-      var self=this;self.callType="voice";self.showPlusPanel=false;
-      api("/chat/conversations").then(function(r){
-        var convs=r.data||[];
-        var c=convs.find(function(x){return x.id===self.convId});
-        if(c){self.callPartnerId=c.other_user_id;self.callPartnerName=c.other_nickname||"";self.doCall()}
-        else{toast("无法获取对方信息","terr")}
-      }).catch(function(){toast("网络错误","terr")});
+      var self=this;self.showPlusPanel=false;
+      // S12：当前无 Agora 配置，通话为纯 UI 壳，标注"敬请期待"避免"能点但接不通"
+      if(window.NotificationUtils){
+        window.NotificationUtils.showToast('语音通话功能即将上线，敬请期待','info');
+      } else { toast("语音通话功能即将上线，敬请期待","tinfo"); }
     },
     onVideoCall: function(){
-      var self=this;self.callType="video";self.showPlusPanel=false;
-      api("/chat/conversations").then(function(r){
-        var convs=r.data||[];
-        var c=convs.find(function(x){return x.id===self.convId});
-        if(c){self.callPartnerId=c.other_user_id;self.callPartnerName=c.other_nickname||"";self.doCall()}
-        else{toast("无法获取对方信息","terr")}
-      }).catch(function(){toast("网络错误","terr")});
+      var self=this;self.showPlusPanel=false;
+      // S12：当前无 Agora 配置，通话为纯 UI 壳，标注"敬请期待"避免"能点但接不通"
+      if(window.NotificationUtils){
+        window.NotificationUtils.showToast('视频通话功能即将上线，敬请期待','info');
+      } else { toast("视频通话功能即将上线，敬请期待","tinfo"); }
     },
     doCall: function(){
       var self=this;
@@ -637,13 +767,44 @@ var ChatDetailPage = {
         }else{toast(r.message||"发送失败","terr")}
       }catch(e){toast("发送失败","terr")}
     },
+    // 根据对方已读时间戳，将我方已读前的消息标记为已读（展示"已读"）
+    _applyReadState: function(){
+      var self=this;
+      if(!self.partnerReadTs)return;
+      var ts=new Date(self.partnerReadTs).getTime();
+      self.msgs.forEach(function(m){
+        if(m.sender_id===self.userId&&m.id&&!m._local){
+          var mt=new Date(m.created_at).getTime();
+          if(mt<=ts&&!m._read){m._read=true;m.delivered=true}
+        }
+      });
+    },
     handleWs: function(d){
       var self=this;
-      if(d.type==="message"&&d.data&&d.data.conversation_id===self.convId){
-        if(!d.data.id&&!d.data._local)return;
+      if(d.type==="message"&&d.data&&d.data.conversation_id===self.convId){        if(!d.data.id&&!d.data._local)return;
         if(self.msgs.some(function(m){return m.id&&m.id===d.data.id}))return;
         self.msgs.push(d.data);self.addTimeDividers();Vue.nextTick(function(){self.scrollBottom()});
         api("/chat/mark-read",{method:"POST",body:JSON.stringify({conversation_id:self.convId})}).catch(function(){});
+        // 发送已读回执给对方
+        self.sendReadReceipt();
+      }
+      // 对方正在输入
+      if(d.type==="typing"&&d.data&&d.data.user_id===self.partnerId){
+        self.partnerTyping=true;
+        if(self._typingTimer)clearTimeout(self._typingTimer);
+        self._typingTimer=setTimeout(function(){self.partnerTyping=false},3000);
+      }
+      if(d.type==="stop_typing"&&d.data&&d.data.user_id===self.partnerId){
+        self.partnerTyping=false;
+      }
+      // 对方在线状态实时更新
+      if(d.type==="online_status"&&d.data&&d.data.user_id===self.partnerId){
+        self.partner.online=!!d.data.online;
+      }
+      // 对方已读回执：将对方已读前的我方消息标记为已读
+      if(d.type==="read_receipt"&&d.data&&d.data.conversation_id===self.convId){
+        self.partnerReadTs=d.data.timestamp||new Date().toISOString();
+        self._applyReadState();
       }
       if(d.type==="message_sent"&&d.data){
         var idx=-1;for(var i=self.msgs.length-1;i>=0;i--){if(self.msgs[i]._local&&self.msgs[i]._sending&&self.msgs[i].content===d.data.content){idx=i;break}}
@@ -699,6 +860,10 @@ var ChatDetailPage = {
     wsOn("call_user_offline",self._wsHandler);
     wsOn("call_blocked",self._wsHandler);
     wsOn("call_ended",self._wsHandler);
+    wsOn("typing",self._wsHandler);
+    wsOn("stop_typing",self._wsHandler);
+    wsOn("online_status",self._wsHandler);
+    wsOn("read_receipt",self._wsHandler);
     Vue.nextTick(function(){var el=self.$refs.chat;if(el){el.addEventListener("scroll",self._scrollFn)}});
   },
   beforeUnmount: function(){
@@ -713,6 +878,10 @@ var ChatDetailPage = {
     wsOff("call_user_offline",this._wsHandler);
     wsOff("call_blocked",this._wsHandler);
     wsOff("call_ended",this._wsHandler);
+    wsOff("typing",this._wsHandler);
+    wsOff("stop_typing",this._wsHandler);
+    wsOff("online_status",this._wsHandler);
+    wsOff("read_receipt",this._wsHandler);
     if(this.callTimer)clearInterval(this.callTimer);
     if(this._callTimeout)clearTimeout(this._callTimeout);
     if(this._localStream){this._localStream.getTracks().forEach(function(t){t.stop()})}
@@ -723,7 +892,7 @@ var ChatDetailPage = {
       <button class="bk" @click="$router.back()">←</button>
       <div style="flex:1;min-width:0;cursor:pointer" @click="partnerId&&$router.push('/user/'+partnerId)">
         <div class="nm">{{partner.nickname||"加载中..."}}</div>
-        <div class="st" :class="{on:partner.online}">{{partner.online?"● 在线":"离线"}}</div>
+        <div class="st" :class="{on:partner.online}">{{partnerTyping?"对方正在输入...":(partner.online?"● 在线":"离线")}}</div>
       </div>
     </div>
     <div v-if="calling" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(160deg,#1a1a2e,#16213e);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff">
@@ -769,6 +938,7 @@ var ChatDetailPage = {
             <div v-else :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
               <div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div>
               <div v-if="m._sending" style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+              <div v-else-if="m.sender_id===userId&&m.id&&!m._local" style="font-size:10px;margin-top:2px;text-align:right;opacity:.5"><span style="color:var(--tm)">{{m._read?"已读":(m.delivered?"已送达":"")}}</span></div>
             </div>
           </div>
         </div>
@@ -804,12 +974,12 @@ var ChatDetailPage = {
           <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">📸</div>
           <span style="font-size:11px;color:#666">拍摄</span>
         </div>
-        <div @click="onVideoCall" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer" :style="{opacity:calling?0.4:1,pointerEvents:calling?'none':'auto'}">
-          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">📹</div>
+        <div @click="onVideoCall" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08);position:relative">📹<span style="position:absolute;top:-4px;right:-6px;background:#FF6B9D;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px">敬请期待</span></div>
           <span style="font-size:11px;color:#666">视频通话</span>
         </div>
-        <div @click="onVoiceCall" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer" :style="{opacity:calling?0.4:1,pointerEvents:calling?'none':'auto'}">
-          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">📞</div>
+        <div @click="onVoiceCall" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08);position:relative">📞<span style="position:absolute;top:-4px;right:-6px;background:#FF6B9D;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px">敬请期待</span></div>
           <span style="font-size:11px;color:#666">语音通话</span>
         </div>
         <div @click="openGiftPanel" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
@@ -822,11 +992,101 @@ var ChatDetailPage = {
       <button @click="toggleVoiceMode" style="border:none;background:none;font-size:24px;padding:0 2px;flex-shrink:0;cursor:pointer;width:32px">{{voiceMode?"⌨️":"🎙️"}}</button>
       <button v-if="voiceMode" @mousedown="startRecording" @mouseup="stopRecording" @touchstart.prevent="startRecording" @touchend.prevent="stopRecording" :style="{background:recording?'#c8c8c8':'#fff'}" style="flex:1;height:40px;border-radius:6px;border:1px solid #ddd;font-size:15px;cursor:pointer;color:#333;transition:background .15s">{{recording?'松开发送':'按住说话'}}</button>
       <div v-else class="inp" style="flex:1;border-radius:20px;display:flex;align-items:center">
-        <input v-model="text" placeholder="输入消息..." @keydown.enter="sendMsg" style="flex:1;border:none;background:none;outline:none;padding:8px 12px;font-size:15px">
+        <input v-model="text" placeholder="输入消息..." @keydown.enter="sendMsg" @input="sendTyping" @blur="sendStopTyping" style="flex:1;border:none;background:none;outline:none;padding:8px 12px;font-size:15px">
       </div>
       <button v-if="!voiceMode&&text.trim()" @click="sendMsg" class="btn bp" style="border-radius:20px;padding:8px 16px;font-size:14px;flex-shrink:0">发送</button>
       <button v-if="!voiceMode&&!text.trim()" @click="toggleEmoji" style="border:none;background:none;font-size:24px;flex-shrink:0;cursor:pointer;width:32px">😊</button>
       <button v-if="!voiceMode&&!text.trim()" @click="togglePlus" style="border:none;background:none;font-size:24px;flex-shrink:0;cursor:pointer;width:32px">➕</button>
+    </div>
+  </div>`
+};
+
+var CheckinPage = {
+  data: function(){return {status:null,tasks:[],checking:false,loading:true,weekNames:["日","一","二","三","四","五","六"]}},
+  methods: {
+    load: async function(){
+      this.loading=true;
+      try{var r=await api("/checkin/status");this.status=r.data||{}}catch(e){}
+      try{var t=await api("/checkin/tasks");this.tasks=t.data||[]}catch(e){}
+      this.loading=false;
+    },
+    doCheckin: async function(){
+      var self=this;
+      if(self.checking)return;
+      self.checking=true;
+      try{
+        var r=await api("/checkin",{method:"POST",body:"{}"});
+        if(r.code===0){
+          if(window.NotificationUtils){
+            window.NotificationUtils.showToast(r.message||'签到成功！获得'+r.data.reward+'金币','success');
+          } else { toast(r.message||("签到成功！+"+r.data.reward+"金币"),"tok"); }
+          self.load();
+        }else{
+          if(window.NotificationUtils){
+            window.NotificationUtils.showToast(r.message||'签到失败','error');
+          } else { toast(r.message||"签到失败","terr"); }
+        }
+      }catch(e){
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast(e.message||'签到失败','error');
+        } else { toast(e.message||"签到失败","terr"); }
+      }
+      self.checking=false;
+    },
+    // 生成最近7天日期列表（含今日）
+    last7Days: function(){
+      var arr=[];
+      var now=new Date();
+      for(var i=6;i>=0;i--){
+        var d=new Date(now);d.setDate(d.getDate()-i);
+        arr.push({date:("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2),week:d.getDay()});
+      }
+      return arr;
+    },
+    // 某天是否已签到
+    checkedOn: function(dayStr){
+      var s=this.status;
+      if(!s||!s.history||!s.history.length)return false;
+      return s.history.some(function(h){
+        if(!h.checkin_date)return false;
+        var d=String(h.checkin_date).slice(5,10);
+        return d===dayStr;
+      });
+    },
+    taskDone: function(t){return t.completed}
+  },
+  mounted: function(){this.load()},
+  template: `<div style="padding:16px">
+    <div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;border-radius:var(--r);padding:24px;text-align:center;margin-bottom:16px">
+      <div style="font-size:40px">📅</div>
+      <div style="font-size:18px;font-weight:600;margin:8px 0">每日签到</div>
+      <div v-if="status" style="font-size:14px;opacity:.9;margin-bottom:16px">已连续签到 <b style="font-size:22px">{{status.streak||0}}</b> 天</div>
+      <button class="btn bw" :style="{background:status&&status.today_checked_in?'rgba(255,255,255,.35)':'#fff',color:'#ff5e7d',border:'none',padding:'10px 36px',borderRadius:'24px',fontSize:'15px',fontWeight:'600',cursor:'pointer'}" @click="doCheckin" :disabled="checking||(status&&status.today_checked_in)">{{status&&status.today_checked_in?'今日已签到':'立即签到'}}</button>
+      <div style="font-size:12px;opacity:.8;margin-top:10px">连续签到第7天最高可得 5+14=19金币</div>
+    </div>
+    <div v-if="loading" style="text-align:center;padding:24px"><div class="spin"></div></div>
+    <div v-else>
+      <div style="background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);padding:16px;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:600;margin-bottom:12px">最近7天</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+          <div v-for="day in last7Days()" :key="day.date" style="text-align:center">
+            <div style="font-size:11px;color:var(--tm)">{{day.week==0||day.week==6?'周末':weekNames[day.week]}}</div>
+            <div :style="{width:'34px',height:'34px',lineHeight:'34px',borderRadius:'50%',margin:'4px auto 0',fontSize:'13px',background:checkedOn(day.date)?'linear-gradient(135deg,#FF6B9D,#FF8E53)':'var(--bg-page)',color:checkedOn(day.date)?'#fff':'var(--tm)'}">{{checkedOn(day.date)?'✓':day.date.slice(3)}}</div>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);padding:16px">
+        <div style="font-size:15px;font-weight:600;margin-bottom:12px">每日任务</div>
+        <div v-if="tasks.length===0" style="text-align:center;color:var(--tm);font-size:13px;padding:16px">暂无任务</div>
+        <div v-for="t in tasks" :key="t.key" style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--b)">
+          <div :style="{width:'40px',height:'40px',borderRadius:'12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',background:t.completed?'linear-gradient(135deg,#FF6B9D,#FF8E53)':'var(--bg-page)'}">{{t.completed?'✅':'🎯'}}</div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:500">{{t.name}}</div>
+            <div style="font-size:12px;color:var(--tm);margin-top:2px">{{t.progress||0}}/{{t.max}}</div>
+          </div>
+          <span :style="{fontSize:'12px',fontWeight:'600',color:t.completed?'var(--s)':'var(--p)'}">+{{t.reward}}金币</span>
+        </div>
+      </div>
     </div>
   </div>`
 };
@@ -838,7 +1098,7 @@ var MyPage = {
     logout: function(){localStorage.clear();this.$router.replace("/login");toast("已退出登录","tinfo")}
   },
   mounted: function(){this.load()},
-  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
+  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'📅',label:'签到领金币',path:'/checkin'},{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
 };
 
 var EditProfilePage = {
@@ -854,7 +1114,7 @@ var EditProfilePage = {
 };
 
 var UserProfilePage = {
-  data: function(){return {profile:null,loading:true}},
+  data: function(){return {profile:null,loading:true,liking:false,matchModal:null,showReport:false,reportReason:""}},
   methods: {
     load: async function(){this.loading=true;try{var r=await api("/user/profile/"+this.$route.params.id);this.profile=r.data}catch(e){}this.loading=false},
     greetOrChat: async function(){
@@ -880,9 +1140,76 @@ var UserProfilePage = {
         }catch(e){toast(e.message,"terr")}
       }
     },
+    likeUser: async function(){
+      var u=this.profile;if(!u||this.liking)return;
+      this.liking=true;
+      try{
+        var r=await api("/match/like",{method:"POST",body:JSON.stringify({target_user_id:u.id})});
+        if(r.code===0){
+          if(r.data&&r.data.matched){
+            this.matchModal={partner:r.data.partner||u,conversation_id:r.data.conversation_id,common_tags:r.data.common_tags||[],icebreakers:r.data.icebreakers||[]};
+            if(window.NotificationUtils){
+              window.NotificationUtils.showToast('💕 匹配成功！','match');
+            } else { toast("💕 匹配成功！","tok"); }
+          }else{toast(r.message||"已喜欢","tok")}
+        }else{toast(r.message||"操作失败","terr")}
+      }catch(e){toast(e.message||"操作失败","terr")}
+      this.liking=false;
+    },
+    superLikeUser: async function(){
+      var u=this.profile;if(!u||this.liking)return;
+      this.liking=true;
+      try{
+        var r=await api("/match/super-like",{method:"POST",body:JSON.stringify({target_user_id:u.id})});
+        if(r.code===0){toast("⭐ 超级喜欢成功","tok")}else{toast(r.message||"操作失败","terr")}
+      }catch(e){toast(e.message||"操作失败","terr")}
+      this.liking=false;
+    },
+    blockUser: async function(){
+      var u=this.profile;if(!u)return;
+      if(!window.confirm("确定要拉黑 "+(u.nickname||"TA")+" 吗？拉黑后将无法再收到TA的消息"))return;
+      try{
+        var r=await api("/block/add",{method:"POST",body:JSON.stringify({blocked_user_id:u.id})});
+        if(r.code===0){toast("已拉黑","tok");this.$router.back()}else{toast(r.message||"拉黑失败","terr")}
+      }catch(e){toast(e.message||"拉黑失败","terr")}
+    },
+    submitReport: async function(){
+      var u=this.profile;if(!u)return;
+      var reason=this.reportReason.trim();
+      if(!reason){toast("请选择举报原因","tinfo");return}
+      try{
+        var r=await api("/report/submit",{method:"POST",body:JSON.stringify({reported_user_id:u.id,reason:reason})});
+        if(r.code===0){toast("举报成功，我们会尽快处理","tok");this.showReport=false;this.reportReason=""}else{toast(r.message||"举报失败","terr")}
+      }catch(e){toast(e.message||"举报失败","terr")}
+    },
+    closeMatchModal: function(){this.matchModal=null},
+    goChat: function(convId){
+      var self=this;
+      self.matchModal=null;
+      if(convId)self.$router.push("/chat/"+convId);
+    }
   },
   mounted: function(){this.load()},
-  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px"><button class="btn bp" style="flex:1" @click="greetOrChat">💬 打招呼</button></div></div></div>`
+  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px;flex-wrap:wrap"><button class="btn bp" style="flex:1;min-width:100px" @click="greetOrChat">💬 打招呼</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid var(--p);color:var(--p)" @click="likeUser" :disabled="liking">❤️ 喜欢</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid #F6D365;color:#d99000" @click="superLikeUser" :disabled="liking">⭐ 超级喜欢</button></div><div style="display:flex;gap:12px;padding:0 16px 16px"><button class="btn bs" style="flex:1;font-size:13px" @click="showReport=!showReport">🚩 举报</button><button class="btn bs" style="flex:1;font-size:13px;color:var(--e)" @click="blockUser">⛔ 拉黑</button></div><div v-if="showReport" style="margin:0 16px 16px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
+    <div style="font-size:14px;font-weight:600;margin-bottom:10px">举报该用户</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><span v-for="rr in ['骚扰','虚假资料','广告营销','违法违规','其他']" :key="rr" @click="reportReason=rr" :class=\"['tag',reportReason===rr?'tp':'']\" style="cursor:pointer;border:1px solid var(--b);border-radius:16px;padding:6px 12px;font-size:13px">{{rr}}</span></div>
+    <button class="btn bp bs" style="width:100%" @click="submitReport" :disabled="!reportReason">提交举报</button>
+  </div>
+  <div v-if="matchModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:20px;padding:28px 24px;width:300px;text-align:center;position:relative">
+      <button @click="closeMatchModal" style="position:absolute;top:10px;right:14px;border:none;background:none;font-size:18px;cursor:pointer;color:var(--tm)">✕</button>
+      <div style="font-size:40px">💕</div>
+      <h2 style="margin:10px 0 4px">匹配成功！</h2>
+      <p style="color:var(--tm);font-size:13px;margin-bottom:14px">你和{{matchModal.partner.nickname||'TA'}}互相喜欢</p>
+      <div class="avatar av-lg" style="margin:0 auto 14px"><img v-if="matchModal.partner.avatar" :src="matchModal.partner.avatar"><span v-else>👤</span></div>
+      <div v-if="matchModal.common_tags&&matchModal.common_tags.length" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:14px"><span v-for="t in matchModal.common_tags" class="tag tp">{{t}}</span></div>
+      <div v-if="matchModal.icebreakers&&matchModal.icebreakers.length" style="text-align:left;background:var(--bg-page);border-radius:12px;padding:12px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">💬 破冰话题</div>
+        <div v-for="ib in matchModal.icebreakers" style="font-size:13px;color:var(--ts);margin-bottom:4px">{{ib.content}}</div>
+      </div>
+      <button class="btn bp bw bl" @click="goChat(matchModal.conversation_id)">💬 打个招呼</button>
+    </div>
+  </div></div></div>`
 };
 
 var VipPage = {
@@ -900,7 +1227,113 @@ var RechargePage = {
 
 var SettingsPage = {
   methods: {clearCache:function(){try{localStorage.clear();if(typeof caches!=="undefined")caches.keys().then(function(k){k.forEach(function(c){caches.delete(c)})});toast("缓存已清除","tok")}catch(e){toast("清除失败","terr")}}},
-  template: `<div style="padding:12px 16px"><div v-for="item in [{i:'🔒',l:'账号安全'},{i:'🔔',l:'消息通知'},{i:'🛡️',l:'隐私设置'},{i:'❓',l:'帮助与反馈'},{i:'📄',l:'关于我们',d:'v1.0.0 公测版'}]" :key="item.l" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{item.i}}</span><div style="flex:1"><div style="font-size:15px">{{item.l}}</div><div v-if="item.d" style="font-size:12px;color:var(--tm)">{{item.d}}</div></div><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:16px" @click="clearCache">清除缓存</button></div>`
+  template: `<div style="padding:12px 16px"><div v-for="item in [{i:'🛡️',l:'认证中心',p:'/verification'},{i:'🚫',l:'黑名单',p:'/blocklist'},{i:'🔒',l:'账号安全'},{i:'🔔',l:'消息通知'},{i:'❓',l:'帮助与反馈'},{i:'📄',l:'关于我们',d:'v1.0.0 公测版'}]" :key="item.l" @click="item.p&&$router.push(item.p)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh);cursor:pointer"><span style="font-size:20px;margin-right:12px">{{item.i}}</span><div style="flex:1"><div style="font-size:15px">{{item.l}}</div><div v-if="item.d" style="font-size:12px;color:var(--tm)">{{item.d}}</div></div><span style="color:var(--tm)">{{item.p?'›':''}}</span></div><button class="btn bo bw" style="margin-top:16px" @click="clearCache">清除缓存</button></div>`
+};
+
+var VerificationPage = {
+  data: function(){return {status:null,loading:true,realName:{real_name:"",id_card_number:"",id_card_front_url:"",id_card_back_url:""},education:{school_name:"",education_level:"本科",graduation_year:2020,education_cert_url:""},vehicle:{car_brand:"",car_model:"",driving_license_url:""},submitting:""}},
+  methods: {
+    load: async function(){
+      this.loading=true;
+      try{var r=await api("/verification/status");this.status=r.data||{}}catch(e){}
+      this.loading=false;
+    },
+    typeStatus: function(type){
+      var s=this.status;
+      if(!s||!s.verifications||!s.verifications[type])return "none";
+      return s.verifications[type].status;
+    },
+    statusText: function(st){
+      return st==="approved"?"已认证":st==="pending"?"审核中":st==="rejected"?"未通过":"未认证";
+    },
+    statusColor: function(st){
+      return st==="approved"?"var(--s)":st==="pending"?"#F6D365":st==="rejected"?"var(--e)":"var(--tm)";
+    },
+    submitRealName: async function(){
+      var self=this;
+      if(!self.realName.real_name||!self.realName.id_card_number){toast("请填写姓名和身份证号","tinfo");return}
+      self.submitting="real_name";
+      try{
+        var r=await api("/verification/real-name",{method:"POST",body:JSON.stringify(self.realName)});
+        if(r.code===0){toast(r.message||"实名认证已提交","tok");self.load()}else{toast(r.message||"提交失败","terr")}
+      }catch(e){toast(e.message||"提交失败","terr")}
+      self.submitting="";
+    },
+    submitEducation: async function(){
+      var self=this;
+      if(!self.education.school_name){toast("请填写学校名称","tinfo");return}
+      self.submitting="education";
+      try{
+        var r=await api("/verification/education",{method:"POST",body:JSON.stringify(self.education)});
+        if(r.code===0){toast(r.message||"学历认证已提交","tok");self.load()}else{toast(r.message||"提交失败","terr")}
+      }catch(e){toast(e.message||"提交失败","terr")}
+      self.submitting="";
+    },
+    submitVehicle: async function(){
+      var self=this;
+      if(!self.vehicle.car_brand){toast("请填写车辆品牌","tinfo");return}
+      self.submitting="vehicle";
+      try{
+        var r=await api("/verification/vehicle",{method:"POST",body:JSON.stringify(self.vehicle)});
+        if(r.code===0){toast(r.message||"车辆认证已提交","tok");self.load()}else{toast(r.message||"提交失败","terr")}
+      }catch(e){toast(e.message||"提交失败","terr")}
+      self.submitting="";
+    }
+  },
+  mounted: function(){this.load()},
+  template: `<div style="padding:16px">
+    <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:var(--r);padding:20px;text-align:center;margin-bottom:16px">
+      <div style="font-size:36px">🛡️</div>
+      <div style="font-size:18px;font-weight:600;margin:8px 0">认证中心</div>
+      <div style="font-size:13px;opacity:.85">当前认证等级：<b>{{status?status.level||0:0}}</b> / 4</div>
+    </div>
+    <div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div>
+    <div v-else>
+      <div style="background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);padding:16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🪪</span><div style="flex:1"><div style="font-size:15px;font-weight:600">实名认证</div><div style="font-size:12px;color:var(--tm)">提升可信度，解锁更多特权</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('real_name'))}">{{statusText(typeStatus('real_name'))}}</span></div>
+        <template v-if="typeStatus('real_name')==='none'">
+          <input v-model="realName.real_name" placeholder="真实姓名" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
+          <input v-model="realName.id_card_number" placeholder="身份证号" maxlength="18" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
+          <button class="btn bp bs" style="width:100%" @click="submitRealName" :disabled="submitting==='real_name'">{{submitting==='real_name'?'提交中...':'提交认证'}}</button>
+        </template>
+      </div>
+      <div style="background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);padding:16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🎓</span><div style="flex:1"><div style="font-size:15px;font-weight:600">学历认证</div><div style="font-size:12px;color:var(--tm)">验证教育背景</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('education'))}">{{statusText(typeStatus('education'))}}</span></div>
+        <template v-if="typeStatus('education')==='none'">
+          <input v-model="education.school_name" placeholder="学校名称" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
+          <div style="display:flex;gap:8px;margin-bottom:8px"><select v-model="education.education_level" style="flex:1;padding:10px;border:1px solid var(--b);border-radius:8px;font-size:14px"><option>大专</option><option>本科</option><option>硕士</option><option>博士</option></select><input v-model.number="education.graduation_year" type="number" min="1950" :max="new Date().getFullYear()" style="flex:1;padding:10px;border:1px solid var(--b);border-radius:8px;font-size:14px" placeholder="毕业年份"></div>
+          <button class="btn bp bs" style="width:100%" @click="submitEducation" :disabled="submitting==='education'">{{submitting==='education'?'提交中...':'提交认证'}}</button>
+        </template>
+      </div>
+      <div style="background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);padding:16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🚗</span><div style="flex:1"><div style="font-size:15px;font-weight:600">车辆认证</div><div style="font-size:12px;color:var(--tm)">验证车辆信息</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('vehicle'))}">{{statusText(typeStatus('vehicle'))}}</span></div>
+        <template v-if="typeStatus('vehicle')==='none'">
+          <input v-model="vehicle.car_brand" placeholder="车辆品牌" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
+          <input v-model="vehicle.car_model" placeholder="车辆型号(选填)" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
+          <button class="btn bp bs" style="width:100%" @click="submitVehicle" :disabled="submitting==='vehicle'">{{submitting==='vehicle'?'提交中...':'提交认证'}}</button>
+        </template>
+      </div>
+    </div>
+  </div>`
+};
+
+var BlockListPage = {
+  data: function(){return {list:[],loading:true}},
+  methods: {
+    load: async function(){
+      this.loading=true;
+      try{var r=await api("/block/list");this.list=r.data||[]}catch(e){}
+      this.loading=false;
+    },
+    unblock: async function(u){
+      try{
+        var r=await api("/block/remove",{method:"POST",body:JSON.stringify({blocked_user_id:u.blocked_user_id||u.id})});
+        if(r.code===0){toast("已解除拉黑","tok");this.load()}else{toast(r.message||"操作失败","terr")}
+      }catch(e){toast(e.message||"操作失败","terr")}
+    }
+  },
+  mounted: function(){this.load()},
+  template: `<div style="padding:12px 16px"><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="list.length===0" class="empty"><div class="ei">🚫</div><div class="et">黑名单为空</div><div class="ed">拉黑的用户会出现在这里</div></div><div v-else v-for="u in list" :key="u.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;gap:12px;box-shadow:var(--sh)"><div class="avatar av-sm"><img v-if="u.avatar" :src="u.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-weight:500">{{u.nickname}}</div><div style="font-size:12px;color:var(--tm)">{{u.location||""}}</div></div><button class="btn bs" style="font-size:13px;border:1px solid var(--b)" @click="unblock(u)">解除</button></div></div>`
 };
 
 var MeetPage = {
@@ -936,6 +1369,9 @@ var routes = [
   {path:"/post/:id",component:PostDetailPage},{path:"/user/:id",component:UserProfilePage},
   {path:"/edit-profile",component:EditProfilePage},{path:"/vip",component:VipPage},
   {path:"/settings",component:SettingsPage},{path:"/my",component:MyPage},
+  {path:"/checkin",component:CheckinPage},
+  {path:"/verification",component:VerificationPage},
+  {path:"/blocklist",component:BlockListPage},
   {path:"/meet",component:MeetPage},{path:"/recharge",component:RechargePage},
   {path:"/earnings",component:EarningsPage},{path:"/fans",component:FansPage},
   {path:"/following",component:FollowingPage}
@@ -1027,6 +1463,16 @@ var AppRoot = {
       } else {
         toast("⭐ 有人超级喜欢了你！","tok");
       }
+    },
+    // S13：App启动注册推送Token（离线推送链路）
+    registerPushToken: function(){
+      var self=this;
+      var cached=localStorage.getItem("pushToken");
+      if(cached)return; // 已注册过
+      var devId="web_"+Date.now()+"_"+Math.random().toString(36).slice(2,10);
+      api("/push/register",{method:"POST",body:JSON.stringify({platform:"web",device_token:devId})}).then(function(r){
+        if(r.code===0){localStorage.setItem("pushToken",devId)}
+      }).catch(function(){});
     }
   },
   mounted: function(){
@@ -1050,6 +1496,8 @@ var AppRoot = {
     self.loadUnreadCount();
     // 定时刷新未读数（每30秒）
     self._unreadTimer=setInterval(function(){self.loadUnreadCount()},30000);
+    // App启动注册推送Token（S13：离线推送链路）
+    self.registerPushToken();
   },
   beforeUnmount: function(){
     wsOff("message",this._gMsgFn);

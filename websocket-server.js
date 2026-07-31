@@ -6,11 +6,8 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const Conversation = require('./src/models/Conversation');
-const Message = require('./src/models/Message');
 const Block = require('./src/models/Block');
 const websocketService = require('./src/services/websocket.service');
-const contentAuditService = require('./src/services/contentAudit.service');
-const antifraudService = require('./src/services/antifraud.service');
 const callService = require('./src/services/call.service');
 const offlineMessageService = require('./src/services/offlineMessage.service');
 
@@ -231,160 +228,57 @@ function startWebSocketServer(server) {
 
 /**
  * 处理发送消息
+ * 实现收敛：转调 chat.service.sendMessage（唯一实现，含审核/反欺诈/拉黑/WS推送/离线）
  * @param {number} userId - 发送者ID
  * @param {Object} data - 消息数据
  */
 async function handleSendMessage(userId, data) {
-  let { receiver_id, conversation_id, content, type = 0 } = data;
-  const msgType = parseInt(type) || 0;
+  const chatService = require('./src/services/chat.service');
 
-  // 如果没有 receiver_id，从 conversation_id 推断
-  if (!receiver_id && conversation_id) {
-    try {
-      const conv = await Conversation.findById(conversation_id);
-      if (conv) receiver_id = conv.user1_id === userId ? conv.user2_id : conv.user1_id;
-    } catch(e) {}
-  }
+  const result = await chatService.sendMessage({
+    sender_id: userId,
+    receiver_id: data.receiver_id,
+    conversation_id: data.conversation_id,
+    content: data.content,
+    type: data.type,
+    // 类型专属字段透传
+    voice_url: data.voice_url,
+    voice_duration: data.voice_duration,
+    video_url: data.video_url,
+    video_duration: data.video_duration,
+    video_cover: data.video_cover,
+    sticker_id: data.sticker_id,
+    location_data: data.location_data,
+    gift_data: data.gift_data
+  });
 
-  // 校验发送者是否存在（防止外键约束失败）
-  try {
-    const User = require('./src/models/User');
-    const sender = await User.findById(userId);
-    if (!sender) {
-      websocketService.sendToUser(userId, {
-        type: 'error',
-        data: { message: '用户不存在，请重新登录' }
-      });
-      return;
-    }
-  } catch (e) { /* 校验失败则继续，不阻塞消息 */ }
-
-  // 非文字/系统消息时允许 content 为空
-  if (!receiver_id) return;
-  if (msgType <= 1 && !content) return;
-
-  let filteredContent = content || '';
-
-  // 内容审核和反欺诈仅对文字消息执行
-  if (msgType <= 1 && content) {
-    const auditResult = contentAuditService.checkSensitiveContent(content);
-    if (!auditResult.pass) {
-      websocketService.sendToUser(userId, {
-        type: 'message_blocked',
-        data: { receiver_id, reason: auditResult.message, timestamp: new Date().toISOString() }
-      });
-      console.log(`用户 ${userId} 的消息被拦截: ${auditResult.message}`);
-      return;
-    }
-    filteredContent = contentAuditService.filterSensitiveContent(content);
-
-    const msgRiskCheck = await antifraudService.checkMessageBehavior(userId, filteredContent);
-    if (msgRiskCheck.blocked) {
-      websocketService.sendToUser(userId, {
-        type: 'message_blocked',
-        data: { receiver_id, reason: '消息发送异常，已被系统拦截', timestamp: new Date().toISOString() }
-      });
-      console.log(`用户 ${userId} 的消息被反欺诈拦截: ${msgRiskCheck.reasons.join(', ')}`);
-      return;
-    }
-  }
-
-  // 检查拉黑关系（双向）：存在拉黑则不能发消息
-  const isMutualBlocked = await Block.isMutualBlocked(userId, receiver_id);
-  if (isMutualBlocked) {
+  if (!result.success && result.blocked) {
+    // 被拦截（审核/反欺诈/拉黑）：仅通知发送者
     websocketService.sendToUser(userId, {
       type: 'message_blocked',
-      data: {
-        receiver_id,
-        reason: '无法发送消息，存在拉黑关系',
-        timestamp: new Date().toISOString()
-      }
+      data: { receiver_id: result.receiver_id, reason: result.reason, timestamp: new Date().toISOString() }
     });
-    console.log(`用户 ${userId} 向 ${receiver_id} 发送消息被拦截: 存在拉黑关系`);
+    return;
+  }
+  if (!result.success) {
+    // 参数/业务错误
+    websocketService.sendToUser(userId, {
+      type: 'error',
+      data: { message: result.message }
+    });
     return;
   }
 
-  try {
-    // 创建或获取会话
-    const conversation = await Conversation.createOrGet(userId, receiver_id);
-
-    // 构建消息数据（支持多类型）
-    const msgData = {
-      conversation_id: conversation.id,
-      sender_id: userId,
-      receiver_id,
-      content: filteredContent,
-      type: msgType
-    };
-    if (msgType === 2) { msgData.voice_url = data.voice_url || null; msgData.voice_duration = parseInt(data.voice_duration) || 0; }
-    if (msgType === 3) { msgData.video_url = data.video_url || null; msgData.video_duration = parseInt(data.video_duration) || 0; msgData.video_cover = data.video_cover || null; }
-    if (msgType === 4) { msgData.sticker_id = parseInt(data.sticker_id) || null; }
-    if (msgType === 5) { msgData.location_data = data.location_data || null; }
-    if (msgType === 6) { msgData.gift_data = data.gift_data || null; }
-
-    // 创建消息
-    const message = await Message.create(msgData);
-
-    // 构建消息对象
-    const messageObj = {
-      type: 'message',
-      data: {
-        id: message.id,
-        conversation_id: message.conversation_id,
-        sender_id: message.sender_id,
-        sender_nickname: message.sender_nickname || null,
-        sender_avatar: message.sender_avatar || null,
-        receiver_id: message.receiver_id,
-        content: message.content,
-        type: message.type,
-        status: message.status,
-        created_at: message.created_at,
-        voice_url: message.voice_url,
-        voice_duration: message.voice_duration,
-        video_url: message.video_url,
-        video_duration: message.video_duration,
-        video_cover: message.video_cover,
-        sticker_id: message.sticker_id,
-        location_data: message.location_data,
-        gift_data: message.gift_data
-      }
-    };
-
-    // 发送消息给接收者，检查是否成功
-    const sent = websocketService.sendToUser(receiver_id, messageObj);
-    
-    // 记录日志
-    console.log(`[WS] 用户${userId} -> 用户${receiver_id}: ${sent ? '已送达' : '对方不在线，消息已存储'}`);
-
-    // 发送消息确认给发送者，包含送达状态
-    websocketService.sendToUser(userId, {
-      type: 'message_sent',
-      data: {
-        ...message,
-        delivered: sent,
-        receiver_online: sent
-      }
-    });
-    
-    // 如果接收者不在线，存储离线消息
-    if (!sent) {
-      storeOfflineMessage(receiver_id, messageObj);
+  // 发送消息确认给发送者，包含送达状态
+  websocketService.sendToUser(userId, {
+    type: 'message_sent',
+    data: {
+      ...result.data,
+      delivered: result.delivered,
+      receiver_online: result.receiver_online
     }
-  } catch (err) {
-    console.error('发送消息失败:', err);
-  }
-}
-
-
-/**
- * 存储离线消息
- * @param {number} userId - 接收者用户ID
- * @param {Object} messageObj - 消息对象
- */
-function storeOfflineMessage(userId, messageObj) {
-  offlineMessageService.storeMessage(userId, messageObj).catch(err => {
-    console.error('[WS] 存储离线消息失败:', err.message);
   });
+  console.log(`[WS] 用户${userId} -> 用户${result.data.receiver_id}: ${result.delivered ? '已送达' : '对方不在线，消息已存储'}`);
 }
 
 /**
@@ -569,13 +463,14 @@ function handleIceCandidate(userId, data) {
 /**
  * 处理消息撤回（通过 WebSocket 实时撤回）
  * 客户端发送 { type: "recall_message", data: { message_id } }
- * 服务端校验后推送撤回事件给双方
+ * 实现收敛：转调 chat.service.recallMessage（唯一实现，含 WS 推送双方）
  */
 async function handleRecallMessage(userId, data) {
   const { message_id } = data;
   if (!message_id) return;
 
-  const result = await Message.recall(message_id, userId);
+  const chatService = require('./src/services/chat.service');
+  const result = await chatService.recallMessage(message_id, userId);
 
   if (!result.success) {
     // 撤回失败，仅通知发起者
@@ -583,30 +478,7 @@ async function handleRecallMessage(userId, data) {
       type: 'recall_failed',
       data: { message_id, reason: result.message }
     });
-    return;
   }
-
-  // 通知接收者
-  websocketService.sendToUser(result.data.receiver_id, {
-    type: 'message_recalled',
-    data: {
-      message_id: result.data.id,
-      conversation_id: result.data.conversation_id,
-      sender_id: userId,
-      recalled_at: new Date().toISOString()
-    }
-  });
-
-  // 通知发送者（多设备同步）
-  websocketService.sendToUser(userId, {
-    type: 'message_recalled',
-    data: {
-      message_id: result.data.id,
-      conversation_id: result.data.conversation_id,
-      sender_id: userId,
-      recalled_at: new Date().toISOString()
-    }
-  });
 }
 
 function handleReadReceipt(userId, data) {
