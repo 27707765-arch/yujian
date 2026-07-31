@@ -568,13 +568,10 @@ var ChatDetailPage = {
   template: `<div style="display:flex;flex-direction:column;height:100%;background:var(--bg-page)">
     <div class="chat-hdr">
       <button class="bk" @click="$router.back()">←</button>
-      <div class="avatar av-sm pavatar" style="position:relative;cursor:pointer" @click="partnerId&&$router.push('/user/'+partnerId)"><img v-if="partner.avatar" :src="partner.avatar"><span v-else>👤</span><span v-if="partner.online" class="online-dot"></span></div>
       <div style="flex:1;min-width:0;cursor:pointer" @click="partnerId&&$router.push('/user/'+partnerId)">
         <div class="nm">{{partner.nickname||"加载中..."}}</div>
         <div class="st" :class="{on:partner.online}">{{partner.online?"● 在线":"离线"}}</div>
       </div>
-      <button class="act" @click="onVoiceCall" :style="{opacity:calling?0.4:1,pointerEvents:calling?'none':'auto'}" title="语音通话">📞</button>
-      <button class="act" @click="onVideoCall" :style="{opacity:calling?0.4:1,pointerEvents:calling?'none':'auto'}" title="视频通话">📹</button>
     </div>
     <div v-if="calling" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(160deg,#1a1a2e,#16213e);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff">
       <div style="width:88px;height:88px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:16px">{{callType==="video"?"📹":"📞"}}</div>
@@ -605,21 +602,20 @@ var ChatDetailPage = {
           <div v-if="m.type===99" class="msg-sy">{{m.content}}</div>
           <div v-else-if="m.type===6" class="msg-sy">
             <div style="font-size:14px">🎁 {{m.content}}</div>
-            <div style="font-size:10px;opacity:.6">{{timeStr(m.created_at)}}</div>
           </div>
           <div v-else class="msg-row" :style="{flexDirection:m.sender_id===userId?'row-reverse':'row'}">
             <div class="avatar"><img v-if="avatarOf(m)" :src="avatarOf(m)"><span v-else>👤</span></div>
             <div v-if="m.type===1" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
               <img :src="m.content" class="msg-img" style="max-width:200px;border-radius:8px;display:block">
-              <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+              <div v-if="m._sending" style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
             </div>
             <div v-else-if="m.type===2" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
               <div style="display:flex;align-items:center;gap:8px;cursor:pointer"><span style="font-size:20px">🔊</span><span style="font-size:13px">{{m.voice_duration||0}}″ 语音</span></div>
-              <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+              <div v-if="m._sending" style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
             </div>
             <div v-else :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
               <div style="font-size:15px;white-space:pre-wrap;word-break:break-word">{{m.content}}</div>
-              <div style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span>{{timeStr(m.created_at)}}</span><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
+              <div v-if="m._sending" style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span v-if="m._sending" style="color:var(--tm);margin-left:4px">⏳</span></div>
             </div>
           </div>
         </div>
@@ -777,7 +773,7 @@ router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",
 // 简短提示音（Web Audio API，无需外部文件）
 function _playBeep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=800;o.type="sine";g.gain.setValueAtTime(0.25,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);}catch(e){}}
 var AppRoot = {
-  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260731-3",_unreadCount:0}},
+  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260731-4",_unreadCount:0}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
