@@ -4,7 +4,22 @@
 var toasts = Vue.reactive([]);
 var uiState = Vue.reactive({hideHdr:false}); // 全局UI状态（聊天详情页隐藏顶部导航头）
 var _tid = 0;
-function toast(msg, cls) { var id = ++_tid; toasts.push({id:id, msg:msg, cls:cls}); setTimeout(function(){ var i=toasts.findIndex(function(t){return t.id===id}); if(i>-1)toasts.splice(i,1); }, 3000); }
+
+// 增强版toast函数（使用新的通知工具）
+function toast(msg, cls, type) {
+  // 如果有新的通知工具，优先使用
+  if(window.NotificationUtils && type){
+    window.NotificationUtils.showToast(msg, type);
+    return;
+  }
+  // 降级到旧版toast
+  var id = ++_tid;
+  toasts.push({id:id, msg:msg, cls:cls});
+  setTimeout(function(){
+    var i=toasts.findIndex(function(t){return t.id===id});
+    if(i>-1)toasts.splice(i,1);
+  }, 3000);
+}
 function token() { return localStorage.getItem("token") || ""; }
 function timeAgo(t) { if(!t)return""; var d=Math.floor((Date.now()-new Date(t).getTime())/1000); if(d<60)return"刚刚"; if(d<3600)return Math.floor(d/60)+"分钟前"; if(d<86400)return Math.floor(d/3600)+"小时前"; return Math.floor(d/86400)+"天前"; }
 function timeStr(t) { if(!t)return""; var d=new Date(t); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
@@ -87,8 +102,38 @@ var HomePage = {
       }else{this.load()}
     },
     switchTab: function(t){this.tab=t;this.load()},
-    like: function(u){if(!u)return;var s=this;api("/match/like",{method:"POST",body:JSON.stringify({target_user_id:u.id})}).then(function(r){if(r.data&&r.data.matched)toast("💕 匹配成功！","tok")}).catch(function(e){toast(e.message,"terr")});s.users=s.users.filter(function(x){return x.id!==u.id})},
-    skip: function(u){if(!u)return;var s=this;api("/match/skip",{method:"POST",body:JSON.stringify({target_user_id:u.id})}).catch(function(){});s.users=s.users.filter(function(x){return x.id!==u.id})},
+    chatUp: async function(u){
+      if(!u)return;
+      var s=this;
+      // 已有会话：直接跳转聊天
+      if(u._has_conversation){
+        try{
+          var cr = await api("/chat/conversations",{method:"POST",body:JSON.stringify({other_user_id:u.id})});
+          if(cr.data)this.$router.push("/chat/"+cr.data.id);
+        }catch(e){toast(e.message||"打开会话失败","terr")}
+        return;
+      }
+      // 没有会话：打招呼
+      try{
+        var convR = await api("/chat/conversations",{method:"POST",body:JSON.stringify({other_user_id:u.id})});
+        if(convR.code!==0||!convR.data){toast("发起会话失败","terr");return;}
+        var convId = convR.data.id;
+        var greetText = "Hi~ 很高兴认识你！";
+        await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:convId,content:greetText,type:0})});
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast('已向'+(u.nickname||'TA')+'发送打招呼消息','like');
+        } else {
+          toast("💬 已发送打招呼消息","tok");
+        }
+      }catch(e){
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast(e.message||'打招呼失败','error');
+        } else {
+          toast(e.message||"打招呼失败","terr");
+        }
+      }
+      s.users=s.users.filter(function(x){return x.id!==u.id});
+    },
     parseTags: function(t){if(!t)return[];if(Array.isArray(t))return t;try{return JSON.parse(t)}catch(e){return[]}}
   },
   mounted: function(){this.load();this.initLocation()},
@@ -131,8 +176,7 @@ var HomePage = {
         <div v-if="parseTags(u.tags).length" style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in parseTags(u.tags).slice(0,3)" class="tag tp">{{t}}</span></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;flex-shrink:0">
-        <button @click.stop="skip(u)" title="跳过" style="width:40px;height:40px;border-radius:50%;border:1px solid var(--b);background:var(--w);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh)">✕</button>
-        <button @click.stop="like(u)" title="喜欢" style="width:40px;height:40px;border-radius:50%;border:none;background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,107,107,.35)">♥</button>
+        <button @click.stop="chatUp(u)" :title="u._has_conversation?'发消息':'打招呼'" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,107,107,.35)" :style="{background:u._has_conversation?'linear-gradient(135deg,#667eea,#764ba2)':'linear-gradient(135deg,#FF6B9D,#FF8E53)'}">{{u._has_conversation?'发消息':'打招呼'}}</button>
       </div>
     </div>
   </div></div>`
@@ -142,10 +186,67 @@ var DiscoverPage = {
   data: function(){return {posts:[],loading:true,err:false,tab:"all",showPublish:false,pubText:"",pubImage:null,pubPreview:""}},
   methods: {
     load: async function(){this.loading=true;this.err=false;try{var r=await api("/posts?limit=20");this.posts=r.data||[];if(this.posts.length===0)this.errMsg="暂无动态"}catch(e){this.err=true;this.errMsg=e.message||"加载失败，请稍后重试"}this.loading=false},
-    toggleLike: async function(p){try{await api("/posts/"+p.id+"/like",{method:"POST"});p.liked=!p.liked;p.like_count+=p.liked?1:-1;if(p.like_count<0)p.like_count=0}catch(e){toast(e.message,"terr")}},
+    toggleLike: async function(p){
+      try{
+        await api("/posts/"+p.id+"/like",{method:"POST"});
+        p.liked=!p.liked;
+        p.like_count+=p.liked?1:-1;
+        if(p.like_count<0)p.like_count=0;
+        // 点赞通知
+        if(p.liked && window.NotificationUtils){
+          window.NotificationUtils.playSound('like');
+        }
+      }catch(e){
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast(e.message,'error');
+        } else {
+          toast(e.message,"terr");
+        }
+      }
+    },
     switchTab: function(t){this.tab=t;this.load()},
     pubImageChange: function(e){var f=e.target.files[0];if(f){this.pubImage=f;this.pubPreview=URL.createObjectURL(f)}},
-    publish: async function(){var t=this.pubText.trim();if(!t&&!this.pubImage){toast("请输入内容或选择图片","tinfo");return}try{var fd=new FormData();if(t)fd.append("content",t);if(this.pubImage)fd.append("images",this.pubImage);var r=await api("/posts",{method:"POST",body:fd});if(r.code===0){toast("发布成功","tok");this.showPublish=false;this.pubText="";this.pubImage=null;this.pubPreview="";this.load()}else toast(r.message,"terr")}catch(e){toast(e.message,"terr")}}
+    publish: async function(){
+      var t=this.pubText.trim();
+      if(!t&&!this.pubImage){
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast("请输入内容或选择图片",'warning');
+        } else {
+          toast("请输入内容或选择图片","tinfo");
+        }
+        return;
+      }
+      try{
+        var fd=new FormData();
+        if(t)fd.append("content",t);
+        if(this.pubImage)fd.append("images",this.pubImage);
+        var r=await api("/posts",{method:"POST",body:fd});
+        if(r.code===0){
+          if(window.NotificationUtils){
+            window.NotificationUtils.showToast("发布成功",'success');
+          } else {
+            toast("发布成功","tok");
+          }
+          this.showPublish=false;
+          this.pubText="";
+          this.pubImage=null;
+          this.pubPreview="";
+          this.load();
+        } else {
+          if(window.NotificationUtils){
+            window.NotificationUtils.showToast(r.message,'error');
+          } else {
+            toast(r.message,"terr");
+          }
+        }
+      }catch(e){
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast(e.message,'error');
+        } else {
+          toast(e.message,"terr");
+        }
+      }
+    }
   },
   mounted: function(){this.load()},
   template: `<div style="padding:12px 16px">
@@ -183,8 +284,47 @@ var PostDetailPage = {
   methods: {
     timeAgo: function(t){if(!t)return"";var d=Math.floor((Date.now()-new Date(t).getTime())/1000);if(d<60)return"刚刚";if(d<3600)return Math.floor(d/60)+"分钟前";if(d<86400)return Math.floor(d/3600)+"小时前";return Math.floor(d/86400)+"天前"},
     load: async function(){this.pid=parseInt(this.$route.params.id);this.loading=true;try{var r=await api("/posts/"+this.pid);this.post=(r.data&&r.data.post)||r.data;this.comments=(r.data&&r.data.comments)||[]}catch(e){}this.loading=false},
-    toggleLike: async function(){try{await api("/posts/"+this.pid+"/like",{method:"POST"});this.post.liked=!this.post.liked;this.post.like_count+=this.post.liked?1:-1;if(this.post.like_count<0)this.post.like_count=0}catch(e){toast(e.message,"terr")}},
-    addComment: async function(){var t=this.text.trim();if(!t)return;try{await api("/posts/"+this.pid+"/comment",{method:"POST",body:JSON.stringify({content:t})});this.text="";var uname=localStorage.getItem("uname")||"我";this.comments.push({content:t,nickname:uname,created_at:new Date().toISOString(),_local:true});if(this.post)this.post.comment_count=(this.post.comment_count||0)+1;toast("评论成功","tok")}catch(e){toast(e.message,"terr")}}
+    toggleLike: async function(){
+      try{
+        await api("/posts/"+this.pid+"/like",{method:"POST"});
+        this.post.liked=!this.post.liked;
+        this.post.like_count+=this.post.liked?1:-1;
+        if(this.post.like_count<0)this.post.like_count=0;
+        // 点赞通知
+        if(this.post.liked && window.NotificationUtils){
+          window.NotificationUtils.playSound('like');
+        }
+      }catch(e){
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast(e.message,'error');
+        } else {
+          toast(e.message,"terr");
+        }
+      }
+    },
+    addComment: async function(){
+      var t=this.text.trim();
+      if(!t)return;
+      try{
+        await api("/posts/"+this.pid+"/comment",{method:"POST",body:JSON.stringify({content:t})});
+        this.text="";
+        var uname=localStorage.getItem("uname")||"我";
+        this.comments.push({content:t,nickname:uname,created_at:new Date().toISOString(),_local:true});
+        if(this.post)this.post.comment_count=(this.post.comment_count||0)+1;
+        // 评论成功通知
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast('评论成功','success');
+        } else {
+          toast("评论成功","tok");
+        }
+      }catch(e){
+        if(window.NotificationUtils){
+          window.NotificationUtils.showToast(e.message,'error');
+        } else {
+          toast(e.message,"terr");
+        }
+      }
+    }
   },
   mounted: function(){this.load()},
   template: `<div>
@@ -214,6 +354,7 @@ var ChatListPage = {
     fmtTime:function(t){if(!t)return"";var d=new Date(t),now=new Date();var sameDay=d.toDateString()===now.toDateString();if(sameDay)return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);var yes=new Date(now);yes.setDate(yes.getDate()-1);if(d.toDateString()===yes.toDateString())return"昨天";return ("0"+(d.getMonth()+1)).slice(-2)+"/"+("0"+d.getDate()).slice(-2)},
     fmtLastMsg:function(c){if(!c.last_message)return"暂无消息";if(c.last_msg_type===1)return"[图片]";if(c.last_msg_type===2)return"[语音]";if(c.last_msg_type===99)return c.last_message;return c.last_message},
     onWsMsg:function(d){
+      // 只处理收到的消息（message_sent 是自己发出的确认，不产生未读）
       if(d.type!=="message"||!d.data)return;
       var cid=d.data.conversation_id;if(!cid)return;
       var s=this;
@@ -240,14 +381,15 @@ var ChatListPage = {
     }
   },
   mounted: function(){
-    var s=this;s.load();
+    var s=this;
+    s.load();
     s._clWsFn=function(d){s.onWsMsg(d)};
     wsOn("message",s._clWsFn);
-    wsOn("message_sent",s._clWsFn);
+    // 进入聊天列表时清除全局未读计数
+    if(s.$root)s.$root.unreadCount=0;
   },
   beforeUnmount: function(){
     wsOff("message",this._clWsFn);
-    wsOff("message_sent",this._clWsFn);
   },
   template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="convs.length===0" class="empty"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" @click="open(c)" class="conv-item"><div class="conv-avatar-wrap"><div class="conv-avatar"><img v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span class="conv-time">{{fmtTime(c.last_message_time)}}</span></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div></div></div></div>`
 };
@@ -685,7 +827,7 @@ var MyPage = {
     logout: function(){localStorage.clear();this.$router.replace("/login");toast("已退出登录","tinfo")}
   },
   mounted: function(){this.load()},
-  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:24px 20px"><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">🪙{{wallet.balance||0}}</div><div style="font-size:11px;opacity:.8">金币</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
+  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
 };
 
 var EditProfilePage = {
@@ -704,11 +846,32 @@ var UserProfilePage = {
   data: function(){return {profile:null,loading:true}},
   methods: {
     load: async function(){this.loading=true;try{var r=await api("/user/profile/"+this.$route.params.id);this.profile=r.data}catch(e){}this.loading=false},
-    like: async function(){try{var r=await api("/match/like",{method:"POST",body:JSON.stringify({target_user_id:this.profile.id})});toast(r.data&&r.data.matched?"💕匹配成功！":"已喜欢","tok")}catch(e){toast(e.message,"terr")}},
-    chat: async function(){try{var r=await api("/chat/conversations",{method:"POST",body:JSON.stringify({other_user_id:this.profile.id})});if(r.data)this.$router.push("/chat/"+r.data.id)}catch(e){toast(e.message,"terr")}}
+    greetOrChat: async function(){
+      var u=this.profile;if(!u)return;
+      // 检测是否已有会话
+      var hasConv = u._has_conversation;
+      if(!hasConv){
+        try{
+          var cr = await api("/chat/conversations",{method:"POST",body:JSON.stringify({other_user_id:u.id})});
+          hasConv = cr.data && cr.data.id;
+        }catch(e){}
+      }
+      if(hasConv){
+        // 已有会话：直接跳转聊天
+        try{var r=await api("/chat/conversations",{method:"POST",body:JSON.stringify({other_user_id:u.id})});if(r.data)this.$router.push("/chat/"+r.data.id)}catch(e){toast(e.message,"terr")}
+      } else {
+        // 没有会话：打招呼
+        try{
+          var convR=await api("/chat/conversations",{method:"POST",body:JSON.stringify({other_user_id:u.id})});
+          if(!convR.data){toast("发起会话失败","terr");return}
+          await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:convR.data.id,content:"Hi~ 很高兴认识你！",type:0})});
+          toast("💬 已发送打招呼消息","tok");
+        }catch(e){toast(e.message,"terr")}
+      }
+    },
   },
   mounted: function(){this.load()},
-  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px"><button class="btn bo" style="flex:1" @click="like">♥ 喜欢</button><button class="btn bp" style="flex:1" @click="chat">💬 发消息</button></div></div></div>`
+  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px"><button class="btn bp" style="flex:1" @click="greetOrChat">💬 打招呼</button></div></div></div>`
 };
 
 var VipPage = {
@@ -773,7 +936,7 @@ router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",
 // 简短提示音（Web Audio API，无需外部文件）
 function _playBeep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=800;o.type="sine";g.gain.setValueAtTime(0.25,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);}catch(e){}}
 var AppRoot = {
-  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260731-4",_unreadCount:0}},
+  data: function(){return {toasts:toasts,uiState:uiState,appVersion:"v20260801",unreadCount:0}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
@@ -781,34 +944,109 @@ var AppRoot = {
   },
   methods: {
     goBack:function(){this.$router.back()},
+    loadUnreadCount: async function(){
+      try{
+        var r=await api("/chat/unread-count");
+        if(r.code===0&&r.data){
+          this.unreadCount=r.data.count||0;
+        }
+      }catch(e){}
+    },
     onGlobalMsg: function(d){
+      // 只处理收到的消息，忽略自己发出的消息确认
       if(d.type!=="message"||!d.data)return;
       var self=this;
+      var myId=parseInt(localStorage.getItem("userId"));
+      if(d.data.sender_id===myId)return;
+      // 更新未读计数
+      if(!self.$route.path.startsWith("/chat/")){
+        self.unreadCount=(self.unreadCount||0)+1;
+      }
       // 不在聊天详情页时提示
       if(!self.$route.path.startsWith("/chat/")){
         var nick=d.data.sender_nickname||"用户";
-        _playBeep();
-        toast("💬 "+nick+": "+((d.data.content||"").slice(0,20)),"tok");
-        // 桌面通知
-        try{
-          if(window.Notification&&window.Notification.permission==="granted"){
-            new window.Notification("遇见 - 新消息",{body:nick+": "+((d.data.content||"").slice(0,60)),icon:"/icon.png"});
+        var content=(d.data.content||"").slice(0,30);
+        // 使用新的通知工具
+        if(window.NotificationUtils){
+          window.NotificationUtils.showNotification({
+            title:'遇见 - 新消息',
+            body:nick+": "+content,
+            type:'message',
+            icon:'/icon.png',
+            onClick:function(){
+              self.$router.push('/chat/'+d.data.conversation_id);
+            }
+          });
+        } else {
+          // 降级到旧版通知
+          _playBeep();
+          toast("💬 "+nick+": "+content,"tok");
+        }
+      }
+    },
+    onMatchSuccess: function(d){
+      if(d.type!=="match_success"||!d.data)return;
+      var self=this;
+      var partner=d.data.partner||{};
+      // 匹配成功通知
+      if(window.NotificationUtils){
+        window.NotificationUtils.showNotification({
+          title:'💕 匹配成功！',
+          body:'你和'+(partner.nickname||'TA')+'互相喜欢，快去聊天吧！',
+          type:'match',
+          icon:partner.avatar||'/icon.png',
+          onClick:function(){
+            self.$router.push('/chat/'+d.data.conversation_id);
           }
-        }catch(e){}
+        });
+      } else {
+        toast("💕 匹配成功！","tok");
+      }
+    },
+    onSuperLike: function(d){
+      if(d.type!=="super_like_received"||!d.data)return;
+      // 超级喜欢通知
+      if(window.NotificationUtils){
+        window.NotificationUtils.showNotification({
+          title:'⭐ 超级喜欢',
+          body:'有人超级喜欢了你！',
+          type:'like',
+          icon:'/icon.png'
+        });
+      } else {
+        toast("⭐ 有人超级喜欢了你！","tok");
       }
     }
   },
   mounted: function(){
     var self=this;
+    // 消息通知
     self._gMsgFn=function(d){self.onGlobalMsg(d)};
     wsOn("message",self._gMsgFn);
+    // 匹配成功通知
+    self._matchFn=function(d){self.onMatchSuccess(d)};
+    wsOn("match_success",self._matchFn);
+    // 超级喜欢通知
+    self._superLikeFn=function(d){self.onSuperLike(d)};
+    wsOn("super_like_received",self._superLikeFn);
     // 请求桌面通知权限
-    try{window.Notification&&window.Notification.requestPermission()}catch(e){}
+    if(window.NotificationUtils){
+      window.NotificationUtils.requestNotificationPermission();
+    } else {
+      try{window.Notification&&window.Notification.requestPermission()}catch(e){}
+    }
+    // 加载未读消息数
+    self.loadUnreadCount();
+    // 定时刷新未读数（每30秒）
+    self._unreadTimer=setInterval(function(){self.loadUnreadCount()},30000);
   },
   beforeUnmount: function(){
     wsOff("message",this._gMsgFn);
+    wsOff("match_success",this._matchFn);
+    wsOff("super_like_received",this._superLikeFn);
+    if(this._unreadTimer)clearInterval(this._unreadTimer);
   },
-  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">←</button><span class="tt">{{pageTitle}}</span></header><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><component :is=\"Component\" :key=\"route.fullPath\"/></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\"><div class=\"ni\">💬</div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div></div>`
+  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">←</button><span class="tt">{{pageTitle}}</span></header><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><component :is=\"Component\" :key=\"route.fullPath\"/></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\">💬<span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div></div>`
 };
 
 var app = Vue.createApp(AppRoot);

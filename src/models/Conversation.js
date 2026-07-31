@@ -264,6 +264,31 @@ class Conversation {
     }
     return true;
   }
+  /**
+   * 批量检查用户是否与候选用户已有会话
+   * @param {number} userId - 当前用户ID
+   * @param {Array<number>} targetIds - 候选用户ID列表
+   * @returns {Promise<Set<number>>} - 已有会话的对方用户ID集合
+   */
+  static async batchExists(userId, targetIds) {
+    if (!targetIds || targetIds.length === 0) return new Set();
+    try {
+      if (isDbAvailable()) {
+        const placeholders = targetIds.map(() => '?').join(',');
+        const [rows] = await executeQuery(
+          `SELECT CASE WHEN user1_id = ? THEN user2_id ELSE user1_id END as other_id
+           FROM conversations
+           WHERE (user1_id = ? AND user2_id IN (${placeholders}))
+              OR (user2_id = ? AND user1_id IN (${placeholders}))`,
+          [userId, userId, ...targetIds, userId, ...targetIds]
+        );
+        return new Set(rows.map(r => r.other_id));
+      }
+    } catch (error) {
+      console.error('批量查询会话失败:', error.message);
+    }
+    return new Set();
+  }
 }
 
 module.exports = Conversation;

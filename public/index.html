@@ -234,21 +234,125 @@ html,body{
 .empty-title{font-size:17px;font-weight:600;margin-bottom:8px;color:var(--text)}
 .empty-desc{font-size:14px;color:var(--text-muted);margin-bottom:20px}
 
-/* ============ Toast ============ */
+/* ============ Toast Notifications ============ */
 .toast-container{
   position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;
-  display:flex;flex-direction:column;gap:8px;pointer-events:none;
-  width:calc(100% - 32px);max-width:360px
+  display:flex;flex-direction:column;gap:10px;pointer-events:none;
+  width:calc(100% - 32px);max-width:380px
 }
 .toast-item{
-  padding:12px 20px;border-radius:var(--radius-sm);font-size:14px;
-  color:#fff;text-align:center;animation:toastIn .3s;box-shadow:0 4px 12px rgba(0,0,0,.15)
+  display:flex;align-items:center;gap:10px;
+  padding:14px 20px;border-radius:16px;font-size:14px;
+  color:#fff;box-shadow:0 8px 32px rgba(0,0,0,.15);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transform:translateY(-20px);opacity:0;
+  transition:all .3s cubic-bezier(.4,0,.2,1)
 }
-.toast-leaving{animation:toastOut .3s forwards}
-.toast-ok{background:var(--success)}
-.toast-error{background:var(--error)}
-.toast-warning{background:var(--warning)}
-.toast-info{background:#0984E3}
+.toast-item.toast-visible{
+  transform:translateY(0);opacity:1
+}
+.toast-item.toast-exit{
+  transform:translateY(-20px);opacity:0
+}
+.toast-icon{font-size:18px;flex-shrink:0}
+.toast-text{flex:1;line-height:1.4}
+
+/* Toast类型样式 */
+.toast-message{
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  border-left:4px solid #fff
+}
+.toast-like{
+  background:linear-gradient(135deg,#f093fb,#f5576c);
+  border-left:4px solid #fff
+}
+.toast-match{
+  background:linear-gradient(135deg,#4facfe,#00f2fe);
+  border-left:4px solid #fff
+}
+.toast-success{
+  background:linear-gradient(135deg,#43e97b,#38f9d7);
+  border-left:4px solid #fff
+}
+.toast-error{
+  background:linear-gradient(135deg,#fa709a,#fee140);
+  border-left:4px solid #fff
+}
+.toast-warning{
+  background:linear-gradient(135deg,#f6d365,#fda085);
+  border-left:4px solid #fff
+}
+.toast-info{
+  background:linear-gradient(135deg,#a18cd1,#fbc2eb);
+  border-left:4px solid #fff
+}
+
+/* Toast动画 */
+@keyframes toastSlideIn{
+  from{transform:translateY(-20px) scale(.95);opacity:0}
+  to{transform:translateY(0) scale(1);opacity:1}
+}
+@keyframes toastSlideOut{
+  from{transform:translateY(0) scale(1);opacity:1}
+  to{transform:translateY(-20px) scale(.95);opacity:0}
+}
+@keyframes toastPulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.02)}
+}
+
+/* Toast图标动画 */
+.toast-icon{
+  animation:toastIconBounce .5s ease
+}
+@keyframes toastIconBounce{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.2)}
+}
+
+/* 消息通知特殊样式 */
+.toast-message .toast-icon{
+  animation:messageIconPulse 1s ease infinite
+}
+@keyframes messageIconPulse{
+  0%,100%{transform:scale(1);opacity:1}
+  50%{transform:scale(1.1);opacity:.8}
+}
+
+/* 点赞通知特殊样式 */
+.toast-like .toast-icon{
+  animation:likeIconPop .6s ease
+}
+@keyframes likeIconPop{
+  0%{transform:scale(0) rotate(-180deg)}
+  50%{transform:scale(1.3) rotate(10deg)}
+  100%{transform:scale(1) rotate(0deg)}
+}
+
+/* 匹配通知特殊样式 */
+.toast-match{
+  animation:matchShine 2s ease infinite
+}
+@keyframes matchShine{
+  0%,100%{box-shadow:0 8px 32px rgba(0,0,0,.15)}
+  50%{box-shadow:0 8px 32px rgba(79,172,254,.4)}
+}
+
+/* 未读消息徽章 */
+.badge{
+  position:absolute;top:-6px;right:-8px;
+  min-width:18px;height:18px;padding:0 5px;
+  background:var(--error);color:#fff;
+  font-size:11px;font-weight:600;line-height:18px;
+  text-align:center;border-radius:9px;
+  box-shadow:0 2px 6px rgba(255,59,48,.4);
+  animation:badgePop .3s ease
+}
+@keyframes badgePop{
+  0%{transform:scale(0)}
+  60%{transform:scale(1.2)}
+  100%{transform:scale(1)}
+}
 
 /* ============ Message Bubbles ============ */
 .msg-bubble{max-width:75%;padding:10px 14px;border-radius:16px;line-height:1.5;word-break:break-word;font-size:14px;margin-bottom:12px}
@@ -654,7 +758,8 @@ html,body{
 
 <script src="/js/vue.global.js"></script>
 <script src="/js/vue-router.global.js"></script>
-<script src="/js/yujian-app.js?v=202607311700"></script>
+<script src="/js/notification.js"></script>
+<script src="/js/yujian-app.js?v=202608010100"></script>
 </body>
 </html>
 

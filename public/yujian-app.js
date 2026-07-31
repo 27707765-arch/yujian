@@ -86,8 +86,7 @@ var HomePage = {
       }else{this.load()}
     },
     switchTab: function(t){this.tab=t;this.load()},
-    like: function(u){if(!u)return;var s=this;api("/match/like",{method:"POST",body:JSON.stringify({target_user_id:u.id})}).then(function(r){if(r.data&&r.data.matched)toast("💕 匹配成功！","tok")}).catch(function(e){toast(e.message,"terr")});s.users=s.users.filter(function(x){return x.id!==u.id})},
-    skip: function(u){if(!u)return;var s=this;api("/match/skip",{method:"POST",body:JSON.stringify({target_user_id:u.id})}).catch(function(){});s.users=s.users.filter(function(x){return x.id!==u.id})},
+    chatUp: async function(u){if(!u)return;var s=this;try{var convR=await api("/chat/conversations",{method:"POST",body:JSON.stringify({other_user_id:u.id})});if(convR.code!==0||!convR.data){toast("发起会话失败","terr");return}var convId=convR.data.id;await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:convId,content:"Hi~ 很高兴认识你！",type:0})})}catch(e){toast(e.message||"搭讪失败","terr")}s.users=s.users.filter(function(x){return x.id!==u.id});if(window.NotificationUtils){window.NotificationUtils.showToast('已向'+(u.nickname||'TA')+'发送搭讪消息','like')}else{toast("💬 已发送搭讪消息","tok")}},
     parseTags: function(t){if(!t)return[];if(Array.isArray(t))return t;try{return JSON.parse(t)}catch(e){return[]}}
   },
   mounted: function(){this.load();this.initLocation()},
@@ -130,8 +129,7 @@ var HomePage = {
         <div v-if="parseTags(u.tags).length" style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in parseTags(u.tags).slice(0,3)" class="tag tp">{{t}}</span></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;flex-shrink:0">
-        <button @click.stop="skip(u)" title="跳过" style="width:40px;height:40px;border-radius:50%;border:1px solid var(--b);background:var(--w);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh)">✕</button>
-        <button @click.stop="like(u)" title="喜欢" style="width:40px;height:40px;border-radius:50%;border:none;background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,107,107,.35)">♥</button>
+        <button @click.stop="chatUp(u)" title="打招呼" style="width:44px;height:44px;border-radius:50%;border:none;background:linear-gradient(135deg,#FF6B9D,#FF8E53);color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,107,107,.35)">打招呼</button>
       </div>
     </div>
   </div></div>`
