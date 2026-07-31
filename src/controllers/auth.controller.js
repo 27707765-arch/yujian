@@ -8,6 +8,7 @@ const User = require('../models/User');
 const smsService = require('../services/sms.service');
 const emailService = require('../services/email.service');
 const antifraudService = require('../services/antifraud.service');
+const { getRandomAvatar } = require('../utils/avatar');
 const { success, error, serverError } = require('../utils/response');
 const { executeQuery } = require('../utils/database');
 
@@ -149,10 +150,13 @@ async function login(req, res) {
       if (!user) {
         // 自动注册
         const autoNickname = await generateUniqueNickname();
+        // 新用户自动分配随机头像（性别未知，随机分配）
+        const randomAvatar = getRandomAvatar(null);
         user = await User.create({
           email: loginAccount,
           phone: null,
           nickname: autoNickname,
+          avatar: randomAvatar,
           email_verified: 1
         });
       }
@@ -176,10 +180,13 @@ async function login(req, res) {
           return error(res, 403, '注册受限，请联系客服');
         }
         const autoNickname = await generateUniqueNickname();
+        // 新用户自动分配随机头像（性别未知，随机分配）
+        const randomAvatar = getRandomAvatar(null);
         user = await User.create({
           phone: loginAccount,
           email: null,
-          nickname: autoNickname
+          nickname: autoNickname,
+          avatar: randomAvatar
         });
       }
     }

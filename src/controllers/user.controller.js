@@ -8,6 +8,7 @@ const UserPhoto = require('../models/UserPhoto');
 const UserSettings = require('../models/UserSettings');
 const Like = require('../models/Like');
 const View = require('../models/View');
+const { getRandomAvatar } = require('../utils/avatar');
 const Checkin = require('../models/Checkin');
 const Wallet = require('../models/Wallet');
 const { success, error, serverError } = require('../utils/response');
@@ -132,6 +133,20 @@ async function updateUserInfo(req, res) {
     if (lng != null) updateData.lng = parseFloat(lng);
     if (tags !== undefined) {
       updateData.tags = JSON.stringify(tags);
+    }
+
+    // 当用户更新性别时，如果当前头像是默认随机头像，则更新为性别对应的随机头像
+    if (gender === 1 || gender === 2) {
+      try {
+        const currentUser = await User.findById(id);
+        if (currentUser && currentUser.avatar && currentUser.avatar.includes('dicebear.com')) {
+          // 当前使用的是默认随机头像，更新为性别对应的头像
+          updateData.avatar = getRandomAvatar(gender);
+        }
+      } catch (err) {
+        // 查询失败不影响主流程
+        console.error('查询用户头像失败:', err.message);
+      }
     }
 
     // 当同时传了 lat 和 lng（都不是 null）时，自动逆地理编码填充行政区划
