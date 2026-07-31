@@ -427,6 +427,15 @@ async function startServer() {
       }
       console.warn('⚠️  警告: DB_PASSWORD 使用默认值，生产环境请务必修改 .env 中的 DB_PASSWORD');
     }
+    // 安全检查：生产环境禁止开启短信/支付模拟开关（防止固定验证码与假支付）
+    if (process.env.NODE_ENV === 'production' && process.env.SMS_SIMULATE === 'true') {
+      console.error('❌ 生产环境禁止开启短信模拟（SMS_SIMULATE=true），请将 SMS_SIMULATE 设为 false 或去除该配置');
+      process.exit(1);
+    }
+    if (process.env.NODE_ENV === 'production' && process.env.SIMULATE_PAYMENT === 'true') {
+      console.error('❌ 生产环境禁止开启模拟支付（SIMULATE_PAYMENT=true），请将 SIMULATE_PAYMENT 设为 false 或去除该配置');
+      process.exit(1);
+    }
     console.log('正在启动服务器...');
 
     // 创建HTTP服务器
