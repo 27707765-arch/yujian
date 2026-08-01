@@ -240,7 +240,9 @@ var HomePage = {
     </div>
     <button class="btn bp bs bw" @click="load();showFilter=false">应用</button>
   </div>
-  <div v-if="loading" style="text-align:center;padding:48px 0"><div class="spin"></div><p style="color:var(--tm);margin-top:12px;font-size:14px">正在推荐...</p></div>
+  <div v-if="loading" style="padding:4px 0">
+    <div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div style="flex:1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div>
+  </div>
   <div v-else-if="err" class="empty" style="padding:48px 24px"><div style="font-size:48px;margin-bottom:12px">😵</div><div style="color:var(--ts);margin-bottom:16px;font-size:14px">{{errMsg}}</div><button class="btn bp bs" @click="load">重试</button></div>
   <div v-else-if="users.length===0" class="empty"><div class="ei">🔍</div><div class="et">{{tab==='city'?'暂无同城用户':'暂无附近用户'}}</div><div class="ed">换个时间再来或调整筛选条件</div><button class="btn bp bs" @click="load">刷新</button></div>
   <div v-else style="display:flex;flex-direction:column;gap:10px">
@@ -289,9 +291,29 @@ var HomePage = {
 };
 
 var DiscoverPage = {
-  data: function(){return {posts:[],loading:true,err:false,tab:"all",showPublish:false,pubText:"",pubImage:null,pubPreview:""}},
+  data: function(){return {posts:[],loading:true,err:false,tab:"all",showPublish:false,pubText:"",pubImage:null,pubPreview:"",offset:0,hasMore:true,loadingMore:false}},
   methods: {
-    load: async function(){this.loading=true;this.err=false;try{var r=await api("/posts?limit=20");this.posts=r.data||[];if(this.posts.length===0)this.errMsg="暂无动态"}catch(e){this.err=true;this.errMsg=e.message||"加载失败，请稍后重试"}this.loading=false},
+    load: async function(){this.loading=true;this.err=false;this.offset=0;this.hasMore=true;try{var r=await api("/posts?limit=20&offset=0");this.posts=r.data||[];if(this.posts.length===0)this.errMsg="暂无动态";if((r.data||[]).length<20)this.hasMore=false}catch(e){this.err=true;this.errMsg=e.message||"加载失败，请稍后重试"}this.loading=false},
+    loadMore: async function(){
+      if(this.loading||this.loadingMore||!this.hasMore)return;
+      this.loadingMore=true;
+      var next=this.offset+20;
+      try{
+        var r=await api("/posts?limit=20&offset="+next);
+        var more=r.data||[];
+        if(more.length>0){
+          this.posts=this.posts.concat(more);
+          this.offset=next;
+        }
+        if(more.length<20)this.hasMore=false;
+      }catch(e){ /* 触底加载失败静默，可再次触发 */ }
+      this.loadingMore=false;
+    },
+    onScroll: function(){
+      var el=document.querySelector(".pg")||this.$el;
+      if(!el)return;
+      if((el.scrollTop+el.clientHeight)>=el.scrollHeight-60)this.loadMore();
+    },
     toggleLike: async function(p){
       try{
         await api("/posts/"+p.id+"/like",{method:"POST"});
@@ -354,7 +376,8 @@ var DiscoverPage = {
       }
     }
   },
-  mounted: function(){this.load()},
+  mounted: function(){this.load();this._scrollFn=this.onScroll.bind(this);this.$nextTick(function(){var el=document.querySelector(".pg")||this.$el;if(el)el.addEventListener("scroll",this._scrollFn,{passive:true})})},
+  unmounted: function(){var el=document.querySelector(".pg")||this.$el;if(this._scrollFn&&el)el.removeEventListener("scroll",this._scrollFn)},
   template: `<div style="padding:12px 16px">
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn bs" :class="tab==='all'?'bp':'bo'" @click="switchTab('all')">全部</button>
@@ -371,7 +394,9 @@ var DiscoverPage = {
       <button class="btn bo bs" @click="showPublish=false;pubText='';pubImage=null;pubPreview=''">取消</button>
     </div>
   </div>
-  <div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div><p style="color:var(--tm);margin-top:12px">加载中...</p></div>
+  <div v-if="loading" style="padding:4px 0">
+    <div v-for="n in 3" :key="n" class="skeleton-card"><div class="skeleton skeleton-avatar" style="margin-bottom:10px"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div>
+  </div>
   <div v-else-if="err" class="empty" style="padding:48px 24px"><div style="font-size:48px">😵</div><p style="color:var(--ts);margin:12px 0">加载失败</p><button class="btn bp bs" @click="load">重试</button></div>
   <div v-else-if="posts.length===0" class="empty"><div class="ei">📝</div><div class="et">暂无动态</div><div class="ed">来发布第一条动态吧</div></div>
   <div v-else><div v-for="p in posts" :key="p.id" class="card" style="padding:16px;margin-bottom:12px;cursor:pointer" @click="$router.push('/post/'+p.id)">
@@ -382,7 +407,10 @@ var DiscoverPage = {
     <p v-if="p.content" style="margin-bottom:10px;line-height:1.6;font-size:15px">{{p.content}}</p>
     <div v-if="p.images&&p.images.length" :style="{display:'grid',gridTemplateColumns:'repeat('+Math.min(p.images.length,3)+',1fr)',gap:'4px',marginBottom:'10px'}"><img v-for="(img,i) in p.images.slice(0,9)" :src="img" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px"></div>
     <div style="display:flex;gap:24px;font-size:13px;color:var(--tm)"><span @click.stop="toggleLike(p)" :style="{color:p.liked?'var(--p)':''}">{{p.liked?'❤️':'🤍'}} {{p.like_count||0}}</span><span>💬 {{p.comment_count||0}}</span></div>
-  </div></div></div>`
+  </div>
+  <div v-if="loadingMore" style="text-align:center;padding:16px;color:var(--tm);font-size:13px"><div class="spin" style="width:20px;height:20px;margin:0 auto 6px"></div>加载更多...</div>
+  <div v-else-if="!hasMore&&posts.length>0" style="text-align:center;padding:12px;color:var(--tm);font-size:12px">— 没有更多了 —</div>
+  </div></div>`
 };
 
 var PostDetailPage = {
@@ -511,7 +539,7 @@ var ChatListPage = {
     wsOff("message",this._clWsFn);
     wsOff("online_status",this._clOnlineFn);
   },
-  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="convs.length===0" class="empty"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" @click="open(c)" class="conv-item"><div class="conv-avatar-wrap"><div class="conv-avatar"><img v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span class="conv-time">{{fmtTime(c.last_message_time)}}</span></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div></div></div></div>`
+  template: `<div><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div style="flex:1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else-if="convs.length===0" class="empty"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" @click="open(c)" class="conv-item"><div class="conv-avatar-wrap"><div class="conv-avatar"><img v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span class="conv-time">{{fmtTime(c.last_message_time)}}</span></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div></div></div></div>`
 };
 
 
