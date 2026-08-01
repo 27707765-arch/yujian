@@ -1,5 +1,0 @@
-{
-  "importDefaultIsMock": true,
-  "requireIsMock": false,
-  "requireIsDefault": "undefined"
-}
