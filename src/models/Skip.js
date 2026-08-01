@@ -1,7 +1,8 @@
 const { executeQuery, isDbAvailable } = require('../utils/database');
+const { createMapStore } = require('../utils/memoryStore');
 
-const memoryStore = new Map();
-let autoIncrementId = 1;
+// 内存降级存储（DB 不可用时使用）
+const { map: memoryStore, nextId } = createMapStore();
 
 class Skip {
   static async create(user_id, target_user_id) {
@@ -17,7 +18,7 @@ class Skip {
       console.error('数据库操作失败，使用内存存储:', error.message);
     }
 
-    const id = autoIncrementId++;
+    const id = nextId();
     const skip = { id, user_id, target_user_id, created_at: new Date() };
     memoryStore.set(id, skip);
     return skip;

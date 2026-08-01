@@ -309,13 +309,14 @@ async function handleLike(user_id, target_user_id) {
       // 初始化亲密关系（fire-and-forget）
       try { const is = require('./intimacy.service'); is.onMatch(user_id, target_user_id).catch(() => {}); } catch (e) {}
 
-      // 发送系统消息：互相喜欢
+      // 发送系统消息：互相喜欢（receiverOnline 由 service 层注入，避免 model 反向依赖）
       await Message.create({
         conversation_id: conversation.id,
         sender_id: 0,
         receiver_id: user_id,
         content: '💕 你们互相喜欢，开始聊天吧！',
-        type: 99
+        type: 99,
+        receiverOnline: websocketService.isUserOnline(user_id)
       });
 
       // 计算共同标签并生成破冰话题
@@ -331,7 +332,8 @@ async function handleLike(user_id, target_user_id) {
           sender_id: 0,
           receiver_id: user_id,
           content: `💬 ${topic}`,
-          type: 99
+          type: 99,
+          receiverOnline: websocketService.isUserOnline(user_id)
         });
         icebreakerMessages.push({ id: msg.id, content: topic });
       }

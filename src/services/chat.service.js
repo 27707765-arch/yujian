@@ -151,7 +151,9 @@ function createChatService(deps = {}) {
       sender_id,
       receiver_id: receiverId,
       content: filteredContent,
-      type: msgType
+      type: msgType,
+      // 由 service 层注入在线状态，避免 model 反向依赖 websocket.service
+      receiverOnline: websocketService.isUserOnline(receiverId)
     };
     if (msgType === 2) {
       msgData.voice_url = extra.voice_url || null;

@@ -11,10 +11,13 @@ class Message {
   /**
    * 创建新消息
    * @param {Object} messageData - 消息数据
+   * @param {boolean} [messageData.receiverOnline] - 接收者是否在线（由调用方注入，
+   *        避免 model 反向依赖 websocket.service；不传时内部查询保持兼容）
    * @returns {Promise<Object>}
    */
   static async create(messageData) {
     const { conversation_id, sender_id, receiver_id, content, type } = messageData;
+    const receiverOnline = messageData.receiverOnline;
     const voice_url = messageData.voice_url || null;
     const voice_duration = messageData.voice_duration || 0;
     const video_url = messageData.video_url || null;
@@ -43,12 +46,15 @@ class Message {
         else if (type === 4) lastText = '[贴纸]';
         else if (type === 5) lastText = '[位置]';
         else if (type === 6) lastText = '[礼物]';
-        let receiverOnline = false;
-        try {
-          const ws = require('../services/websocket.service');
-          receiverOnline = ws.isUserOnline(receiver_id);
-        } catch (e) { /* 忽略 */ }
-        if (!receiverOnline) {
+        let receiverOnlineFlag = receiverOnline;
+        if (receiverOnlineFlag === undefined) {
+          try {
+            // 调用方未注入时回退查询（保持向后兼容；正常由 chat.service/match.service 注入）
+            const ws = require('../services/websocket.service');
+            receiverOnlineFlag = ws.isUserOnline(receiver_id);
+          } catch (e) { /* 忽略 */ }
+        }
+        if (!receiverOnlineFlag) {
           await executeQuery(
             'UPDATE conversations SET last_message = ?, last_message_time = ?, last_msg_type = ?, unread_count = COALESCE(unread_count, 0) + 1 WHERE id = ?',
             [lastText, new Date(), type, conversation_id]
