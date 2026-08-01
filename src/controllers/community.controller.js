@@ -2,7 +2,18 @@
  * 圈子控制器
  */
 const Community = require('../models/Community');
+const CommunityPost = require('../models/CommunityPost');
+const CommunityEvent = require('../models/CommunityEvent');
+const { executeQuery } = require('../utils/database');
 const { success, error, serverError } = require('../utils/response');
+
+/** 校验用户是否为圈子成员 */
+async function isMember(communityId, userId) {
+  try {
+    const [rows] = await executeQuery('SELECT 1 FROM community_members WHERE community_id = ? AND user_id = ?', [communityId, userId]);
+    return !!rows[0];
+  } catch (e) { return false; }
+}
 
 async function createCommunity(req, res) {
   try {
@@ -55,4 +66,83 @@ async function getMembers(req, res) {
   } catch (err) { serverError(res, err, '获取成员列表失败'); }
 }
 
-module.exports = { createCommunity, getList, getDetail, joinCommunity, leaveCommunity, getMembers };
+// ===== 圈子帖子 =====
+async function createPost(req, res) {
+  try {
+    const { id } = req.user;
+    const communityId = parseInt(req.params.id);
+    const { content, images } = req.body;
+    if (!content || !content.trim()) return error(res, 400, '内容不能为空');
+    if (!await isMember(communityId, id)) return error(res, 403, '请先加入圈子再发帖');
+    const post = await CommunityPost.create(communityId, id, content.trim(), images);
+    success(res, post, '发布成功');
+  } catch (err) { serverError(res, err, '发布帖子失败'); }
+}
+
+async function listPosts(req, res) {
+  try {
+    const { limit, offset } = req.query;
+    const posts = await CommunityPost.getByCommunity(parseInt(req.params.id), {
+      limit: parseInt(limit) || 20, offset: parseInt(offset) || 0
+    });
+    success(res, posts);
+  } catch (err) { serverError(res, err, '获取帖子失败'); }
+}
+
+async function likePost(req, res) {
+  try {
+    await CommunityPost.toggleLike(parseInt(req.params.pid));
+    success(res, null, '点赞成功');
+  } catch (err) { serverError(res, err, '点赞失败'); }
+}
+
+async function commentPost(req, res) {
+  try {
+    const post = await CommunityPost.getDetail(parseInt(req.params.pid));
+    if (!post) return error(res, 404, '帖子不存在');
+    await CommunityPost.addComment(post.id);
+    success(res, null, '评论成功');
+  } catch (err) { serverError(res, err, '评论失败'); }
+}
+
+// ===== 圈子事件 =====
+async function createEvent(req, res) {
+  try {
+    const { id } = req.user;
+    const communityId = parseInt(req.params.id);
+    const { title, description, location, start_time, max_participants } = req.body;
+    if (!title || !title.trim()) return error(res, 400, '事件标题不能为空');
+    if (!start_time) return error(res, 400, '请选择开始时间');
+    if (!await isMember(communityId, id)) return error(res, 403, '请先加入圈子再创建事件');
+    const event = await CommunityEvent.create(communityId, id, { title: title.trim(), description, location, start_time, max_participants });
+    success(res, event, '事件创建成功');
+  } catch (err) { serverError(res, err, '创建事件失败'); }
+}
+
+async function listEvents(req, res) {
+  try {
+    const events = await CommunityEvent.getByCommunity(parseInt(req.params.id));
+    success(res, events);
+  } catch (err) { serverError(res, err, '获取事件失败'); }
+}
+
+async function joinEvent(req, res) {
+  try {
+    const event = await CommunityEvent.getDetail(parseInt(req.params.eid));
+    if (!event) return error(res, 404, '事件不存在');
+    if (event.max_participants && event.participant_count >= event.max_participants) {
+      return error(res, 400, '报名人数已满');
+    }
+    await CommunityEvent.join(event.id);
+    success(res, null, '报名成功');
+  } catch (err) { serverError(res, err, '报名失败'); }
+}
+
+async function leaveEvent(req, res) {
+  try {
+    await CommunityEvent.leave(parseInt(req.params.eid));
+    success(res, null, '已取消报名');
+  } catch (err) { serverError(res, err, '取消报名失败'); }
+}
+
+module.exports = { createCommunity, getList, getDetail, joinCommunity, leaveCommunity, getMembers, createPost, listPosts, likePost, commentPost, createEvent, listEvents, joinEvent, leaveEvent };

@@ -1,5 +1,6 @@
 const Post = require('../models/Post');
 const Checkin = require('../models/Checkin');
+const Topic = require('../models/Topic');
 const { success, error, serverError } = require('../utils/response');
 const { validateMagicBytes } = require('../services/upload.service');
 const path = require('path');
@@ -253,5 +254,12 @@ module.exports = { createPost, getPosts, getPostDetail, addComment, toggleLike, 
       });
       success(res, null, '转发成功');
     } catch (err) { serverError(res, err, '转发失败'); }
+  },
+  // 热点话题
+  async getHotTopics(req, res) {
+    try {
+      const topics = await Topic.getHotTopics(20);
+      success(res, topics);
+    } catch (err) { serverError(res, err, '获取热点话题失败'); }
   }
 };

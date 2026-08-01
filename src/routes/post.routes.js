@@ -14,6 +14,9 @@ const mixedUpload = uploadService.mixedUpload([
   { name: 'video_cover', maxCount: 1 }
 ]);
 
+// 热点话题（静态路径必须在 /:id 之前）
+router.get('/hot-topics', postController.getHotTopics);
+
 // 创建动态（支持图片和视频）
 router.post('/', mixedUpload, contentAudit({ fields: ['content'] }), postController.createPost);
 
