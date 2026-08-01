@@ -1138,7 +1138,7 @@ var MyPage = {
     logout: function(){localStorage.clear();this.$router.replace("/login");toast("已退出登录","tinfo")}
   },
   mounted: function(){this.load()},
-  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img loading="lazy" v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'📅',label:'签到领金币',path:'/checkin'},{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'🌐',label:'圈子',path:'/community'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
+  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img loading="lazy" v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'📅',label:'签到领金币',path:'/checkin'},{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💎',label:'贵族装扮',path:'/noble'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'🧾',label:'我的订单',path:'/orders'},{ico:'🌐',label:'圈子',path:'/community'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
 };
 
 var EditProfilePage = {
@@ -1254,8 +1254,8 @@ var UserProfilePage = {
 
 var VipPage = {
   data: function(){return {pkgs:[],loading:false}},
-  mounted: async function(){try{var r=await api("/user/vip-info");this.pkgs=(r.data&&r.data.packages)||[]}catch(e){}},
-  methods: {buy:async function(p){this.loading=true;try{var r=await api("/orders/vip",{method:"POST",body:JSON.stringify({package_id:p.id})});toast(r.message||"开通成功","tok")}catch(e){toast(e.message,"terr")}this.loading=false}},
+  mounted: async function(){try{var r=await api("/vip/packages");this.pkgs=r.data||[]}catch(e){}},
+  methods: {buy:async function(p){this.loading=true;try{var r=await api("/orders/vip",{method:"POST",body:JSON.stringify({package_id:p.id})});toast(r.message||"开通成功","tok");this.$router.push("/orders")}catch(e){toast(e.message,"terr")}this.loading=false}},
   template: `<div style="padding:20px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:48px">👑</div><h2 style="margin-top:8px">遇见VIP</h2><p style="color:var(--tm);font-size:14px">解锁更多特权</p></div><div v-if="pkgs.length===0" style="text-align:center;color:var(--tm);padding:24px">暂无可购买套餐</div><div v-else v-for="p in pkgs" :key="p.id" style="background:var(--w);border-radius:var(--r);padding:20px;margin-bottom:12px;box-shadow:var(--sh);text-align:center"><div style="font-size:28px;font-weight:700;color:var(--p)">¥{{p.price}}</div><div style="font-size:15px;margin:8px 0">{{p.name}}</div><div style="font-size:13px;color:var(--tm);margin-bottom:16px">{{p.duration}}天</div><button class="btn bp bw" @click="buy(p)" :disabled="loading">立即开通（模拟支付）</button></div><div style="padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);margin-top:16px"><h4 style="margin-bottom:8px">VIP特权</h4><p style="font-size:13px;color:var(--ts);line-height:2.2">✅ 查看更多推荐<br>✅ 高级筛选<br>✅ 查看谁喜欢了我<br>✅ 专属身份标识<br>✅ 无限制聊天</p></div></div>`
 };
 
@@ -1263,6 +1263,36 @@ var RechargePage = {
   data: function(){return {amounts:[6,18,30,68,128,298],sel:null,loading:false,pay:"wechat"}},
   methods: {go:async function(){if(!this.sel){toast("请选择金额","tinfo");return}this.loading=true;try{var r=await api("/orders/recharge",{method:"POST",body:JSON.stringify({amount:this.sel})});toast("充值成功！获得"+r.data.coins+"金币","tok");this.sel=null}catch(e){toast(e.message,"terr")}this.loading=false}},
   template: `<div style="padding:20px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:48px">💰</div><h2>金币充值</h2><p style="color:var(--tm);font-size:13px">1元=100金币</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div v-for="a in amounts" :key="a" @click="sel=a" :style="{background:sel===a?'var(--p)':'var(--w)',color:sel===a?'#fff':'var(--t)',padding:'20px',borderRadius:'var(--r)',textAlign:'center',cursor:'pointer',border:'2px solid '+(sel===a?'var(--p)':'var(--b)'),transition:'all .2s'}"><div style="font-size:24px;font-weight:700">¥{{a}}</div><div :style=\"{fontSize:'12px',marginTop:'4px',color:sel===a?'rgba(255,255,255,.8)':'var(--tm)'}\">{{a*100}}金币</div></div></div><div style="display:flex;gap:12px;margin-top:20px"><button class="btn bs" :class=\"pay==='wechat'?'bp':'bo'\" @click=\"pay='wechat'\" style="flex:1">💚微信</button><button class="btn bs" :class=\"pay==='alipay'?'bp':'bo'\" @click=\"pay='alipay'\" style="flex:1">💙支付宝</button></div><button class="btn bp bw bl" style="margin-top:20px" @click="go" :disabled="loading||!sel">{{loading?'处理中...':'确认支付 ¥'+(sel||0)}}</button><p style="text-align:center;color:var(--tm);font-size:11px;margin-top:12px">当前为模拟支付，公测期间不会真实扣款</p></div>`
+};
+
+// ==== 我的订单（S23 预留，展示历史订单） ====
+var OrdersPage = {
+  data: function(){return {orders:[],loading:true,err:false}},
+  methods: {
+    load: async function(){
+      var s=this;s.loading=true;s.err=false;
+      try{var r=await api("/orders/list?limit=50");s.orders=r.data||[]}catch(e){s.err=true}
+      s.loading=false;
+    },
+    statusText: function(st){return st===1?"已支付":st===2?"已取消":"待支付"},
+    statusColor: function(st){return st===1?"var(--s)":st===2?"var(--tm)":"#F6D365"},
+    fmtTime: function(t){if(!t)return"";try{return new Date(t).toLocaleString("zh-CN")}catch(e){return t}}
+  },
+  mounted: function(){this.load()},
+  template: `<div style="padding:16px">
+    <div style="text-align:center;margin-bottom:16px"><div style="font-size:44px">🧾</div><h2 style="margin:6px 0">我的订单</h2><p style="color:var(--tm);font-size:13px">VIP开通与金币充值的记录</p></div>
+    <div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div>
+    <div v-else-if="err" class="empty"><div class="ei">😵</div><div class="et">加载失败</div><button class="btn bp bs" @click="load">重试</button></div>
+    <div v-else-if="orders.length===0" class="empty"><div class="ei">📭</div><div class="et">暂无订单</div><div class="ed">开通VIP或充值后记录会显示在这里</div></div>
+    <div v-else v-for="o in orders" :key="o.id" style="background:var(--w);border-radius:var(--rs);padding:14px;margin-bottom:8px;box-shadow:var(--sh)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:600">¥{{o.amount}}</div>
+        <span :style="{fontSize:'12px',fontWeight:'600',color:statusColor(o.status)}">{{statusText(o.status)}}</span>
+      </div>
+      <div style="font-size:12px;color:var(--tm);margin-top:6px">单号：{{o.order_no}}</div>
+      <div style="font-size:12px;color:var(--tm);margin-top:2px">{{fmtTime(o.created_at)}}</div>
+    </div>
+  </div>`
 };
 
 var SettingsPage = {
@@ -1377,6 +1407,73 @@ var BlockListPage = {
 };
 
 // ==== 圈子（S21-C2） ====
+// ==== 贵族装扮（S21-C3） ====
+var NoblePage = {
+  data: function(){return {levels:[],items:[],myItems:[],tab:"avatar_frame",loading:true,vipInfo:null,acting:false}},
+  computed: { tabs: function(){return [{k:"avatar_frame",l:"头像框"},{k:"chat_bubble",l:"聊天气泡"},{k:"name_tag",l:"名字铭牌"}]} },
+  methods: {
+    load: async function(){
+      var s=this;s.loading=true;
+      try{var l=await api("/vip/noble-levels");s.levels=l.data||[]}catch(e){s.levels=[]}
+      try{var i=await api("/vip/dress-up/shop?type="+s.tab);s.items=i.data||[]}catch(e){s.items=[]}
+      try{var m=await api("/vip/dress-up/my");s.myItems=m.data||[]}catch(e){s.myItems=[]}
+      try{var v=await api("/user/vip-info");s.vipInfo=v.data||null}catch(e){}
+      s.loading=false;
+    },
+    switchTab: function(t){this.tab=t;this.load()},
+    owned: function(it){return this.myItems.some(function(x){return x.id===it.id})},
+    using: function(it){return this.myItems.some(function(x){return x.id===it.id&&(x.is_using===1||x.is_using==="1")})},
+    buy: async function(it){
+      var s=this;s.acting=true;
+      try{var r=await api("/vip/dress-up/purchase/"+it.id,{method:"POST",body:"{}"});if(r.code===0){toast("购买成功","tok");s.load()}}catch(e){toast(e.message||"购买失败","terr")}
+      s.acting=false;
+    },
+    use: async function(it){
+      var s=this;s.acting=true;
+      try{var r=await api("/vip/dress-up/use/"+it.id,{method:"POST",body:"{}"});if(r.code===0){toast("已启用","tok");s.load()}}catch(e){toast(e.message||"操作失败","terr")}
+      s.acting=false;
+    }
+  },
+  mounted: function(){this.load()},
+  template: `<div style="padding:16px">
+    <div style="text-align:center;margin-bottom:16px"><div style="font-size:44px">👑</div><h2 style="margin:6px 0">贵族装扮</h2><p style="color:var(--tm);font-size:13px">解锁身份等级，专属装扮彰显与众不同</p></div>
+    <div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div>
+    <div v-else>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:12px">
+        <div v-for="lv in levels" :key="lv.level" style="flex-shrink:0;background:var(--w);border-radius:var(--rs);padding:10px 14px;text-align:center;box-shadow:var(--sh)">
+          <div style="font-size:20px">{{lv.icon_url||'🏅'}}</div><div style="font-size:13px;font-weight:600;margin-top:2px">Lv{{lv.level}} {{lv.name}}</div><div style="font-size:11px;color:var(--tm)">¥{{lv.price_monthly}}/月</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button v-for="tb in tabs" :key="tb.k" class="btn bs" :class=\"tab===tb.k?'bp':'bo'\" @click="switchTab(tb.k)" style="flex:1">{{tb.l}}</button>
+      </div>
+      <div v-if="items.length===0" class="empty"><div class="ei">🎨</div><div class="et">暂无装扮</div><div class="ed">该分类还没有可购买的装扮</div></div>
+      <div v-else style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div v-for="it in items" :key="it.id" style="background:var(--w);border-radius:var(--r);padding:16px;box-shadow:var(--sh);text-align:center">
+          <div style="width:72px;height:72px;margin:0 auto 10px;border-radius:16px;overflow:hidden;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));display:flex;align-items:center;justify-content:center">
+            <img loading="lazy" v-if="it.preview_url" :src="it.preview_url" style="width:100%;height:100%;object-fit:cover"><span v-else style="font-size:30px">🎨</span>
+          </div>
+          <div style="font-size:15px;font-weight:600">{{it.name}}</div>
+          <div v-if="it.noble_level_required>0" style="font-size:11px;color:#d99000;margin-top:2px">需要 Lv{{it.noble_level_required}}+</div>
+          <div v-else style="font-size:11px;color:var(--tm);margin-top:2px">普通装扮</div>
+          <div style="font-size:13px;color:var(--p);margin:6px 0">{{it.price>0?'🪙'+it.price:'免费'}}</div>
+          <button v-if="owned(it)&&using(it)" class="btn bs" style="border:1px solid var(--s);color:var(--s);width:100%">✓ 使用中</button>
+          <button v-else-if="owned(it)" class="btn bp bs" style="width:100%" @click="use(it)" :disabled="acting">使用</button>
+          <button v-else class="btn bp bs" style="width:100%" @click="buy(it)" :disabled="acting">{{it.price>0?'购买':'领取'}}</button>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);font-size:13px;color:var(--ts)">
+        <div style="font-weight:600;margin-bottom:6px">✨ 我的装扮</div>
+        <div v-if="myItems.length===0" style="color:var(--tm)">还没有拥有装扮，去购买心仪的一款吧</div>
+        <div v-else v-for="m in myItems" :key="m.id" style="display:flex;align-items:center;gap:8px;padding:6px 0">
+          <span>{{m.preview_url?'': '🎨'}}</span><span style="flex:1">{{m.name}}</span>
+          <span style="font-size:11px;color:var(--s)" v-if="m.is_using===1||m.is_using==='1'">使用中</span>
+        </div>
+      </div>
+    </div>
+  </div>`
+};
+
 var CommunityPage = {
   data: function(){return {
     communities:[],loading:true,err:false,tab:"hot",
@@ -1576,10 +1673,12 @@ var routes = [
   {path:"/meet",component:MeetPage},{path:"/recharge",component:RechargePage},
   {path:"/earnings",component:EarningsPage},{path:"/fans",component:FansPage},
   {path:"/following",component:FollowingPage},
-  {path:"/community",component:CommunityPage}
+  {path:"/community",component:CommunityPage},
+  {path:"/noble",component:NoblePage},
+  {path:"/orders",component:OrdersPage}
 ];
 var router = VueRouter.createRouter({history:VueRouter.createWebHashHistory(),routes:routes});
-router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录",community:"圈子"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";next()});
+router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录",community:"圈子",noble:"贵族装扮",orders:"我的订单"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";next()});
 
 // ==== App ====
 // 简短提示音（Web Audio API，无需外部文件）
