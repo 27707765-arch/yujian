@@ -43,12 +43,12 @@ function generateOrderNo() {
  */
 async function completeOrder(order) {
   // 幂等：已支付直接返回
-  const [[rows]] = await pool.execute('SELECT status FROM orders WHERE id = ?', [order.id]);
+  const [[rows]] = await pool.query('SELECT status FROM orders WHERE id = ?', [order.id]);
   if (!rows || rows.status === 1) {
     return { already_paid: true, credited: false };
   }
 
-  await pool.execute('UPDATE orders SET status = 1 WHERE id = ?', [order.id]);
+  await pool.query('UPDATE orders SET status = 1 WHERE id = ?', [order.id]);
 
   const credited = order.package_id === COIN_PACKAGE_ID
     ? await creditCoins(order)
@@ -66,7 +66,7 @@ async function creditCoins(order) {
 
 /** VIP 开通：按套餐时长续期 */
 async function creditVip(order) {
-  const [packages] = await pool.execute('SELECT * FROM vip_packages WHERE id = ?', [order.package_id]);
+  const [packages] = await pool.query('SELECT * FROM vip_packages WHERE id = ?', [order.package_id]);
   const pkg = packages[0];
   if (!pkg || !pkg.duration) return { type: 'vip', error: '套餐数据异常' };
   const expireTime = new Date(Date.now() + pkg.duration * 86400000);
@@ -92,7 +92,7 @@ async function createOrder(query) {
   const useSimulate = provider === 'simulate' && isSimulateMode();
 
   // 统一落订单（simulate 先落 status=0，随后幂等到账；真实 provider 保持待支付）
-  const [result] = await pool.execute(
+  const [result] = await pool.query(
     'INSERT INTO orders (user_id, package_id, order_no, amount, status) VALUES (?, ?, ?, ?, 0)',
     [user_id, package_id || (order_type === 'recharge' ? COIN_PACKAGE_ID : null), orderNo, amount || 0]
   );
@@ -133,7 +133,7 @@ async function verifyNotify(provider, payload) {
   if (provider === 'simulate') {
     const { order_no, amount } = payload || {};
     if (!order_no) return { valid: false, reason: '缺少订单号' };
-    const [rows] = await pool.execute('SELECT * FROM orders WHERE order_no = ?', [order_no]);
+    const [rows] = await pool.query('SELECT * FROM orders WHERE order_no = ?', [order_no]);
     if (!rows[0]) return { valid: false, reason: '订单不存在' };
     const order = rows[0];
     if (amount !== undefined && Number(amount) !== Number(order.amount)) {

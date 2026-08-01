@@ -24,7 +24,7 @@ async function createVipOrder(req, res) {
     if (!package_id) return error(res, 400, '请选择套餐');
 
     // 查询套餐
-    const [packages] = await pool.execute('SELECT * FROM vip_packages WHERE id = ?', [package_id]);
+    const [packages] = await pool.query('SELECT * FROM vip_packages WHERE id = ?', [package_id]);
     if (packages.length === 0) return error(res, 404, '套餐不存在');
 
     const pkg = packages[0];
@@ -110,7 +110,7 @@ async function getOrders(req, res) {
   try {
     const { id } = req.user;
     const { limit = 20, offset = 0 } = req.query;
-    const [orders] = await pool.execute(
+    const [orders] = await pool.query(
       'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
       [id, parseInt(limit), parseInt(offset)]
     );

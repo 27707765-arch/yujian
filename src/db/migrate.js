@@ -70,18 +70,24 @@ function md5(content) {
 }
 
 /**
- * 执行单个 SQL 文件（multiStatement: true）
+ * 执行单个 SQL 文件
+ * mysql2 的 query 不支持 multipleStatements 选项（那是连接配置项），
+ * 因此这里按分号拆分 SQL 为单条语句，逐条执行（事务内，失败整体回滚）。
  */
 async function runSqlFile(conn, file) {
   const content = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
-  // 去掉纯注释行，避免空语句
-  const statements = content
+  // 去掉纯注释行与空行
+  const body = content
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => !l.startsWith('--') && l !== '')
     .join('\n');
-  if (!statements) return;
-  await conn.query({ sql: statements, multipleStatements: true });
+  if (!body) return;
+  // 按分号拆分（不处理存储过程/触发器内分号，迁移脚本均为纯语句）
+  const statements = body.split(';').map((s) => s.trim()).filter((s) => s.length > 0);
+  for (const stmt of statements) {
+    await conn.query(stmt);
+  }
 }
 
 async function main() {
