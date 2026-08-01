@@ -12,10 +12,13 @@
 /* ============ CSS Reset & Variables ============ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
+  /* ===== 品牌色（单一主视觉：粉红系） ===== */
   --primary:#FF5E7D;
   --primary-dark:#E84D6A;
   --primary-light:#FF8099;
   --primary-bg:#FFF0F3;
+  --gradient-a:#FF5E7D;   /* 品牌渐变起点（收敛 #667eea/#FF6B6B 等残留） */
+  --gradient-b:#FF9A8B;   /* 品牌渐变终点（收敛 #764ba2/#FF8E8E 等残留） */
   --bg-white:#FFFFFF;
   --bg-page:#F5F5F7;
   --text:#1D1D1F;
@@ -194,7 +197,7 @@ html,body{
   color:#fff;padding:24px 20px
 }
 .gradient-header-purple{
-  background:linear-gradient(135deg,#667eea,#764ba2);
+  background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));
   color:#fff;padding:32px 20px 24px;text-align:center
 }
 
@@ -259,7 +262,7 @@ html,body{
 
 /* Toast类型样式 */
 .toast-message{
-  background:linear-gradient(135deg,#667eea,#764ba2);
+  background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));
   border-left:4px solid #fff
 }
 .toast-like{
@@ -494,7 +497,7 @@ html,body{
   display:flex;align-items:center;padding:12px;background:var(--bg-white);
   border-radius:var(--radius);box-shadow:var(--shadow);cursor:pointer
 }
-.home-user-avatar{width:60px;height:60px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#667eea,#764ba2)}
+.home-user-avatar{width:60px;height:60px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b))}
 .home-user-avatar img{width:100%;height:100%;object-fit:cover}
 .home-user-avatar-placeholder{font-size:28px}
 .home-user-info{flex:1;min-width:0;margin:0 12px}

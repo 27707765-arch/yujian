@@ -6,13 +6,21 @@ var uiState = Vue.reactive({hideHdr:false}); // 全局UI状态（聊天详情页
 var _tid = 0;
 
 // 增强版toast函数（使用新的通知工具）
+// 旧类型映射：tok→success, terr→error, tinfo→info
 function toast(msg, cls, type) {
   // 如果有新的通知工具，优先使用
-  if(window.NotificationUtils && type){
-    window.NotificationUtils.showToast(msg, type);
+  if(window.NotificationUtils){
+    var nt;
+    switch(cls){
+      case "tok": nt="success"; break;
+      case "terr": nt="error"; break;
+      case "tinfo": nt="info"; break;
+      default: nt = (type==="success"||type==="error"||type==="info"||type==="warning"||type==="message"||type==="like"||type==="match") ? type : "info";
+    }
+    window.NotificationUtils.showToast(msg, nt);
     return;
   }
-  // 降级到旧版toast
+  // 降级到旧版toast（NotificationUtils 未加载时）
   var id = ++_tid;
   toasts.push({id:id, msg:msg, cls:cls});
   setTimeout(function(){
@@ -237,7 +245,7 @@ var HomePage = {
   <div v-else-if="users.length===0" class="empty"><div class="ei">🔍</div><div class="et">{{tab==='city'?'暂无同城用户':'暂无附近用户'}}</div><div class="ed">换个时间再来或调整筛选条件</div><button class="btn bp bs" @click="load">刷新</button></div>
   <div v-else style="display:flex;flex-direction:column;gap:10px">
     <div v-for="u in users" :key="u.id" class="card" style="display:flex;align-items:center;padding:12px;cursor:pointer" @click="$router.push('/user/'+u.id)">
-      <div style="width:58px;height:58px;border-radius:50%;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center">
+      <div style="width:58px;height:58px;border-radius:50%;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));display:flex;align-items:center;justify-content:center">
         <img v-if="u.avatar" :src="u.avatar" style="width:100%;height:100%;object-fit:cover">
         <span v-else style="font-size:26px">👤</span>
       </div>
@@ -259,7 +267,7 @@ var HomePage = {
         <button @click.stop="likeUser(u)" title="喜欢" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,107,107,.35);background:linear-gradient(135deg,#FF6B9D,#FF8E53)">❤️</button>
         <button @click.stop="skipUser(u)" title="跳过" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(150,160,180,.3);background:linear-gradient(135deg,#8e9eab,#9aa7b5)">✕</button>
         <button @click.stop="superLikeUser(u)" title="超级喜欢(10金币)" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,200,80,.4);background:linear-gradient(135deg,#F6D365,#FDA085)">⭐</button>
-        <button @click.stop="chatUp(u)" :title="u._has_conversation?'发消息':'打招呼'" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(102,126,234,.35)" :style="{background:u._has_conversation?'linear-gradient(135deg,#667eea,#764ba2)':'linear-gradient(135deg,#FF6B9D,#FF8E53)'}">{{u._has_conversation?'💬':'👋'}}</button>
+        <button @click.stop="chatUp(u)" :title="u._has_conversation?'发消息':'打招呼'" style="width:44px;height:44px;border-radius:50%;border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,94,125,.35)" :style="{background:u._has_conversation?'linear-gradient(135deg,var(--gradient-a),var(--gradient-b))':'linear-gradient(135deg,#FF6B9D,#FF8E53)'}">{{u._has_conversation?'💬':'👋'}}</button>
       </div>
     </div>
   </div>
@@ -1190,7 +1198,7 @@ var UserProfilePage = {
     }
   },
   mounted: function(){this.load()},
-  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px;flex-wrap:wrap"><button class="btn bp" style="flex:1;min-width:100px" @click="greetOrChat">💬 打招呼</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid var(--p);color:var(--p)" @click="likeUser" :disabled="liking">❤️ 喜欢</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid #F6D365;color:#d99000" @click="superLikeUser" :disabled="liking">⭐ 超级喜欢</button></div><div style="display:flex;gap:12px;padding:0 16px 16px"><button class="btn bs" style="flex:1;font-size:13px" @click="showReport=!showReport">🚩 举报</button><button class="btn bs" style="flex:1;font-size:13px;color:var(--e)" @click="blockUser">⛔ 拉黑</button></div><div v-if="showReport" style="margin:0 16px 16px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
+  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px;flex-wrap:wrap"><button class="btn bp" style="flex:1;min-width:100px" @click="greetOrChat">💬 打招呼</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid var(--p);color:var(--p)" @click="likeUser" :disabled="liking">❤️ 喜欢</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid #F6D365;color:#d99000" @click="superLikeUser" :disabled="liking">⭐ 超级喜欢</button></div><div style="display:flex;gap:12px;padding:0 16px 16px"><button class="btn bs" style="flex:1;font-size:13px" @click="showReport=!showReport">🚩 举报</button><button class="btn bs" style="flex:1;font-size:13px;color:var(--e)" @click="blockUser">⛔ 拉黑</button></div><div v-if="showReport" style="margin:0 16px 16px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
     <div style="font-size:14px;font-weight:600;margin-bottom:10px">举报该用户</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><span v-for="rr in ['骚扰','虚假资料','广告营销','违法违规','其他']" :key="rr" @click="reportReason=rr" :class=\"['tag',reportReason===rr?'tp':'']\" style="cursor:pointer;border:1px solid var(--b);border-radius:16px;padding:6px 12px;font-size:13px">{{rr}}</span></div>
     <button class="btn bp bs" style="width:100%" @click="submitReport" :disabled="!reportReason">提交举报</button>
@@ -1282,7 +1290,7 @@ var VerificationPage = {
   },
   mounted: function(){this.load()},
   template: `<div style="padding:16px">
-    <div style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:var(--r);padding:20px;text-align:center;margin-bottom:16px">
+    <div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;border-radius:var(--r);padding:20px;text-align:center;margin-bottom:16px">
       <div style="font-size:36px">🛡️</div>
       <div style="font-size:18px;font-weight:600;margin:8px 0">认证中心</div>
       <div style="font-size:13px;opacity:.85">当前认证等级：<b>{{status?status.level||0:0}}</b> / 4</div>
