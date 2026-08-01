@@ -1,5 +1,10 @@
 -- 文件名：schema.sql
--- 用途：数据库表结构脚本
+-- 用途：数据库表结构脚本（唯一基线初始化脚本）
+-- 说明：
+--   - 本文件是初始基线，创建 33 张核心表 + 内联 ALTER + 种子数据。
+--   - 后续数据库变更一律通过 src/db/migrations/NNNN_*.sql 编号脚本，由
+--     `node src/db/migrate.js` 执行（schema_migrations 记录，幂等）。
+--   - 严禁在此文件追加新表/新字段（改走迁移脚本）。
 
 -- 创建数据库
 CREATE DATABASE IF NOT EXISTS yujian DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -268,8 +273,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户隐私设置表';
 
 -- 修改 users 表，增加 tags 和设置关联
-ALTER TABLE users ADD COLUMN IF NOT EXISTS tags JSON DEFAULT NULL COMMENT '用户兴趣标签（JSON数组）' AFTER bio;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS photos_count INT DEFAULT 0 COMMENT '照片数量' AFTER avatar;
+ALTER TABLE users ADD COLUMN tags JSON DEFAULT NULL COMMENT '用户兴趣标签（JSON数组）' AFTER bio;
+ALTER TABLE users ADD COLUMN photos_count INT DEFAULT 0 COMMENT '照片数量' AFTER avatar;
 
 -- 插入默认会员套餐数据
 INSERT INTO vip_packages (name, price, duration, description) VALUES
@@ -372,7 +377,7 @@ CREATE TABLE IF NOT EXISTS vip_privileges (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='VIP特权配置表';
 
 -- ALTER: users 表增加 vip_level 字段
-ALTER TABLE users ADD COLUMN IF NOT EXISTS vip_level VARCHAR(10) DEFAULT 'normal' COMMENT 'VIP等级：normal/vip/svip' AFTER is_vip;
+ALTER TABLE users ADD COLUMN vip_level VARCHAR(10) DEFAULT 'normal' COMMENT 'VIP等级：normal/vip/svip' AFTER is_vip;
 
 -- 插入默认礼物数据
 INSERT INTO gifts (name, price, animation_type, category, sort_order) VALUES
@@ -413,7 +418,7 @@ CREATE TABLE IF NOT EXISTS post_likes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='动态点赞表';
 
 -- 修改评论表支持嵌套
-ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS parent_id INT UNSIGNED DEFAULT NULL COMMENT '父评论ID，NULL=顶级评论' AFTER content;
+ALTER TABLE post_comments ADD COLUMN parent_id INT UNSIGNED DEFAULT NULL COMMENT '父评论ID，NULL=顶级评论' AFTER content;
 
 -- 每日签到表
 CREATE TABLE IF NOT EXISTS daily_checkins (
@@ -428,7 +433,7 @@ CREATE TABLE IF NOT EXISTS daily_checkins (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日签到表';
 
 -- 动态话题标签（ALTER posts 表）
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS topics JSON DEFAULT NULL COMMENT '话题标签' AFTER images;
+ALTER TABLE posts ADD COLUMN topics JSON DEFAULT NULL COMMENT '话题标签' AFTER images;
 
 -- ==================== 每日任务进度表 ====================
 CREATE TABLE IF NOT EXISTS user_tasks (
@@ -444,26 +449,26 @@ CREATE TABLE IF NOT EXISTS user_tasks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日任务进度表';
 
 -- users 表增加礼物统计字段
-ALTER TABLE users ADD COLUMN IF NOT EXISTS gifts_received_count INT DEFAULT 0 COMMENT '收到礼物数';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS gifts_sent_count INT DEFAULT 0 COMMENT '送出礼物数';
+ALTER TABLE users ADD COLUMN gifts_received_count INT DEFAULT 0 COMMENT '收到礼物数';
+ALTER TABLE users ADD COLUMN gifts_sent_count INT DEFAULT 0 COMMENT '送出礼物数';
 
 -- messages 表增加消息撤回字段
-ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_recalled TINYINT(1) DEFAULT 0 COMMENT '是否已撤回：0-未撤回，1-已撤回';
-ALTER TABLE messages ADD COLUMN IF NOT EXISTS recalled_at DATETIME DEFAULT NULL COMMENT '撤回时间';
+ALTER TABLE messages ADD COLUMN is_recalled TINYINT(1) DEFAULT 0 COMMENT '是否已撤回：0-未撤回，1-已撤回';
+ALTER TABLE messages ADD COLUMN recalled_at DATETIME DEFAULT NULL COMMENT '撤回时间';
 
 -- users 表增加新手引导完成标记
-ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed TINYINT(1) DEFAULT 0 COMMENT '是否完成新手引导：0-未完成，1-已完成';
+ALTER TABLE users ADD COLUMN onboarding_completed TINYINT(1) DEFAULT 0 COMMENT '是否完成新手引导：0-未完成，1-已完成';
 
 -- posts 表增加视频相关字段
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_url VARCHAR(500) DEFAULT NULL COMMENT '视频URL';
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_duration INT DEFAULT NULL COMMENT '视频时长(秒)';
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_cover VARCHAR(500) DEFAULT NULL COMMENT '视频封面URL';
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS edited_at DATETIME DEFAULT NULL COMMENT '最后编辑时间';
+ALTER TABLE posts ADD COLUMN video_url VARCHAR(500) DEFAULT NULL COMMENT '视频URL';
+ALTER TABLE posts ADD COLUMN video_duration INT DEFAULT NULL COMMENT '视频时长(秒)';
+ALTER TABLE posts ADD COLUMN video_cover VARCHAR(500) DEFAULT NULL COMMENT '视频封面URL';
+ALTER TABLE posts ADD COLUMN edited_at DATETIME DEFAULT NULL COMMENT '最后编辑时间';
 
 -- users 表增加行政区划字段（用于同城匹配）
-ALTER TABLE users ADD COLUMN IF NOT EXISTS province VARCHAR(50) DEFAULT NULL COMMENT '省份' AFTER location;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(50) DEFAULT NULL COMMENT '地级市' AFTER province;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS district VARCHAR(50) DEFAULT NULL COMMENT '区县' AFTER city;
+ALTER TABLE users ADD COLUMN province VARCHAR(50) DEFAULT NULL COMMENT '省份' AFTER location;
+ALTER TABLE users ADD COLUMN city VARCHAR(50) DEFAULT NULL COMMENT '地级市' AFTER province;
+ALTER TABLE users ADD COLUMN district VARCHAR(50) DEFAULT NULL COMMENT '区县' AFTER city;
 
 -- users 表增加同城/附近查询索引
 -- 同城查询：按 city + status 过滤
@@ -512,10 +517,10 @@ CREATE TABLE IF NOT EXISTS comment_likes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评论点赞表';
 
 -- 会话表增加 is_pinned 字段（如果不存在）
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_pinned TINYINT DEFAULT 0 COMMENT '是否置顶';
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS is_deleted_by_user INT UNSIGNED DEFAULT NULL COMMENT '软删除用户ID';
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_sender_id INT UNSIGNED DEFAULT NULL COMMENT '最后发送者ID';
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_msg_type TINYINT DEFAULT 0 COMMENT '最后消息类型';
+ALTER TABLE conversations ADD COLUMN is_pinned TINYINT DEFAULT 0 COMMENT '是否置顶';
+ALTER TABLE conversations ADD COLUMN is_deleted_by_user INT UNSIGNED DEFAULT NULL COMMENT '软删除用户ID';
+ALTER TABLE conversations ADD COLUMN last_sender_id INT UNSIGNED DEFAULT NULL COMMENT '最后发送者ID';
+ALTER TABLE conversations ADD COLUMN last_msg_type TINYINT DEFAULT 0 COMMENT '最后消息类型';
 
 -- ====================================================================
 -- 多重身份认证系统（任务1）
@@ -551,12 +556,12 @@ CREATE TABLE IF NOT EXISTS user_verifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户认证记录表';
 
 -- users表新增认证字段
-ALTER TABLE users ADD COLUMN IF NOT EXISTS is_real_name_verified TINYINT(1) DEFAULT 0 COMMENT '是否实名认证';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS is_face_verified TINYINT(1) DEFAULT 0 COMMENT '是否人脸认证';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS is_education_verified TINYINT(1) DEFAULT 0 COMMENT '是否学历认证';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS is_vehicle_verified TINYINT(1) DEFAULT 0 COMMENT '是否车辆认证';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_level TINYINT DEFAULT 0 COMMENT '认证等级(0-4)';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_badges JSON DEFAULT NULL COMMENT '认证徽章列表';
+ALTER TABLE users ADD COLUMN is_real_name_verified TINYINT(1) DEFAULT 0 COMMENT '是否实名认证';
+ALTER TABLE users ADD COLUMN is_face_verified TINYINT(1) DEFAULT 0 COMMENT '是否人脸认证';
+ALTER TABLE users ADD COLUMN is_education_verified TINYINT(1) DEFAULT 0 COMMENT '是否学历认证';
+ALTER TABLE users ADD COLUMN is_vehicle_verified TINYINT(1) DEFAULT 0 COMMENT '是否车辆认证';
+ALTER TABLE users ADD COLUMN verification_level TINYINT DEFAULT 0 COMMENT '认证等级(0-4)';
+ALTER TABLE users ADD COLUMN verified_badges JSON DEFAULT NULL COMMENT '认证徽章列表';
 
 -- ====================================================================
 -- 语音/视频通话系统（任务3）

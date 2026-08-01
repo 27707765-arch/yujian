@@ -219,6 +219,20 @@ mysql -u yujian -p yujian < schema.sql
 mysql -u root -p yujian < schema.sql
 ```
 
+> **迁移体系（S16）**：schema.sql 是唯一基线脚本（33 张核心表 + 种子数据）。
+> 后续所有数据库变更一律写入 `src/db/migrations/NNNN_*.sql` 编号脚本，通过迁移执行器应用：
+>
+> ```bash
+> # 新环境：基线初始化后，按编号执行全部未应用的迁移
+> node src/db/migrate.js
+>
+> # 已有生产库（迁移脚本曾手工执行过）：登记已应用脚本、不执行 SQL
+> node src/db/migrate.js --baseline
+> ```
+>
+> 迁移记录写入 `schema_migrations` 表，每脚本仅执行一次（幂等），
+> 重复执行 `node src/db/migrate.js` 无副作用。
+
 **验证表结构：**
 
 ```bash

@@ -1,4 +1,11 @@
--- 后台管理系统增强 - 数据库迁移
+-- ============================================================
+-- 0003_admin_features.sql 后台管理系统增强
+-- 来源：原 add_admin_features.sql（生产已手工执行）
+-- 说明：ALTER 用裸语法（MySQL 8.0 不支持 ADD COLUMN IF NOT EXISTS），
+--       幂等性由 migrate.js 的 schema_migrations 记录保证（每脚本仅执行一次）。
+-- 执行：node src/db/migrate.js
+-- ============================================================
+
 -- 任务2: 用户备注
 CREATE TABLE IF NOT EXISTS user_admin_notes (user_id INT UNSIGNED PRIMARY KEY, note TEXT, updated_by INT UNSIGNED, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

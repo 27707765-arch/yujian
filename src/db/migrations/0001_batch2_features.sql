@@ -1,3 +1,11 @@
+-- ============================================================
+-- 0001_batch2_features.sql 聊天优化 + VIP增强
+-- 来源：原 add_features_batch2.sql（生产已手工执行）
+-- 说明：ALTER 用裸语法（MySQL 8.0 不支持 ADD COLUMN IF NOT EXISTS），
+--       幂等性由 migrate.js 的 schema_migrations 记录保证（每脚本仅执行一次）。
+-- 执行：node src/db/migrate.js
+-- ============================================================
+
 -- 任务3: 智能破冰系统
 CREATE TABLE IF NOT EXISTS icebreaker_topics (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, category VARCHAR(20) NOT NULL, content VARCHAR(200) NOT NULL, is_active TINYINT(1) DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS match_icebreakers (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, match_id INT UNSIGNED NOT NULL, user1_id INT UNSIGNED NOT NULL, user2_id INT UNSIGNED NOT NULL, topics JSON DEFAULT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uk_match (match_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
