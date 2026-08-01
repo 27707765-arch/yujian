@@ -14,6 +14,12 @@
 
 const fs = require('fs');
 const path = require('path');
+
+// 独立运行时需显式加载 .env（server.js 入口才会自动加载）
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+} catch (e) { /* dotenv 未安装时忽略，走环境变量 */ }
+
 const { pool } = require('../config/database');
 
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
