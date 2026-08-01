@@ -402,6 +402,24 @@ app.use((req, res) => {
 // 错误处理中间件
 app.use((err, req, res, next) => {
   logger.error('服务器错误:', err);
+  // 错误告警 webhook（S24：配置 ERROR_ALERT_WEBHOOK_URL 后异步推送，不影响错误响应）
+  const webhookUrl = process.env.ERROR_ALERT_WEBHOOK_URL;
+  if (webhookUrl) {
+    try {
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: 'error',
+          message: (err && err.message) || '未知错误',
+          stack: (err && err.stack) ? String(err.stack).slice(0, 2000) : null,
+          path: req.originalUrl || req.url,
+          method: req.method,
+          ts: new Date().toISOString()
+        })
+      }).catch(alertErr => { console.error('错误告警 webhook 发送失败:', alertErr.message); });
+    } catch (alertErr) { /* webhook 发送异常静默，不阻塞主流程 */ }
+  }
   res.status(500).json({
     code: 500,
     message: '服务器内部错误',

@@ -566,30 +566,28 @@ pm2 startup
 
 ### 8.2 WebSocket 注意事项
 
-当前 [ecosystem.config.js](ecosystem.config.js) 使用 cluster 模式（2实例）。**WebSocket 在 cluster 模式下需要粘性会话**，有两种方案：
+当前 [ecosystem.config.js](ecosystem.config.js) 使用 **fork 模式（单实例）**。这是 WebSocket 场景最稳定的选择（无需粘性会话，代码已在 S19 收敛 WS 到单实例）。
 
-**方案A：改为单实例（简单，内测推荐）**
+**如需扩容为 cluster 双实例（生产量级提升后）：**
 
-修改 `ecosystem.config.js`：
+**方案A：单实例（当前，内测推荐）**
 
 ```js
-instances: 1,            // 改为1
-exec_mode: 'fork',       // 改为 fork
+instances: 1,            // 当前配置
+exec_mode: 'fork',       // 当前配置
 ```
 
-**方案B：保持双实例 + Nginx ip_hash（生产推荐）**
+**方案B：双实例 + Nginx ip_hash（量级提升后）**
 
-Nginx 的 `upstream` 块中已配置 `ip_hash`，同一个客户端IP始终路由到同一进程，WebSocket 可以正常工作。
+Nginx 的 `upstream` 块中已配置 `ip_hash`（见 §13.2），同一个客户端IP始终路由到同一进程，WebSocket 可以正常工作。切换前把 `instances` 改为 2、`exec_mode` 改为 `cluster`，并用 `pm2 reload yujian-backend` 平滑重启。
 
 ### 8.3 内存与自动重启
 
 ```js
-// ecosystem.config.js 当前配置
-max_memory_restart: '1G',   // 内存超1GB自动重启
-restart_delay: 4000,         // 重启延迟4秒
+// ecosystem.config.js 当前配置（S24 已核对与文件一致）
+max_memory_restart: '512M',   // 内存超512MB自动重启
+restart_delay: 4000,          // 重启延迟4秒
 ```
-
-内测期间如果用户量小，可以将内存限制调低到 `512M` 以提前发现内存泄漏。
 
 ---
 
@@ -740,6 +738,50 @@ pm2 set pm2-logrotate:retain 30
 # 检查: cat /etc/logrotate.d/nginx
 ```
 
+### 11.5 错误告警 webhook（S24）
+
+服务器每产生一次 **500 内部错误**，会异步 POST 一条 JSON 到 `ERROR_ALERT_WEBHOOK_URL`（飞书/钉钉/企业微信自定义机器人地址），不影响错误响应。
+
+```bash
+# .env 中配置（留空则不启用）
+ERROR_ALERT_WEBHOOK_URL=https://oapi.dingtalk.com/robot/send?access_token=xxx
+
+# 机器人加签（飞书/钉钉）时需自定义处理；当前实现为普通 POST JSON
+```
+
+告警 JSON 结构：
+
+```json
+{
+  "level": "error",
+  "message": "错误信息",
+  "stack": "堆栈(前2000字符)",
+  "path": "/api/xxx",
+  "method": "POST",
+  "ts": "2026-08-01T12:00:00.000Z"
+}
+```
+
+验证：`curl -X POST http://127.0.0.1:3000/api/not-exist` 后观察机器人是否收到 404 无关；真实 500 才触发。
+
+### 11.6 发布打 tag（S24）
+
+每次正式发布打一个 git tag，便于回滚定位与版本追溯。tag 版本号与前端 `APP_VERSION`（`public/js/yujian-app.js` 顶部）与 `index.html? v=` 缓存参数对齐：
+
+```bash
+# 提交代码后打 tag
+git tag -a v2026.08.01 -m "第4期 S21-S24 完成"
+git push origin v2026.08.01
+
+# 查看所有 tag
+git tag --sort=-version:refname
+
+# 回滚到上一个发布
+git checkout v2026.07.30
+```
+
+发布后如需强制刷新浏览器缓存，更新 `index.html` 中 `?v=APP_VERSION` 参数并重新部署前端。
+
 ---
 
 ## 12. 内测注意事项
@@ -781,12 +823,15 @@ df -h
 # 检查错误日志
 tail -50 logs/error.log
 
-# 数据库备份（建议加入 crontab 每日执行）
-mkdir -p /home/app/backups
-mysqldump -u yujian -p yujian | gzip > /home/app/backups/yujian_$(date +%Y%m%d).sql.gz
+# 数据库备份（S24：使用仓库内脚本，支持 crontab 每日执行）
+# 备份：mysqldump + gzip + 7天保留
+bash scripts/backup.sh /home/app/backups
 
-# 保留最近7天的备份
-find /home/app/backups -name "yujian_*.sql.gz" -mtime +7 -delete
+# 恢复（⚠️ 危险操作，覆盖现有数据，执行前先再备份一次）
+# bash scripts/restore.sh /home/app/backups/yujian_20260801_030000.sql.gz
+
+# 建议 crontab（每天凌晨 3:05）
+# 5 3 * * * cd /home/app/yujian && bash scripts/backup.sh /home/app/backups >> /home/app/backups/backup.log 2>&1
 ```
 
 ### 12.4 内测用户管理
