@@ -10,6 +10,7 @@ const Block = require('./src/models/Block');
 const websocketService = require('./src/services/websocket.service');
 const callService = require('./src/services/call.service');
 const offlineMessageService = require('./src/services/offlineMessage.service');
+const WsEvents = require('./src/constants/wsEvents');
 
 // 心跳配置（针对移动网络优化）
 // 移动网络特点：4G/5G切换、信号波动可导致5-15秒无响应
@@ -104,7 +105,7 @@ function startWebSocketServer(server) {
 
       // 发送连接成功消息（含心跳参数让客户端适配）
       ws.send(JSON.stringify({
-        type: 'connected',
+        type: WsEvents.CONNECTED,
         message: '连接成功',
         data: {
           heartbeatInterval: HEARTBEAT_INTERVAL,  // 告知客户端心跳间隔
@@ -142,41 +143,41 @@ function startWebSocketServer(server) {
         const data = JSON.parse(message);
 
         // 处理客户端心跳响应（pong 消息）
-        if (data.type === 'pong') {
+        if (data.type === WsEvents.PONG) {
           ws.isAlive = true;
           return;
         }
 
         switch (data.type) {
-          case 'send_message':
+          case WsEvents.SEND_MESSAGE:
             await handleSendMessage(userId, data);
             break;
-          case 'typing':
+          case WsEvents.TYPING:
             handleTyping(userId, data);
             break;
-          case 'stop_typing':
+          case WsEvents.STOP_TYPING:
             handleStopTyping(userId, data);
             break;
           // 语音/视频通话信令
-          case 'call_request':
+          case WsEvents.CALL_REQUEST:
             handleCallRequest(userId, data);
             break;
-          case 'call_accept':
+          case WsEvents.CALL_ACCEPT:
             handleCallAccept(userId, data);
             break;
-          case 'call_reject':
+          case WsEvents.CALL_REJECT:
             handleCallReject(userId, data);
             break;
-          case 'call_end':
+          case WsEvents.CALL_END:
             handleCallEnd(userId, data);
             break;
-          case 'call_ice_candidate':
+          case WsEvents.CALL_ICE_CANDIDATE:
             handleIceCandidate(userId, data);
             break;
-          case 'recall_message':
+          case WsEvents.RECALL_MESSAGE:
             handleRecallMessage(userId, data);
             break;
-          case 'read_receipt':
+          case WsEvents.READ_RECEIPT:
             handleReadReceipt(userId, data);
             break;
           default:
@@ -185,7 +186,7 @@ function startWebSocketServer(server) {
       } catch (err) {
         console.error('处理消息失败:', err);
         ws.send(JSON.stringify({
-          type: 'error',
+          type: WsEvents.ERROR,
           message: '处理消息失败'
         }));
       }
@@ -255,7 +256,7 @@ async function handleSendMessage(userId, data) {
   if (!result.success && result.blocked) {
     // 被拦截（审核/反欺诈/拉黑）：仅通知发送者
     websocketService.sendToUser(userId, {
-      type: 'message_blocked',
+      type: WsEvents.MESSAGE_BLOCKED,
       data: { receiver_id: result.receiver_id, reason: result.reason, timestamp: new Date().toISOString() }
     });
     return;
@@ -263,7 +264,7 @@ async function handleSendMessage(userId, data) {
   if (!result.success) {
     // 参数/业务错误
     websocketService.sendToUser(userId, {
-      type: 'error',
+      type: WsEvents.ERROR,
       data: { message: result.message }
     });
     return;
@@ -271,7 +272,7 @@ async function handleSendMessage(userId, data) {
 
   // 发送消息确认给发送者，包含送达状态
   websocketService.sendToUser(userId, {
-    type: 'message_sent',
+    type: WsEvents.MESSAGE_SENT,
     data: {
       ...result.data,
       delivered: result.delivered,
@@ -290,7 +291,7 @@ function handleTyping(userId, data) {
   const { receiver_id } = data;
   if (receiver_id) {
     websocketService.sendToUser(receiver_id, {
-      type: 'typing',
+      type: WsEvents.TYPING,
       data: {
         user_id: userId
       }
@@ -307,7 +308,7 @@ function handleStopTyping(userId, data) {
   const { receiver_id } = data;
   if (receiver_id) {
     websocketService.sendToUser(receiver_id, {
-      type: 'stop_typing',
+      type: WsEvents.STOP_TYPING,
       data: { user_id: userId }
     });
   }
@@ -327,7 +328,7 @@ async function handleCallRequest(userId, data) {
   const blocked = await Block.isMutualBlocked(userId, receiver_id);
   if (blocked) {
     websocketService.sendToUser(userId, {
-      type: 'call_blocked',
+      type: WsEvents.CALL_BLOCKED,
       data: { receiver_id, reason: '无法发起通话，存在拉黑关系' }
     });
     return;
@@ -337,7 +338,7 @@ async function handleCallRequest(userId, data) {
   const isOnline = websocketService.isUserOnline(receiver_id);
   if (!isOnline) {
     websocketService.sendToUser(userId, {
-      type: 'call_user_offline',
+      type: WsEvents.CALL_USER_OFFLINE,
       data: { receiver_id, message: '对方不在线' }
     });
     return;
@@ -349,7 +350,7 @@ async function handleCallRequest(userId, data) {
     callRecord = await callService.initiateCall(userId, receiver_id, call_type);
   } catch (err) {
     websocketService.sendToUser(userId, {
-      type: 'call_error',
+      type: WsEvents.CALL_ERROR,
       data: { receiver_id, message: err.message }
     });
     return;
@@ -357,7 +358,7 @@ async function handleCallRequest(userId, data) {
 
   // 4. 转发呼叫请求（携带Token和记录ID）
   websocketService.sendToUser(receiver_id, {
-    type: 'call_request',
+    type: WsEvents.CALL_REQUEST,
     data: {
       caller_id: userId,
       call_type,
@@ -371,7 +372,7 @@ async function handleCallRequest(userId, data) {
 
   // 5. 给发起方确认（带call_id和token）
   websocketService.sendToUser(userId, {
-    type: 'call_initiated',
+    type: WsEvents.CALL_INITIATED,
     data: {
       receiver_id,
       call_id: callRecord.call_id,
@@ -400,7 +401,7 @@ async function handleCallAccept(userId, data) {
   const token = channelName ? callService.generateToken(channelName, userId) : null;
 
   websocketService.sendToUser(caller_id, {
-    type: 'call_accepted',
+    type: WsEvents.CALL_ACCEPTED,
     data: {
       receiver_id: userId,
       call_id,
@@ -424,7 +425,7 @@ async function handleCallReject(userId, data) {
   }
 
   websocketService.sendToUser(caller_id, {
-    type: 'call_rejected', data: { receiver_id: userId, reason: reason || '对方拒绝了通话' }
+    type: WsEvents.CALL_REJECTED, data: { receiver_id: userId, reason: reason || '对方拒绝了通话' }
   });
 }
 
@@ -438,7 +439,7 @@ async function handleCallEnd(userId, data) {
       const result = await callService.endCall(call_id, userId, end_reason || 'hangup');
       // 将通话时长传给对方
       websocketService.sendToUser(peer_id, {
-        type: 'call_ended',
+        type: WsEvents.CALL_ENDED,
         data: { user_id: userId, call_id, duration: result.duration, end_reason: end_reason || 'hangup' }
       });
       return;
@@ -448,7 +449,7 @@ async function handleCallEnd(userId, data) {
   }
 
   websocketService.sendToUser(peer_id, {
-    type: 'call_ended', data: { user_id: userId }
+    type: WsEvents.CALL_ENDED, data: { user_id: userId }
   });
 }
 
@@ -456,7 +457,7 @@ function handleIceCandidate(userId, data) {
   const { peer_id, candidate } = data;
   if (!peer_id || !candidate) return;
   websocketService.sendToUser(peer_id, {
-    type: 'ice_candidate', data: { user_id: userId, candidate }
+    type: WsEvents.ICE_CANDIDATE, data: { user_id: userId, candidate }
   });
 }
 
@@ -475,7 +476,7 @@ async function handleRecallMessage(userId, data) {
   if (!result.success) {
     // 撤回失败，仅通知发起者
     websocketService.sendToUser(userId, {
-      type: 'recall_failed',
+      type: WsEvents.RECALL_FAILED,
       data: { message_id, reason: result.message }
     });
   }
@@ -487,7 +488,7 @@ function handleReadReceipt(userId, data) {
     // 通知会话对方已读
     const targetId = receiver_id || userId;
     websocketService.sendToUser(targetId, {
-      type: 'read_receipt',
+      type: WsEvents.READ_RECEIPT,
       data: { conversation_id, reader_id: userId, timestamp: new Date().toISOString() }
     });
   }
@@ -502,7 +503,7 @@ async function broadcastOnlineStatus(userId, online) {
     for (const conv of conversations) {
       const otherId = conv.user1_id === userId ? conv.user2_id : conv.user1_id;
       websocketService.sendToUser(otherId, {
-        type: 'online_status',
+        type: WsEvents.ONLINE_STATUS,
         data: { user_id: userId, online }
       });
     }

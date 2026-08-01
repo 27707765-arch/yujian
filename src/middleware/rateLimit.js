@@ -5,6 +5,8 @@
  */
 
 const redis = require('../config/redis');
+const { error } = require('../utils/response');
+const { ErrorCodes } = require('../utils/errorCodes');
 
 // 内存存储（当Redis不可用时使用）
 const memoryStore = new Map();
@@ -65,11 +67,7 @@ function rateLimit(options = {}) {
         if (current) {
           // 如果计数存在且超过限制
           if (parseInt(current) >= max) {
-            return res.status(429).json({
-              code: 429,
-              message: message,
-              data: null
-            });
+            return error(res, 429, message, ErrorCodes.RATE_LIMITED);
           }
           // 增加计数
           await client.incr(`${keyPrefix}:${key}`);
@@ -91,11 +89,7 @@ function rateLimit(options = {}) {
             memoryStore.set(namespacedKey, { count: 1, resetTime: now + windowMs });
           } else if (record.count >= max) {
             // 超过限制
-            return res.status(429).json({
-              code: 429,
-              message: message,
-              data: null
-            });
+            return error(res, 429, message, ErrorCodes.RATE_LIMITED);
           } else {
             // 增加计数
             record.count++;

@@ -8,6 +8,9 @@
  * 真实模块，默认使用真实模块。生产调用方只需用默认导出的实例。
  */
 
+// 模块级 WsEvents 常量（buildMessageObj 在工厂外使用）
+const WsEvents = require('../constants/wsEvents');
+
 // 默认依赖（真实模块）
 function defaultDeps() {
   return {
@@ -18,6 +21,7 @@ function defaultDeps() {
     contentAuditService: require('./contentAudit.service'),
     antifraudService: require('./antifraud.service'),
     offlineMessageService: require('./offlineMessage.service'),
+    WsEvents,
   };
 }
 
@@ -26,7 +30,7 @@ function defaultDeps() {
  */
 function buildMessageObj(msg) {
   return {
-    type: 'message',
+    type: WsEvents.MESSAGE,
     data: {
       id: msg.id,
       conversation_id: msg.conversation_id,
@@ -59,7 +63,7 @@ function createChatService(deps = {}) {
     ...defaultDeps(),
     ...deps,
   };
-  const { Conversation, Message, Block, websocketService, contentAuditService, antifraudService, offlineMessageService } = d;
+  const { Conversation, Message, Block, websocketService, contentAuditService, antifraudService, offlineMessageService, WsEvents } = d;
 
   /**
    * 发送消息（HTTP 与 WS 唯一实现）
@@ -211,7 +215,7 @@ function createChatService(deps = {}) {
 
     const { data } = result;
     const payload = {
-      type: 'message_recalled',
+      type: WsEvents.MESSAGE_RECALLED,
       data: {
         message_id: data.id,
         conversation_id: data.conversation_id,

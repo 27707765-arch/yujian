@@ -4,6 +4,8 @@
  */
 
 const contentAuditService = require('../services/contentAudit.service');
+const { error } = require('../utils/response');
+const { ErrorCodes } = require('../utils/errorCodes');
 
 /**
  * 内容审核中间件工厂函数
@@ -50,11 +52,7 @@ function contentAudit(options = {}) {
       if (hasSensitiveContent) {
         if (mode === 'block') {
           // 阻止请求
-          return res.status(400).json({
-            code: 400,
-            message: sensitiveMessage || message,
-            data: null
-          });
+          return error(res, 400, sensitiveMessage || message, ErrorCodes.SERVER_ERROR);
         } else if (mode === 'filter') {
           // 过滤敏感词
           for (const field of fields) {

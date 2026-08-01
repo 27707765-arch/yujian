@@ -15,6 +15,7 @@ const View = require('../models/View');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const websocketService = require('./websocket.service');
+const WsEvents = require('../constants/wsEvents');
 const pushService = require('./push.service');
 const MatchAlgorithm = require('./matchAlgorithm.service');
 
@@ -340,11 +341,11 @@ async function handleLike(user_id, target_user_id) {
       const currentData = { id: currentUser.id, nickname: currentUser.nickname, avatar: currentUser.avatar, gender: currentUser.gender, age: currentUser.age, location: currentUser.location };
 
       websocketService.sendToUser(user_id, {
-        type: 'match_success',
+        type: WsEvents.MATCH_SUCCESS,
         data: { match_id: match.id, conversation_id: conversation.id, partner: partnerData, common_tags: commonTags, icebreakers: icebreakerMessages }
       });
       websocketService.sendToUser(target_user_id, {
-        type: 'match_success',
+        type: WsEvents.MATCH_SUCCESS,
         data: { match_id: match.id, conversation_id: conversation.id, partner: currentData, common_tags: commonTags, icebreakers: icebreakerMessages }
       });
 

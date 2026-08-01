@@ -4,6 +4,8 @@
  */
 
 const authMiddleware = require('./auth');
+const { error } = require('../utils/response');
+const { ErrorCodes } = require('../utils/errorCodes');
 
 /**
  * 管理员权限中间件
@@ -13,11 +15,7 @@ function adminAuth(req, res, next) {
   authMiddleware(req, res, () => {
     // JWT验证通过，检查管理员角色
     if (!req.user || !req.user.role || req.user.role !== 'admin') {
-      return res.status(403).json({
-        code: 403,
-        message: '无权限访问，仅限管理员操作',
-        data: null
-      });
+      return error(res, 403, '无权限访问，仅限管理员操作', ErrorCodes.AUTH_ADMIN_ONLY);
     }
     next();
   });
