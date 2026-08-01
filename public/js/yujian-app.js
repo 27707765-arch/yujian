@@ -490,7 +490,7 @@ var ChatListPage = {
     load:async function(){this.loading=true;try{var r=await api("/chat/conversations");this.convs=r.data||[]}catch(e){}this.loading=false},
     open:function(c){this.$router.push("/chat/"+c.id)},
     fmtTime:function(t){if(!t)return"";var d=new Date(t),now=new Date();var sameDay=d.toDateString()===now.toDateString();if(sameDay)return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);var yes=new Date(now);yes.setDate(yes.getDate()-1);if(d.toDateString()===yes.toDateString())return"昨天";return ("0"+(d.getMonth()+1)).slice(-2)+"/"+("0"+d.getDate()).slice(-2)},
-    fmtLastMsg:function(c){if(!c.last_message)return"暂无消息";if(c.last_msg_type===1)return"[图片]";if(c.last_msg_type===2)return"[语音]";if(c.last_msg_type===99)return c.last_message;return c.last_message},
+    fmtLastMsg:function(c){if(!c.last_message)return"暂无消息";if(c.last_msg_type===1)return"[图片]";if(c.last_msg_type===2)return"[语音]";if(c.last_msg_type===4)return"[贴纸]";if(c.last_msg_type===99)return c.last_message;return c.last_message},
     onWsMsg:function(d){
       // 只处理收到的消息（message_sent 是自己发出的确认，不产生未读）
       if(d.type!=="message"||!d.data)return;
@@ -555,6 +555,7 @@ var ChatDetailPage = {
     voiceMode:false,showEmojiPanel:false,showPlusPanel:false,
     recording:false,mediaRecorder:null,audioChunks:[],
     showGiftPanel:false,gifts:[],giftLoading:false,
+    showStickerPanel:false,stickers:[],stickerLoading:false,stickersById:{},stickerCat:"",stickerVipOnly:false,
     calling:false,callType:"",callPartnerId:0,callPartnerName:"",
     showCallDialog:false,incomingCall:null,callDuration:0,callTimer:null,
     partner:{nickname:"",avatar:null,online:false},partnerId:0,myAvatar:"",
@@ -687,8 +688,8 @@ var ChatDetailPage = {
     },
     toggleVoiceMode: function(){this.voiceMode=!this.voiceMode;this.showEmojiPanel=false;this.showPlusPanel=false},
     insertEmoji: function(e){this.text+=e},
-    togglePlus: function(){this.showPlusPanel=!this.showPlusPanel;this.showEmojiPanel=false;this.showGiftPanel=false},
-    toggleEmoji: function(){this.showEmojiPanel=!this.showEmojiPanel;this.showPlusPanel=false;this.showGiftPanel=false},
+    togglePlus: function(){this.showPlusPanel=!this.showPlusPanel;this.showEmojiPanel=false;this.showGiftPanel=false;this.showStickerPanel=false},
+    toggleEmoji: function(){this.showEmojiPanel=!this.showEmojiPanel;this.showPlusPanel=false;this.showGiftPanel=false;this.showStickerPanel=false},
     startRecording: async function(){
       var self=this;
       try{
@@ -806,6 +807,35 @@ var ChatDetailPage = {
           self.showGiftPanel=false;toast("礼物已发送","tok");
         }else{toast(r.message||"发送失败","terr")}
       }catch(e){toast("发送失败","terr")}
+    },
+    // 贴纸面板（S21-C5）
+    openStickerPanel: function(){
+      var s=this;s.showPlusPanel=false;s.showEmojiPanel=false;s.showGiftPanel=false;s.showStickerPanel=true;
+      if(s.stickers.length===0){
+        s.stickerLoading=true;
+        var q="/stickers?category="+encodeURIComponent(s.stickerCat)+(s.stickerVipOnly?"&vip_only=1":"");
+        api(q).then(function(r){s.stickers=r.data||[];s.stickersById={};s.stickers.forEach(function(x){s.stickersById[x.id]=x})}).catch(function(){}).finally(function(){s.stickerLoading=false});
+      }
+    },
+    switchStickerCat: function(c){
+      var s=this;s.stickerCat=c;s.stickers=[];s.openStickerPanel();
+    },
+    toggleStickerVip: function(){
+      var s=this;s.stickerVipOnly=!s.stickerVipOnly;s.stickers=[];s.openStickerPanel();
+    },
+    stickerById: function(id){return this.stickersById[id]},
+    sendSticker: async function(st){
+      var s=this;
+      var msg={conversation_id:s.convId,sender_id:s.userId,content:"[贴纸]",type:4,sticker_id:st.id,_local:true,_sending:true,created_at:new Date().toISOString()};
+      s.msgs.push(msg);s.addTimeDividers();Vue.nextTick(function(){s.scrollBottom()});
+      try{
+        var r=await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:s.convId,content:"[贴纸]",type:4,sticker_id:st.id})});
+        if(r.code===0&&r.data){
+          var i=s.msgs.indexOf(msg);
+          if(i>-1){s.msgs[i].id=r.data.id;s.msgs[i]._sending=false}
+          s.showStickerPanel=false;
+        }else{msg._failed=true;msg._sending=false;toast(r.message||"发送失败","terr")}
+      }catch(e){msg._failed=true;msg._sending=false;toast("发送失败","terr")}
     },
     // 根据对方已读时间戳，将我方已读前的消息标记为已读（展示"已读"）
     _applyReadState: function(){
@@ -965,6 +995,15 @@ var ChatDetailPage = {
           <div v-else-if="m.type===6" class="msg-sy">
             <div style="font-size:14px">🎁 {{m.content}}</div>
           </div>
+          <div v-else-if="m.type===4" class="msg-row" :style="{flexDirection:m.sender_id===userId?'row-reverse':'row'}">
+            <div class="avatar"><img loading="lazy" v-if="avatarOf(m)" :src="avatarOf(m)"><span v-else>👤</span></div>
+            <div :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']" style="padding:6px">
+              <img loading="lazy" v-if="stickerById(m.sticker_id)&&stickerById(m.sticker_id).url" :src="stickerById(m.sticker_id).url" style="width:80px;height:80px;object-fit:contain;border-radius:8px">
+              <div v-else style="font-size:40px;text-align:center">🎨</div>
+              <div v-if="m._sending" style="font-size:10px;margin-top:2px;text-align:right;opacity:.6"><span style="color:var(--tm);margin-left:4px">⏳</span></div>
+              <div v-else-if="m._failed" style="font-size:10px;margin-top:2px;text-align:right;color:var(--e)">发送失败</div>
+            </div>
+          </div>
           <div v-else class="msg-row" :style="{flexDirection:m.sender_id===userId?'row-reverse':'row'}">
             <div class="avatar"><img loading="lazy" v-if="avatarOf(m)" :src="avatarOf(m)"><span v-else>👤</span></div>
             <div v-if="m.type===1" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']">
@@ -999,6 +1038,26 @@ var ChatDetailPage = {
         </div>
       </div>
     </div>
+    <div v-if="showStickerPanel" style="background:#fff;border-top:1px solid var(--b);padding:12px;max-height:220px;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:600">🎨 贴纸</span>
+        <button @click="showStickerPanel=false" style="border:none;background:none;font-size:16px;cursor:pointer;color:var(--tm)">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn bs" :class=\"stickerCat===''?'bp':'bo'\" style="font-size:12px;padding:4px 12px" @click="switchStickerCat('')">全部</button>
+        <button class="btn bs" :class=\"stickerCat==='表情'?'bp':'bo'\" style="font-size:12px;padding:4px 12px" @click="switchStickerCat('表情')">表情</button>
+        <button class="btn bs" :class=\"stickerCat==='动作'?'bp':'bo'\" style="font-size:12px;padding:4px 12px" @click="switchStickerCat('动作')">动作</button>
+        <button class="btn bs" :class=\"stickerCat==='礼物'?'bp':'bo'\" style="font-size:12px;padding:4px 12px" @click="switchStickerCat('礼物')">礼物</button>
+        <button class="btn bs" :class=\"stickerCat==='VIP专属'?'bp':'bo'\" style="font-size:12px;padding:4px 12px" @click="switchStickerCat('VIP专属')">VIP专属</button>
+      </div>
+      <div v-if="stickerLoading" style="text-align:center;padding:16px"><div class="spin" style="width:20px;height:20px;border-width:2px"></div></div>
+      <div v-else-if="stickers.length===0" style="text-align:center;padding:16px;color:var(--tm);font-size:13px">暂无贴纸</div>
+      <div v-else style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+        <div v-for="s in stickers" :key="s.id" @click="sendSticker(s)" style="display:flex;align-items:center;justify-content:center;padding:8px 4px;background:var(--bg-page);border-radius:12px;cursor:pointer">
+          <img loading="lazy" :src="s.url" :alt="s.name" style="width:44px;height:44px;object-fit:contain">
+        </div>
+      </div>
+    </div>
     <div v-if="showEmojiPanel" style="background:#f7f7f7;border-top:1px solid var(--b);padding:10px 8px;height:220px;overflow-y:auto">
       <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px">
         <button v-for="e in emojis" :key="e" @click="insertEmoji(e)" style="border:none;background:none;font-size:22px;padding:6px 0;cursor:pointer;border-radius:6px">{{e}}</button>
@@ -1025,6 +1084,10 @@ var ChatDetailPage = {
         <div @click="openGiftPanel" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
           <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">🎁</div>
           <span style="font-size:11px;color:#666">礼物</span>
+        </div>
+        <div @click="openStickerPanel" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+          <div style="width:56px;height:56px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 1px 3px rgba(0,0,0,.08)">🎨</div>
+          <span style="font-size:11px;color:#666">贴纸</span>
         </div>
       </div>
     </div>
