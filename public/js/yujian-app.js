@@ -1138,7 +1138,7 @@ var MyPage = {
     logout: function(){localStorage.clear();this.$router.replace("/login");toast("已退出登录","tinfo")}
   },
   mounted: function(){this.load()},
-  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img loading="lazy" v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'📅',label:'签到领金币',path:'/checkin'},{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
+  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img loading="lazy" v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'📅',label:'签到领金币',path:'/checkin'},{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'🌐',label:'圈子',path:'/community'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
 };
 
 var EditProfilePage = {
@@ -1376,6 +1376,157 @@ var BlockListPage = {
   template: `<div style="padding:12px 16px"><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="list.length===0" class="empty"><div class="ei">🚫</div><div class="et">黑名单为空</div><div class="ed">拉黑的用户会出现在这里</div></div><div v-else v-for="u in list" :key="u.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;gap:12px;box-shadow:var(--sh)"><div class="avatar av-sm"><img loading="lazy" v-if="u.avatar" :src="u.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-weight:500">{{u.nickname}}</div><div style="font-size:12px;color:var(--tm)">{{u.location||""}}</div></div><button class="btn bs" style="font-size:13px;border:1px solid var(--b)" @click="unblock(u)">解除</button></div></div>`
 };
 
+// ==== 圈子（S21-C2） ====
+var CommunityPage = {
+  data: function(){return {
+    communities:[],loading:true,err:false,tab:"hot",
+    showCreate:false,form:{name:"",description:"",tags:""},
+    current:null,posts:[],events:[],postText:"",member:false,
+    eventForm:{title:"",description:"",location:"",start_time:""},
+    hasMore:true,pageOffset:0,loadingMore:false
+  }},
+  methods: {
+    load: async function(){
+      this.loading=true;this.err=false;
+      try{var r=await api("/community/list?sort="+(this.tab==="hot"?"hot":"new")+"&limit=20&offset="+this.pageOffset);this.communities=r.data||[];this.hasMore=(r.data||[]).length>=20}catch(e){this.err=true}
+      this.loading=false;
+    },
+    switchTab: function(t){this.tab=t;this.pageOffset=0;this.load()},
+    openCreate: function(){this.showCreate=!this.showCreate},
+    create: async function(){
+      var s=this;
+      if(!s.form.name||s.form.name.trim().length<2){toast("圈子名称至少2个字","terr");return}
+      try{
+        var body={name:s.form.name.trim(),description:s.form.description};
+        if(s.form.tags&&s.form.tags.trim())body.tags=s.form.tags.split(/[,，\s]+/).filter(Boolean);
+        var r=await api("/community/create",{method:"POST",body:JSON.stringify(body)});
+        if(r.code===0){toast("圈子创建成功","tok");s.showCreate=false;s.form={name:"",description:"",tags:""};s.load()}
+      }catch(e){toast(e.message||"创建失败","terr")}
+    },
+    open: async function(c){
+      var s=this;
+      s.current=c;s.member=false;
+      try{
+        var ps=await api("/community/"+c.id+"/posts?limit=20");
+        s.posts=ps.data||[];
+      }catch(e){s.posts=[]}
+      try{var ev=await api("/community/"+c.id+"/events");s.events=ev.data||[]}catch(e){s.events=[]}
+      try{var m=await api("/community/"+c.id+"/members");var uid=parseInt(localStorage.getItem("userId"));s.member=(m.data||[]).some(function(x){return x.user_id===uid})}catch(e){}
+    },
+    back: function(){this.current=null;this.load()},
+    join: async function(){
+      var s=this;
+      try{var r=await api("/community/"+s.current.id+"/join",{method:"POST",body:"{}"});if(r.code===0){toast("已加入","tok");s.member=true;s.current.member_count=(s.current.member_count||0)+1}}catch(e){toast(e.message||"加入失败","terr")}
+    },
+    leave: async function(){
+      var s=this;
+      try{var r=await api("/community/"+s.current.id+"/leave",{method:"POST",body:"{}"});if(r.code===0){toast("已退出","tinfo");s.member=false;s.current.member_count=Math.max(0,(s.current.member_count||0)-1)}}catch(e){toast(e.message||"操作失败","terr")}
+    },
+    publishPost: async function(){
+      var s=this;
+      if(!s.postText.trim()){toast("说点什么吧","tinfo");return}
+      try{
+        var r=await api("/community/"+s.current.id+"/posts",{method:"POST",body:JSON.stringify({content:s.postText.trim()})});
+        if(r.code===0){toast("发布成功","tok");s.postText="";s.current.post_count=(s.current.post_count||0)+1;var ps=await api("/community/"+s.current.id+"/posts?limit=20");s.posts=ps.data||[]}
+      }catch(e){toast(e.message||"发布失败","terr")}
+    },
+    likePost: async function(p){
+      try{await api("/community/posts/"+p.id+"/like",{method:"POST",body:"{}"});p.like_count=(p.like_count||0)+1}catch(e){}
+    },
+    createEvent: async function(){
+      var s=this;
+      if(!s.eventForm.title.trim()){toast("请填写事件标题","tinfo");return}
+      if(!s.eventForm.start_time){toast("请选择开始时间","tinfo");return}
+      try{
+        var r=await api("/community/"+s.current.id+"/events",{method:"POST",body:JSON.stringify(s.eventForm)});
+        if(r.code===0){toast("事件创建成功","tok");s.eventForm={title:"",description:"",location:"",start_time:""};var ev=await api("/community/"+s.current.id+"/events");s.events=ev.data||[]}
+      }catch(e){toast(e.message||"创建失败","terr")}
+    },
+    joinEvent: async function(e){
+      var s=this;
+      try{var r=await api("/community/events/"+e.id+"/join",{method:"POST",body:"{}"});if(r.code===0){toast("报名成功","tok");e.participant_count=(e.participant_count||0)+1;e._joined=true}}catch(err){toast(err.message||"报名失败","terr")}
+    },
+    fmtTime: function(t){if(!t)return"";try{return new Date(t).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}catch(e){return t}},
+    parseTags: function(t){if(!t)return[];if(Array.isArray(t))return t;try{return JSON.parse(t)}catch(e){return[]}},
+    highlightTags: function(text){return (text||"").replace(/#([^#\s]+)/g,'<span class="tag tp" style="font-size:12px;margin-right:4px">#$1</span>')}
+  },
+  mounted: function(){this.load()},
+  template: `<div>
+    <div v-if="!current">
+      <div style="padding:16px 16px 4px;display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;gap:8px"><button class="btn bs" :class=\"tab==='hot'?'bp':'bo'\" @click="switchTab('hot')">热门</button><button class="btn bs" :class=\"tab==='new'?'bp':'bo'\" @click="switchTab('new')">最新</button></div>
+        <button class="btn bp bs" @click="openCreate">{{showCreate?'取消':'＋ 创建圈子'}}</button>
+      </div>
+      <div v-if="showCreate" style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
+        <div class="inp" style="margin-bottom:10px"><span>🏷️</span><input v-model="form.name" maxlength="50" placeholder="圈子名称（至少2个字）"></div>
+        <div class="inp" style="margin-bottom:10px"><span>📝</span><input v-model="form.description" maxlength="200" placeholder="圈子简介"></div>
+        <div class="inp" style="margin-bottom:10px"><span>#</span><input v-model="form.tags" maxlength="100" placeholder="标签（逗号分隔，选填）"></div>
+        <button class="btn bp bw bs" @click="create">创建圈子</button>
+      </div>
+      <div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div></div>
+      <div v-else-if="err" class="empty"><div class="ei">😵</div><div class="et">加载失败</div><button class="btn bp bs" @click="load">重试</button></div>
+      <div v-else-if="communities.length===0" class="empty"><div class="ei">🌐</div><div class="et">还没有圈子</div><div class="ed">创建第一个圈子吧</div></div>
+      <div v-else style="padding:12px 16px">
+        <div v-for="c in communities" :key="c.id" @click="open(c)" style="display:flex;align-items:center;padding:14px;background:var(--w);border-radius:var(--rs);margin-bottom:10px;cursor:pointer;box-shadow:var(--sh)">
+          <div style="width:52px;height:52px;border-radius:14px;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));display:flex;align-items:center;justify-content:center">
+            <img loading="lazy" v-if="c.cover_url" :src="c.cover_url" style="width:100%;height:100%;object-fit:cover"><span v-else style="font-size:24px">🌐</span>
+          </div>
+          <div style="flex:1;min-width:0;margin:0 12px">
+            <div style="font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{c.name}}</div>
+            <div style="font-size:12px;color:var(--tm);margin-top:3px">{{c.member_count||0}}人 · {{c.post_count||0}}帖{{c.description?' · '+c.description:''}}</div>
+            <div v-if="parseTags(c.tags).length" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px"><span v-for="t in parseTags(c.tags).slice(0,3)" class="tag tp" style="font-size:11px">{{t}}</span></div>
+          </div>
+          <span style="color:var(--tm)">›</span>
+        </div>
+      </div>
+    </div>
+    <div v-else>
+      <div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;padding:24px 20px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><button @click="back" style="border:none;background:none;color:#fff;font-size:20px;cursor:pointer">←</button><div style="flex:1"><div style="font-size:20px;font-weight:600">{{current.name}}</div><div style="font-size:13px;opacity:.85;margin-top:2px">{{current.member_count||0}}人 · {{current.post_count||0}}帖</div></div></div>
+        <button class="btn" style="background:rgba(255,255,255,.2);color:#fff;border-radius:18px;padding:6px 18px;font-size:13px;cursor:pointer" @click="member?leave():join()">{{member?'退出圈子':'加入圈子'}}</button>
+      </div>
+      <div style="padding:16px">
+        <div v-if="member" style="margin-bottom:14px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
+          <div style="font-size:14px;font-weight:600;margin-bottom:8px">📝 发布动态</div>
+          <textarea v-model="postText" rows="2" placeholder="分享你的想法，用 #话题 打标签" style="width:100%;border:1px solid var(--b);border-radius:10px;padding:10px;font-size:14px;resize:none;box-sizing:border-box"></textarea>
+          <button class="btn bp bs" style="margin-top:8px;width:100%" @click="publishPost">发布</button>
+        </div>
+        <div style="font-size:14px;font-weight:600;margin:6px 0 10px">📢 圈子活动</div>
+        <div v-if="events.length===0" style="color:var(--tm);font-size:13px;padding:8px 0 4px">暂无活动{{member?'，点击下方创建':''}}</div>
+        <div v-for="e in events" :key="e.id" style="background:var(--w);border-radius:var(--rs);padding:12px;margin-bottom:8px;box-shadow:var(--sh)">
+          <div style="font-weight:600">{{e.title}}</div>
+          <div style="font-size:12px;color:var(--tm);margin-top:4px">🗓 {{fmtTime(e.start_time)}}{{e.location?' · 📍'+e.location:''}}</div>
+          <div v-if="e.description" style="font-size:13px;color:var(--ts);margin-top:4px">{{e.description}}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+            <span style="font-size:12px;color:var(--tm)">{{e.participant_count||0}}/{{e.max_participants||'∞'}}人报名</span>
+            <button class="btn bs" :class=\"e._joined?'bo':'bp'\" style="font-size:12px" @click="e._joined?null:joinEvent(e)">{{e._joined?'已报名':'报名'}}</button>
+          </div>
+        </div>
+        <template v-if="member">
+          <div style="font-size:14px;font-weight:600;margin:14px 0 10px">🎉 发起活动</div>
+          <div style="background:var(--w);border-radius:var(--rs);padding:14px;box-shadow:var(--sh)">
+            <div class="inp" style="margin-bottom:8px"><span>📋</span><input v-model="eventForm.title" placeholder="活动标题" maxlength="100"></div>
+            <div class="inp" style="margin-bottom:8px"><span>📍</span><input v-model="eventForm.location" placeholder="活动地点（选填）"></div>
+            <div class="inp" style="margin-bottom:8px"><span>⏰</span><input v-model="eventForm.start_time" type="datetime-local" style="flex:1;border:none;outline:none;font-size:14px;background:transparent"></div>
+            <div class="inp" style="margin-bottom:8px"><span>📝</span><input v-model="eventForm.description" placeholder="活动说明（选填）"></div>
+            <button class="btn bp bw bs" @click="createEvent">创建活动</button>
+          </div>
+        </template>
+        <div style="font-size:14px;font-weight:600;margin:16px 0 10px">💬 圈子动态</div>
+        <div v-if="posts.length===0" style="color:var(--tm);font-size:13px;padding:8px 0 4px">还没有动态，来发第一帖吧</div>
+        <div v-for="p in posts" :key="p.id" style="background:var(--w);border-radius:var(--rs);padding:14px;margin-bottom:10px;box-shadow:var(--sh)">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div class="avatar av-sm"><img loading="lazy" v-if="p.avatar" :src="p.avatar"><span v-else>👤</span></div>
+            <div style="flex:1"><div style="font-size:14px;font-weight:500">{{p.nickname||'用户'}}</div><div style="font-size:11px;color:var(--tm)">{{timeAgo(p.created_at)}}</div></div>
+            <button class="btn bs" style="font-size:12px;border:1px solid var(--b)" @click="likePost(p)">❤️ {{p.like_count||0}}</button>
+          </div>
+          <div style="font-size:14px;line-height:1.6;word-break:break-word" v-html="highlightTags(p.content)"></div>
+        </div>
+      </div>
+    </div>
+  </div>`
+};
+
 var MeetPage = {
   data: function(){return {tab:"viewers",list:[],loading:true}},
   methods: {load:async function(t){this.tab=t;this.loading=true;var ep=t==="viewers"?"/user/viewers":"/user/fans";try{var r=await api(ep);this.list=r.data||[]}catch(e){}this.loading=false}},
@@ -1424,10 +1575,11 @@ var routes = [
   {path:"/help",component:PlaceholderPage,props:{title:"帮助与反馈",icon:"❓"}},
   {path:"/meet",component:MeetPage},{path:"/recharge",component:RechargePage},
   {path:"/earnings",component:EarningsPage},{path:"/fans",component:FansPage},
-  {path:"/following",component:FollowingPage}
+  {path:"/following",component:FollowingPage},
+  {path:"/community",component:CommunityPage}
 ];
 var router = VueRouter.createRouter({history:VueRouter.createWebHashHistory(),routes:routes});
-router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";next()});
+router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录",community:"圈子"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";next()});
 
 // ==== App ====
 // 简短提示音（Web Audio API，无需外部文件）
