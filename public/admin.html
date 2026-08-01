@@ -322,6 +322,13 @@ tbody tr:last-child td{border-bottom:none}
       <a data-page="gift-records" onclick="navigate('gift-records')"><span class="nav-icon">📋</span><span class="nav-title">礼物记录</span></a>
       <a data-page="transactions" onclick="navigate('transactions')"><span class="nav-icon">⏱️</span><span class="nav-title">交易流水</span></a>
       <a data-page="revenue" onclick="navigate('revenue')"><span class="nav-icon">📈</span><span class="nav-title">营收统计</span></a>
+      <a data-page="audit" onclick="navigate('audit')"><span class="nav-icon">🛡️</span><span class="nav-title">内容审核</span></a>
+      <a data-page="sensitive-words" onclick="navigate('sensitive-words')"><span class="nav-icon">🚷</span><span class="nav-title">敏感词管理</span></a>
+      <a data-page="announcements" onclick="navigate('announcements')"><span class="nav-icon">📢</span><span class="nav-title">公告管理</span></a>
+      <a data-page="configs" onclick="navigate('configs')"><span class="nav-icon">⚙️</span><span class="nav-title">系统配置</span></a>
+      <a data-page="admins" onclick="navigate('admins')"><span class="nav-icon">👨‍💼</span><span class="nav-title">管理员管理</span></a>
+      <a data-page="push" onclick="navigate('push')"><span class="nav-icon">📣</span><span class="nav-title">推送管理</span></a>
+      <a data-page="verifications" onclick="navigate('verifications')"><span class="nav-icon">✅</span><span class="nav-title">认证审核</span></a>
     </nav>
     <div class="sidebar-collapse" onclick="toggleSidebarCollapse()" title="折叠侧边栏">◀</div>
   </aside>
@@ -381,7 +388,9 @@ const S = {
 const PAGE_NAMES = {
   dashboard:'仪表盘',users:'用户管理',posts:'动态管理',reports:'举报管理',
   orders:'订单管理',gifts:'礼物管理','gift-records':'礼物记录',
-  transactions:'交易流水',revenue:'营收统计'
+  transactions:'交易流水',revenue:'营收统计',
+  audit:'内容审核','sensitive-words':'敏感词管理',announcements:'公告管理',
+  configs:'系统配置',admins:'管理员管理',push:'推送管理',verifications:'认证审核'
 };
 
 // ============================================================ Init ============================================================
@@ -538,6 +547,13 @@ function navigate(page){
     case 'gift-records': renderGiftRecords(); break;
     case 'transactions': renderTransactions(); break;
     case 'revenue': renderRevenue(); break;
+    case 'audit': renderAudit(); break;
+    case 'sensitive-words': renderSensitiveWords(); break;
+    case 'announcements': renderAnnouncements(); break;
+    case 'configs': renderConfigs(); break;
+    case 'admins': renderAdmins(); break;
+    case 'push': renderPush(); break;
+    case 'verifications': renderVerifications(); break;
   }
 }
 
@@ -1127,6 +1143,459 @@ async function loadRevenue(){
       </div>`;
     area.innerHTML = h;
   } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderRevenue()">重试</button></div>`; }
+}
+
+// ============================================================ Sensitive Words ============================================================
+function renderSensitiveWords(){ S.filters={offset:0}; loadSensitiveWords(); }
+async function loadSensitiveWords(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({limit:S.pageSize,offset:S.filters.offset});
+    const r = await api('GET','/api/admin/sensitive-words?'+p);
+    const {list=[],total=0}=r.data;
+    let h = `
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="swForm(0)">＋ 新增敏感词</button>
+        <button class="btn btn-default btn-sm" onclick="swBatchForm()">📥 批量导入</button>
+        <span style="font-size:12px;color:var(--text-muted)">共 ${total} 个</span>
+      </div>
+      <div class="section-card"><div class="section-header"><h4>🚷 敏感词列表</h4></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>敏感词</th><th>分类</th><th>级别</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody>${list.length===0?'<tr class="empty-row"><td colspan="7">暂无敏感词</td></tr>':list.map(w=>`
+          <tr>
+            <td>${w.id}</td><td><strong>${esc(w.word)}</strong></td><td>${esc(w.category||'general')}</td>
+            <td>Lv${w.level||1}</td>
+            <td>${w.is_active?`<span class="badge-success">启用</span>`:`<span class="badge-danger">停用</span>`}</td>
+            <td>${fmtTime(w.created_at)}</td>
+            <td>
+              <button class="btn btn-text btn-xs" onclick="swForm(${w.id})">✏️ 编辑</button>
+              <button class="btn btn-text btn-xs" onclick="showConfirm('确定删除敏感词「${esc(w.word)}」？',()=>delSw(${w.id}))">🗑️</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div></div>
+      ${buildPagination(S.filters.offset,total,S.pageSize,'swPage')}
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderSensitiveWords()">重试</button></div>`; }
+}
+function swPage(o){S.filters.offset=o;loadSensitiveWords();}
+async function swForm(id){
+  showModal(`
+    <h3>${id?'编辑敏感词':'新增敏感词'}</h3>
+    <div class="form-item"><label>敏感词 *</label><input id="swWord" value="${esc(S.filters._edit_word||'')}"></div>
+    <div class="form-row">
+      <div class="form-item"><label>分类</label><select id="swCat"><option value="general">general</option><option value="politics">politics</option><option value="violence">violence</option><option value="porn">porn</option><option value="ad">ad</option></select></div>
+      <div class="form-item"><label>级别</label><select id="swLevel"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveSw(${id||0})">💾 保存</button>
+    </div>
+  `);
+  if(id){ try{const r=await api('GET','/api/admin/sensitive-words?limit=500');const w=(r.data.list||[]).find(x=>x.id===id);if(w){document.getElementById('swWord').value=w.word;document.getElementById('swCat').value=w.category;document.getElementById('swLevel').value=w.level;}}catch(e){} }
+}
+async function saveSw(id){
+  const word=document.getElementById('swWord').value.trim();
+  if(!word){toast('请填写敏感词','error');return;}
+  const body={word,category:document.getElementById('swCat').value,level:Number(document.getElementById('swLevel').value)};
+  try{
+    if(id){await api('PUT','/api/admin/sensitive-words/'+id,body);toast('更新成功','success');}
+    else{await api('POST','/api/admin/sensitive-words',body);toast('添加成功','success');}
+    closeModal();loadSensitiveWords();
+  }catch(e){toast(e.message,'error');}
+}
+async function delSw(id){
+  try{await api('DELETE','/api/admin/sensitive-words/'+id);toast('已删除','success');loadSensitiveWords();}
+  catch(e){toast(e.message,'error');}
+}
+function swBatchForm(){
+  showModal(`
+    <h3>📥 批量导入敏感词</h3>
+    <div class="form-item"><label>每行一个敏感词</label><textarea id="swBatchArea" rows="8" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveSwBatch()">🚀 导入</button>
+    </div>
+  `);
+}
+async function saveSwBatch(){
+  const raw=document.getElementById('swBatchArea').value;
+  const words=raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(words.length===0){toast('请输入至少一个敏感词','error');return;}
+  try{const r=await api('POST','/api/admin/sensitive-words/batch-import',{words});toast(r.message||`已导入${words.length}个`,'success');closeModal();loadSensitiveWords();}
+  catch(e){toast(e.message,'error');}
+}
+
+// ============================================================ Audit Queue ============================================================
+function renderAudit(){ S.filters={status:'pending',offset:0}; loadAudit(); }
+async function loadAudit(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({limit:S.pageSize,offset:S.filters.offset});
+    if(S.filters.status)p.set('status',S.filters.status);
+    const [r,stats]=await Promise.all([api('GET','/api/admin/audit/queue?'+p),api('GET','/api/admin/audit/stats')]);
+    const list=r.data||[];
+    const statRows=stats.data||[];
+    const statMap={}; statRows.forEach(s=>{statMap[s.content_type+'_'+s.audit_result]=s.cnt;});
+    let h = `
+      <div class="summary-row">
+        <div class="summary-item">🛡️ 待审核: <strong>${statMap['_pending']||statRows.reduce((a,s)=>a+(s.audit_result==='pending'?Number(s.cnt):0),0)}</strong></div>
+        <div class="summary-item">✅ 已通过: <strong>${statRows.reduce((a,s)=>a+(s.audit_result==='pass'?Number(s.cnt):0),0)}</strong></div>
+        <div class="summary-item">❌ 已拒绝: <strong>${statRows.reduce((a,s)=>a+(s.audit_result==='reject'?Number(s.cnt):0),0)}</strong></div>
+      </div>
+      <div class="toolbar">
+        ${['pending','pass','reject'].map(s=>`<button class="btn btn-sm ${S.filters.status===s?'btn-primary':'btn-default'}" onclick="S.filters.status='${s}';S.filters.offset=0;loadAudit()">${s==='pending'?'⏳ 待审核':s==='pass'?'✅ 已通过':'❌ 已拒绝'}</button>`).join(' ')}
+      </div>
+      <div class="section-card"><div class="section-header"><h4>🛡️ 内容审核队列</h4></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>类型</th><th>内容ID</th><th>用户ID</th><th>内容摘要</th><th>状态</th><th>时间</th><th>操作</th></tr></thead>
+        <tbody>${list.length===0?'<tr class="empty-row"><td colspan="8">暂无记录</td></tr>':list.map(a=>`
+          <tr>
+            <td>${a.id}</td><td>${esc(a.content_type||'-')}</td><td>${a.content_id||'-'}</td><td>${a.user_id||'-'}</td>
+            <td style="max-width:260px">${esc(trunc(a.content_text||'',40))}</td>
+            <td>${a.audit_result==='pending'?`<span class="badge-warning">待审</span>`:a.audit_result==='pass'?`<span class="badge-success">通过</span>`:`<span class="badge-danger">拒绝</span>`}</td>
+            <td>${fmtTime(a.created_at)}</td>
+            <td>${a.audit_result==='pending'?`
+              <button class="btn btn-success btn-xs" onclick="auditHandle(${a.id},'pass')">通过</button>
+              <button class="btn btn-danger btn-xs" onclick="auditReject(${a.id})">拒绝</button>`:'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div></div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderAudit()">重试</button></div>`; }
+}
+async function auditHandle(id,result){
+  try{await api('PUT',`/api/admin/audit/${id}/${result}`);toast(result==='pass'?'已通过':'已拒绝','success');loadAudit();}
+  catch(e){toast(e.message,'error');}
+}
+function auditReject(id){
+  showModal(`
+    <h3>❌ 拒绝审核</h3>
+    <div class="form-item"><label>拒绝原因</label><input id="auditReason" placeholder="请输入拒绝原因"></div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" onclick="auditRejectSubmit(${id})">确认拒绝</button>
+    </div>
+  `);
+}
+async function auditRejectSubmit(id){
+  const reason=document.getElementById('auditReason').value.trim();
+  try{await api('PUT',`/api/admin/audit/${id}/reject`,{reason});toast('已拒绝','success');closeModal();loadAudit();}
+  catch(e){toast(e.message,'error');}
+}
+
+// ============================================================ Announcements ============================================================
+function renderAnnouncements(){ loadAnnouncements(); }
+async function loadAnnouncements(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const r=await api('GET','/api/admin/announcements');
+    const list=r.data||[];
+    let h = `
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="annForm(0)">＋ 新增公告</button>
+      </div>
+      <div class="section-card"><div class="section-header"><h4>📢 公告列表</h4></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>标题</th><th>类型</th><th>优先级</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody>${list.length===0?'<tr class="empty-row"><td colspan="7">暂无公告</td></tr>':list.map(a=>`
+          <tr>
+            <td>${a.id}</td><td style="max-width:200px"><strong>${esc(a.title)}</strong><div style="font-size:11px;color:var(--text-muted)">${esc(trunc(a.content||'',30))}</div></td>
+            <td>${esc(a.type||'normal')}</td><td>${a.priority||0}</td>
+            <td>${a.status==='published'?`<span class="badge-success">已发布</span>`:a.status==='offline'?`<span class="badge-default">已下线</span>`:`<span class="badge-warning">草稿</span>`}</td>
+            <td>${fmtTime(a.created_at)}</td>
+            <td>
+              <button class="btn btn-text btn-xs" onclick="annForm(${a.id})">✏️</button>
+              ${a.status!=='published'?`<button class="btn btn-success btn-xs" onclick="annStatus(${a.id},'publish')">发布</button>`:`<button class="btn btn-default btn-xs" onclick="annStatus(${a.id},'offline')">下线</button>`}
+              <button class="btn btn-text btn-xs" onclick="showConfirm('确定删除公告「${esc(a.title)}」？',()=>annDel(${a.id}))">🗑️</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div></div>
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderAnnouncements()">重试</button></div>`; }
+}
+async function annForm(id){
+  showModal(`
+    <h3>${id?'编辑公告':'新增公告'}</h3>
+    <div class="form-item"><label>标题 *</label><input id="annTitle"></div>
+    <div class="form-item"><label>内容 *</label><textarea id="annContent" rows="5" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box"></textarea></div>
+    <div class="form-row">
+      <div class="form-item"><label>类型</label><select id="annType"><option value="normal">normal</option><option value="system">system</option><option value="notice">notice</option></select></div>
+      <div class="form-item"><label>优先级</label><input id="annPriority" type="number" value="0"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveAnn(${id||0})">💾 保存</button>
+    </div>
+  `);
+  if(id){ try{const r=await api('GET','/api/admin/announcements');const a=(r.data||[]).find(x=>x.id===id);if(a){document.getElementById('annTitle').value=a.title;document.getElementById('annContent').value=a.content||'';document.getElementById('annType').value=a.type||'normal';document.getElementById('annPriority').value=a.priority||0;}}catch(e){} }
+}
+async function saveAnn(id){
+  const title=document.getElementById('annTitle').value.trim();
+  const content=document.getElementById('annContent').value.trim();
+  if(!title||!content){toast('请填写标题和内容','error');return;}
+  const body={title,content,type:document.getElementById('annType').value,priority:Number(document.getElementById('annPriority').value)};
+  try{
+    if(id){await api('PUT','/api/admin/announcements/'+id,body);toast('更新成功','success');}
+    else{await api('POST','/api/admin/announcements',body);toast('创建成功','success');}
+    closeModal();loadAnnouncements();
+  }catch(e){toast(e.message,'error');}
+}
+async function annStatus(id,act){
+  try{await api('PUT',`/api/admin/announcements/${id}/${act}`);toast(act==='publish'?'已发布':'已下线','success');loadAnnouncements();}
+  catch(e){toast(e.message,'error');}
+}
+async function annDel(id){
+  try{await api('DELETE','/api/admin/announcements/'+id);toast('已删除','success');loadAnnouncements();}
+  catch(e){toast(e.message,'error');}
+}
+
+// ============================================================ Configs ============================================================
+function renderConfigs(){ loadConfigs(); }
+async function loadConfigs(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const r=await api('GET','/api/admin/configs');
+    const list=r.data||[];
+    const cats={}; list.forEach(c=>{const cat=c.category||'general';(cats[cat]=cats[cat]||[]).push(c);});
+    let h = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">共 ${list.length} 项系统配置</div>`;
+    for(const [cat,items] of Object.entries(cats)){
+      h += `<div class="section-card"><div class="section-header"><h4>⚙️ ${cat}</h4></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>配置键</th><th>说明</th><th>当前值</th><th>操作</th></tr></thead>
+        <tbody>${items.map(c=>`
+          <tr>
+            <td><code>${esc(c.config_key)}</code></td>
+            <td>${esc(c.description||'-')}</td>
+            <td><input id="cfg_${esc(c.config_key)}" value="${esc(c.config_value||'')}" style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;width:140px"></td>
+            <td><button class="btn btn-primary btn-xs" onclick="saveCfg('${esc(c.config_key)}')">保存</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div></div></div>`;
+    }
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderConfigs()">重试</button></div>`; }
+}
+async function saveCfg(key){
+  const v=document.getElementById('cfg_'+key).value.trim();
+  try{await api('PUT','/api/admin/configs/'+encodeURIComponent(key),{config_value:v});toast('配置已更新','success');loadConfigs();}
+  catch(e){toast(e.message,'error');}
+}
+
+// ============================================================ Admins ============================================================
+function renderAdmins(){ loadAdmins(); }
+async function loadAdmins(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const [a,logs]=await Promise.all([api('GET','/api/admin/admins'),api('GET','/api/admin/operation-logs?limit=30')]);
+    const list=a.data||[]; const logList=logs.data||[];
+    let h = `
+      <div class="toolbar"><button class="btn btn-primary btn-sm" onclick="adminForm(0)">＋ 新增管理员</button></div>
+      <div class="section-card"><div class="section-header"><h4>👨‍💼 管理员列表</h4></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>昵称</th><th>手机号</th><th>角色</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody>${list.length===0?'<tr class="empty-row"><td colspan="7">暂无管理员</td></tr>':list.map(u=>`
+          <tr>
+            <td>${u.id}</td><td>${esc(u.nickname||'-')}</td><td>${esc(u.phone||'-')}</td>
+            <td><span class="badge-${u.admin_role==='super_admin'?'danger':u.admin_role==='admin'?'warning':'default'}">${esc(u.admin_role||'-')}</span></td>
+            <td>${u.is_active?`<span class="badge-success">启用</span>`:`<span class="badge-danger">停用</span>`}</td>
+            <td>${fmtTime(u.created_at)}</td>
+            <td>
+              ${u.admin_role!=='super_admin'?`<button class="btn btn-text btn-xs" onclick="adminToggle(${u.id},${u.is_active?0:1})">${u.is_active?'停用':'启用'}</button>
+              <button class="btn btn-text btn-xs" onclick="showConfirm('确定删除该管理员？',()=>adminDel(${u.id}))">🗑️</button>`:'—'}
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div></div></div>
+      <div class="section-card"><div class="section-header"><h4>📋 最近操作日志</h4></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>管理员ID</th><th>操作</th><th>目标</th><th>IP</th><th>时间</th></tr></thead>
+        <tbody>${logList.length===0?'<tr class="empty-row"><td colspan="5">暂无日志</td></tr>':logList.map(l=>`
+          <tr><td>${l.admin_id||'-'}</td><td>${esc(l.action||'-')}</td><td>${esc((l.target_type||'')+' '+(l.target_id||''))}</td><td>${esc(l.ip||'-')}</td><td>${fmtTime(l.created_at)}</td></tr>
+        `).join('')}
+        </tbody>
+      </table></div></div></div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderAdmins()">重试</button></div>`; }
+}
+function adminForm(id){
+  showModal(`
+    <h3>新增管理员</h3>
+    <div class="form-item"><label>用户ID *</label><input id="admUid" type="number" placeholder="用户ID"></div>
+    <div class="form-item"><label>角色</label><select id="admRole">
+      ${['admin','operator','auditor','cs'].map(r=>`<option value="${r}">${r}</option>`).join('')}
+    </select></div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveAdmin()">💾 保存</button>
+    </div>
+  `);
+}
+async function saveAdmin(){
+  const user_id=Number(document.getElementById('admUid').value);
+  const admin_role=document.getElementById('admRole').value;
+  if(!user_id){toast('请填写用户ID','error');return;}
+  try{await api('POST','/api/admin/admins',{user_id,admin_role});toast('管理员已创建','success');closeModal();loadAdmins();}
+  catch(e){toast(e.message,'error');}
+}
+async function adminToggle(id,isActive){
+  try{await api('PUT','/api/admin/admins/'+id,{is_active:isActive});toast(isActive?'已启用':'已停用','success');loadAdmins();}
+  catch(e){toast(e.message,'error');}
+}
+async function adminDel(id){
+  try{await api('DELETE','/api/admin/admins/'+id);toast('已删除','success');loadAdmins();}
+  catch(e){toast(e.message,'error');}
+}
+
+// ============================================================ Push ============================================================
+function renderPush(){ loadPush(); }
+async function loadPush(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const [h,t]=await Promise.all([api('GET','/api/admin/push/history'),api('GET','/api/admin/push/templates')]);
+    const hist=h.data||[]; const templates=t.data||[];
+    let tpl = `
+      <div class="section-card"><div class="section-header"><h4>📣 发送推送</h4></div>
+      <div class="section-body" style="padding:16px">
+        <div class="form-row">
+          <div class="form-item"><label>标题 *</label><input id="pushTitle" placeholder="推送标题"></div>
+          <div class="form-item"><label>目标</label><select id="pushTarget"><option value="all">全部用户</option><option value="active">活跃用户</option></select></div>
+        </div>
+        <div class="form-item"><label>内容 *</label><textarea id="pushContent" rows="3" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box"></textarea></div>
+        <button class="btn btn-primary" onclick="pushSend()">🚀 发送推送</button>
+      </div></div>
+      <div class="section-card"><div class="section-header"><h4>💾 推送模板</h4><button class="btn btn-default btn-sm" onclick="tplForm()">＋ 新建模板</button></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>名称</th><th>标题</th><th>内容</th><th>操作</th></tr></thead>
+        <tbody>${templates.length===0?'<tr class="empty-row"><td colspan="5">暂无模板</td></tr>':templates.map(t=>`
+          <tr><td>${t.id}</td><td>${esc(t.name)}</td><td>${esc(t.title)}</td><td style="max-width:240px">${esc(trunc(t.content||'',30))}</td>
+          <td><button class="btn btn-text btn-xs" onclick="showConfirm('确定删除模板「${esc(t.name)}」？',()=>tplDel(${t.id}))">🗑️</button></td></tr>
+        `).join('')}
+        </tbody>
+      </table></div></div></div>
+      <div class="section-card"><div class="section-header"><h4>📤 推送历史</h4></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>标题</th><th>目标</th><th>发送数</th><th>状态</th><th>发送时间</th></tr></thead>
+        <tbody>${hist.length===0?'<tr class="empty-row"><td colspan="6">暂无推送记录</td></tr>':hist.map(p=>`
+          <tr><td>${p.id}</td><td>${esc(p.title)}</td><td>${esc(p.target_type||'all')}</td>
+          <td>${p.sent_count||0}/${p.target_count||0}</td>
+          <td>${p.status==='sent'?`<span class="badge-success">已发送</span>`:p.status==='sending'?`<span class="badge-warning">发送中</span>`:`<span class="badge-default">${esc(p.status||'draft')}</span>`}</td>
+          <td>${fmtTime(p.sent_at||p.created_at)}</td></tr>
+        `).join('')}
+        </tbody>
+      </table></div></div></div>`;
+    area.innerHTML = tpl;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderPush()">重试</button></div>`; }
+}
+async function pushSend(){
+  const title=document.getElementById('pushTitle').value.trim();
+  const content=document.getElementById('pushContent').value.trim();
+  const target_type=document.getElementById('pushTarget').value;
+  if(!title||!content){toast('请填写标题和内容','error');return;}
+  try{const r=await api('POST','/api/admin/push/send',{title,content,target_type});toast(r.message||`推送成功`,'success');loadPush();}
+  catch(e){toast(e.message,'error');}
+}
+function tplForm(){
+  showModal(`
+    <h3>＋ 新建推送模板</h3>
+    <div class="form-item"><label>模板名称 *</label><input id="tplName"></div>
+    <div class="form-item"><label>标题 *</label><input id="tplTitle"></div>
+    <div class="form-item"><label>内容 *</label><textarea id="tplContent" rows="3" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;box-sizing:border-box"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveTpl()">💾 保存</button>
+    </div>
+  `);
+}
+async function saveTpl(){
+  const name=document.getElementById('tplName').value.trim();
+  const title=document.getElementById('tplTitle').value.trim();
+  const content=document.getElementById('tplContent').value.trim();
+  if(!name||!title||!content){toast('请填写完整','error');return;}
+  try{await api('POST','/api/admin/push/templates',{name,title,content});toast('模板已创建','success');closeModal();loadPush();}
+  catch(e){toast(e.message,'error');}
+}
+async function tplDel(id){
+  try{await api('DELETE','/api/admin/push/templates/'+id);toast('已删除','success');loadPush();}
+  catch(e){toast(e.message,'error');}
+}
+
+// ============================================================ Verifications ============================================================
+function renderVerifications(){ S.filters={offset:0,status:'pending'}; loadVerifications(); }
+async function loadVerifications(){
+  const area = document.getElementById('content-area');
+  area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    const p = new URLSearchParams({limit:S.pageSize,offset:S.filters.offset});
+    if(S.filters.status)p.set('status',S.filters.status);
+    const [r,stats]=await Promise.all([api('GET','/api/admin/verifications?'+p),api('GET','/api/admin/verifications/stats')]);
+    const {list=[],total=0}=r.data;
+    const statRows=stats.data||[];
+    const statMap={}; statRows.forEach(s=>{const k=s.verification_type+'_'+s.status;statMap[k]=s.cnt;});
+    const typeName={real_name:'实名',face:'人脸',education:'学历',vehicle:'车辆'};
+    let h = `
+      <div class="summary-row">
+        ${['real_name','education','vehicle'].map(t=>`<div class="summary-item">${typeName[t]||t} 待审: <strong>${statMap[t+'_pending']||0}</strong></div>`).join('')}
+      </div>
+      <div class="toolbar">
+        <select id="vfStatus" onchange="S.filters.status=this.value;S.filters.offset=0;loadVerifications()">
+          <option value="pending" ${S.filters.status==='pending'?'selected':''}>待审核</option>
+          <option value="approved" ${S.filters.status==='approved'?'selected':''}>已通过</option>
+          <option value="rejected" ${S.filters.status==='rejected'?'selected':''}>已拒绝</option>
+          <option value="none" ${S.filters.status==='none'?'selected':''}>全部</option>
+        </select>
+      </div>
+      <div class="section-card"><div class="section-header"><h4>✅ 认证审核</h4></div>
+      <div class="section-body"><div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>用户</th><th>手机号</th><th>类型</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead>
+        <tbody>${list.length===0?'<tr class="empty-row"><td colspan="7">暂无记录</td></tr>':list.map(v=>`
+          <tr>
+            <td>${v.id}</td><td>${esc(v.nickname||('-')+' ('+v.user_id+')')}</td><td>${esc(v.phone||'-')}</td>
+            <td>${esc(typeName[v.verification_type]||v.verification_type)}</td>
+            <td>${v.status==='pending'?`<span class="badge-warning">待审</span>`:v.status==='approved'?`<span class="badge-success">通过</span>`:`<span class="badge-danger">拒绝</span>`}</td>
+            <td>${fmtTime(v.created_at)}</td>
+            <td>${v.status==='pending'?`
+              <button class="btn btn-success btn-xs" onclick="vfHandle(${v.id},'approve')">通过</button>
+              <button class="btn btn-danger btn-xs" onclick="vfReject(${v.id})">拒绝</button>`:'—'}
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div></div>
+      ${buildPagination(S.filters.offset,total,S.pageSize,'vfPage')}
+      </div>`;
+    area.innerHTML = h;
+  } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderVerifications()">重试</button></div>`; }
+}
+function vfPage(o){S.filters.offset=o;loadVerifications();}
+async function vfHandle(id,act){
+  try{await api('PUT',`/api/admin/verifications/${id}/${act}`);toast('审核通过','success');loadVerifications();}
+  catch(e){toast(e.message,'error');}
+}
+function vfReject(id){
+  showModal(`
+    <h3>❌ 拒绝认证</h3>
+    <div class="form-item"><label>拒绝原因</label><input id="vfReason" placeholder="请输入拒绝原因"></div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" onclick="vfRejectSubmit(${id})">确认拒绝</button>
+    </div>
+  `);
+}
+async function vfRejectSubmit(id){
+  const reason=document.getElementById('vfReason').value.trim();
+  try{await api('PUT',`/api/admin/verifications/${id}/reject`,{reason});toast('已拒绝','success');closeModal();loadVerifications();}
+  catch(e){toast(e.message,'error');}
 }
 
 // ============================================================ Keyboard ============================================================
