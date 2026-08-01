@@ -185,6 +185,7 @@ const chatRoutes = require('./src/routes/chat.routes');
 const reportRoutes = require('./src/routes/report.routes');
 const postRoutes = require('./src/routes/post.routes');
 const orderRoutes = require('./src/routes/order.routes');
+const paymentRoutes = require('./src/routes/payment.routes');
 const blockRoutes = require('./src/routes/block.routes');
 const pushRoutes = require('./src/routes/push.routes');
 const giftRoutes = require('./src/routes/gift.routes');
@@ -246,6 +247,9 @@ app.use('/api/posts', postRoutes);
 
 // 订单/支付路由
 app.use('/api/orders', orderRoutes);
+
+// 支付回调路由（不挂 authMiddleware，支付平台回调用验签）
+app.use('/api/payment', paymentRoutes);
 
 // 拉黑路由
 app.use('/api/block', blockRoutes);
