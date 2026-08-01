@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#FF6B6B">
+<meta name="theme-color" content="#FF5E7D">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon.png">
+<link rel="apple-touch-icon" href="/icon.png">
 <title>遇见 - 同城社交</title>
 <style>
 /* ============ CSS Reset & Variables ============ */
@@ -762,7 +763,17 @@ html,body{
 <script src="/js/vue.global.js"></script>
 <script src="/js/vue-router.global.js"></script>
 <script src="/js/notification.js"></script>
-<script src="/js/yujian-app.js?v=202608010200"></script>
+<script src="/js/yujian-app.js?v=v20260801"></script>
+<script>
+  // PWA Service Worker 注册（S20）
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (err) {
+        console.warn('[PWA] Service Worker 注册失败:', err.message);
+      });
+    });
+  }
+</script>
 </body>
 </html>
 
