@@ -1230,7 +1230,7 @@ var UserProfilePage = {
     }
   },
   mounted: function(){this.load()},
-  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img loading="lazy" v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px;flex-wrap:wrap"><button class="btn bp" style="flex:1;min-width:100px" @click="greetOrChat">💬 打招呼</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid var(--p);color:var(--p)" @click="likeUser" :disabled="liking">❤️ 喜欢</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid #F6D365;color:#d99000" @click="superLikeUser" :disabled="liking">⭐ 超级喜欢</button></div><div style="display:flex;gap:12px;padding:0 16px 16px"><button class="btn bs" style="flex:1;font-size:13px" @click="showReport=!showReport">🚩 举报</button><button class="btn bs" style="flex:1;font-size:13px;color:var(--e)" @click="blockUser">⛔ 拉黑</button></div><div v-if="showReport" style="margin:0 16px 16px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
+  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;padding:32px 20px 24px;text-align:center"><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5)"><img loading="lazy" v-if="profile.avatar" :src="profile.avatar"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:14px;opacity:.8;margin-top:4px">{{profile.age?profile.age+'岁 ':''}}{{profile.occupation||''}} {{profile.location||''}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><h4 style="margin-bottom:8px;color:var(--ts);font-size:14px">个人简介</h4><p style="line-height:1.6">{{profile.bio||'TA还没有写个人简介'}}</p></div><div style="margin:0 16px 12px;padding:14px 16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);cursor:pointer" @click="$router.push('/intimacy/'+profile.id)"><div style="display:flex;align-items:center"><span style="font-size:20px;margin-right:10px">💗</span><div style="flex:1"><div style="font-size:14px;font-weight:600">亲密关系</div><div style="font-size:11px;color:var(--tm);margin-top:2px">查看你们的心动值、徽章与纪念日</div></div><span style="color:var(--tm)">›</span></div></div><div v-if="profile.tags" style="margin:0 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:12px;padding:16px;flex-wrap:wrap"><button class="btn bp" style="flex:1;min-width:100px" @click="greetOrChat">💬 打招呼</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid var(--p);color:var(--p)" @click="likeUser" :disabled="liking">❤️ 喜欢</button><button class="btn bs" style="flex:1;min-width:100px;border:1px solid #F6D365;color:#d99000" @click="superLikeUser" :disabled="liking">⭐ 超级喜欢</button></div><div style="display:flex;gap:12px;padding:0 16px 16px"><button class="btn bs" style="flex:1;font-size:13px" @click="showReport=!showReport">🚩 举报</button><button class="btn bs" style="flex:1;font-size:13px;color:var(--e)" @click="blockUser">⛔ 拉黑</button></div><div v-if="showReport" style="margin:0 16px 16px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
     <div style="font-size:14px;font-weight:600;margin-bottom:10px">举报该用户</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><span v-for="rr in ['骚扰','虚假资料','广告营销','违法违规','其他']" :key="rr" @click="reportReason=rr" :class=\"['tag',reportReason===rr?'tp':'']\" style="cursor:pointer;border:1px solid var(--b);border-radius:16px;padding:6px 12px;font-size:13px">{{rr}}</span></div>
     <button class="btn bp bs" style="width:100%" @click="submitReport" :disabled="!reportReason">提交举报</button>
@@ -1408,6 +1408,63 @@ var BlockListPage = {
 
 // ==== 圈子（S21-C2） ====
 // ==== 贵族装扮（S21-C3） ====
+// ==== 亲密关系（S21-C4） ====
+var IntimacyPage = {
+  data: function(){return {userId:0,rel:null,anniversaries:[],badges:[],loading:true,err:false}},
+  methods: {
+    load: async function(){
+      var s=this;s.loading=true;s.err=false;
+      s.userId=parseInt(this.$route.params.userId);
+      try{var r=await api("/intimacy/"+s.userId);s.rel=r.data||{score:0,level:0,level_name:"初识",progress_percent:0}}catch(e){s.err=true}
+      try{var a=await api("/intimacy/"+s.userId+"/anniversaries");s.anniversaries=a.data||[]}catch(e){s.anniversaries=[]}
+      try{var b=await api("/intimacy/badges");s.badges=b.data||[]}catch(e){s.badges=[]}
+      s.loading=false;
+    },
+    levelIcon: function(lv){return ["💗","💘","💞","💕","❤️"][lv]||"💗"},
+    annText: function(ev){var m={match:"初遇",level_up_1:"心动时刻",level_up_2:"暧昧升温",level_up_3:"恋爱纪念",level_up_4:"挚爱之约"};return m[ev.event_type]||ev.event_type},
+    fmtDate: function(d){if(!d)return"";try{var t=new Date(d);return t.getFullYear()+"-"+("0"+(t.getMonth()+1)).slice(-2)+"-"+("0"+t.getDate()).slice(-2)}catch(e){return d}},
+    fmtDur: function(sec){sec=sec||0;var m=Math.floor(sec/60);return m>=60?Math.floor(m/60)+"小时"+m%60+"分":m+"分钟"}
+  },
+  mounted: function(){this.load()},
+  template: `<div style="padding:16px">
+    <div v-if="loading" style="text-align:center;padding:48px"><div class="spin"></div></div>
+    <div v-else-if="err" class="empty"><div class="ei">😵</div><div class="et">加载失败</div><button class="btn bp bs" @click="load">重试</button></div>
+    <div v-else-if="!rel" class="empty"><div class="ei">💔</div><div class="et">暂无亲密关系</div><div class="ed">多聊天、打电话、送礼物可以提升亲密度</div></div>
+    <div v-else>
+      <div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;border-radius:var(--r);padding:24px;text-align:center;margin-bottom:16px">
+        <div style="font-size:44px">{{levelIcon(rel.level)}}</div>
+        <div style="font-size:22px;font-weight:700;margin-top:8px">{{rel.level_name}}</div>
+        <div style="font-size:13px;opacity:.85;margin-top:4px">亲密值 {{rel.score||0}} 分</div>
+        <div style="height:8px;background:rgba(255,255,255,.3);border-radius:4px;margin-top:14px;overflow:hidden">
+          <div style="height:100%;background:#fff;border-radius:4px;transition:width .5s" :style="{width:(rel.progress_percent||0)+'%'}"></div>
+        </div>
+        <div style="font-size:12px;opacity:.8;margin-top:6px" v-if="rel.level<4">距离{{rel.next_level_score}}分升级下一等级（{{rel.progress_percent||0}}%）</div>
+        <div style="font-size:12px;opacity:.8;margin-top:6px" v-else>已满级，你们是最亲密的伴侣！</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <div style="flex:1;background:var(--w);border-radius:var(--rs);padding:12px;text-align:center;box-shadow:var(--sh)"><div style="font-size:20px">💬</div><div style="font-size:16px;font-weight:600;margin-top:4px">{{rel.total_chat_count||0}}</div><div style="font-size:11px;color:var(--tm)">聊天消息</div></div>
+        <div style="flex:1;background:var(--w);border-radius:var(--rs);padding:12px;text-align:center;box-shadow:var(--sh)"><div style="font-size:20px">📞</div><div style="font-size:16px;font-weight:600;margin-top:4px">{{fmtDur(rel.total_call_duration)}}</div><div style="font-size:11px;color:var(--tm)">通话时长</div></div>
+        <div style="flex:1;background:var(--w);border-radius:var(--rs);padding:12px;text-align:center;box-shadow:var(--sh)"><div style="font-size:20px">🎁</div><div style="font-size:16px;font-weight:600;margin-top:4px">{{rel.total_gift_value||0}}</div><div style="font-size:11px;color:var(--tm)">礼物价值</div></div>
+      </div>
+      <div style="font-size:14px;font-weight:600;margin:0 0 10px">🏅 成就徽章</div>
+      <div v-if="badges.length===0" style="color:var(--tm);font-size:13px;margin-bottom:14px">暂无徽章</div>
+      <div v-else style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+        <div v-for="b in badges" :key="b.id" style="background:var(--w);border-radius:var(--rs);padding:12px;text-align:center;box-shadow:var(--sh)">
+          <div style="font-size:28px">{{b.icon_url||'🏅'}}</div>
+          <div style="font-size:12px;font-weight:600;margin-top:4px">{{b.name}}</div>
+          <div style="font-size:10px;color:var(--tm)">{{b.unlocked_at?"解锁于"+fmtDate(b.unlocked_at):"未解锁"}}</div>
+        </div>
+      </div>
+      <div style="font-size:14px;font-weight:600;margin:0 0 10px">📅 纪念日</div>
+      <div v-if="anniversaries.length===0" style="color:var(--tm);font-size:13px">还没有纪念日，一起创造第一个吧</div>
+      <div v-else v-for="a in anniversaries" :key="a.id" style="display:flex;align-items:center;gap:12px;background:var(--w);border-radius:var(--rs);padding:12px;margin-bottom:8px;box-shadow:var(--sh)">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px">📌</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:500">{{annText(a)}}</div><div style="font-size:12px;color:var(--tm);margin-top:2px">{{fmtDate(a.event_date)}}</div></div>
+      </div>
+    </div>
+  </div>`
+};
+
 var NoblePage = {
   data: function(){return {levels:[],items:[],myItems:[],tab:"avatar_frame",loading:true,vipInfo:null,acting:false}},
   computed: { tabs: function(){return [{k:"avatar_frame",l:"头像框"},{k:"chat_bubble",l:"聊天气泡"},{k:"name_tag",l:"名字铭牌"}]} },
@@ -1675,7 +1732,8 @@ var routes = [
   {path:"/following",component:FollowingPage},
   {path:"/community",component:CommunityPage},
   {path:"/noble",component:NoblePage},
-  {path:"/orders",component:OrdersPage}
+  {path:"/orders",component:OrdersPage},
+  {path:"/intimacy/:userId",component:IntimacyPage}
 ];
 var router = VueRouter.createRouter({history:VueRouter.createWebHashHistory(),routes:routes});
 router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录",community:"圈子",noble:"贵族装扮",orders:"我的订单"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";next()});
