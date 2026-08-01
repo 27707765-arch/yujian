@@ -1201,7 +1201,7 @@ var MyPage = {
     logout: function(){localStorage.clear();this.$router.replace("/login");toast("已退出登录","tinfo")}
   },
   mounted: function(){this.load()},
-  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img loading="lazy" v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'📅',label:'签到领金币',path:'/checkin'},{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💎',label:'贵族装扮',path:'/noble'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'🧾',label:'我的订单',path:'/orders'},{ico:'🌐',label:'圈子',path:'/community'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
+  template: `<div><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:16px 20px 24px;position:relative"><div style="position:absolute;top:12px;right:16px;background:rgba(0,0,0,.25);color:#FFD700;padding:4px 12px;border-radius:14px;font-size:13px;font-weight:600">🪙 {{wallet.balance||0}}</div><div style="display:flex;align-items:center;gap:16px"><div class="avatar av-lg" style="border:3px solid rgba(255,255,255,.5)"><img loading="lazy" v-if="user&&user.avatar" :src="user.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-size:20px;font-weight:600">{{user?user.nickname:'加载中...'}}</div><div style="font-size:13px;opacity:.8;margin-top:4px">{{user&&user.bio?user.bio:'写下个性签名让大家更了解你'}}</div></div><span v-if="user&&user.is_vip" style="background:rgba(255,255,255,.3);color:#fff;padding:4px 12px;border-radius:12px;font-size:12px">👑VIP</span></div><div style="display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.2)"><div style="flex:1;text-align:center" @click.stop="$router.push('/recharge')"><div style="font-size:22px;font-weight:700">💰</div><div style="font-size:11px;opacity:.8">充值</div></div><div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:700">{{user&&user.age?user.age+'岁':'-'}}</div><div style="font-size:11px;opacity:.8">{{user&&user.location?user.location:'设置位置'}}</div></div></div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else style="padding:12px 16px"><div v-for="m in [{ico:'📅',label:'签到领金币',path:'/checkin'},{ico:'✏️',label:'编辑资料',path:'/edit-profile'},{ico:'👑',label:'会员中心',path:'/vip'},{ico:'💎',label:'贵族装扮',path:'/noble'},{ico:'💰',label:'金币充值',path:'/recharge'},{ico:'🧾',label:'我的订单',path:'/orders'},{ico:'🌐',label:'圈子',path:'/community'},{ico:'🎮',label:'互动游戏',path:'/game'},{ico:'💬',label:'破冰话题',path:'/icebreaker'},{ico:'📊',label:'我的收益',path:'/earnings'},{ico:'💝',label:'我的遇见',path:'/meet'},{ico:'👥',label:'粉丝',path:'/fans'},{ico:'❤️',label:'关注',path:'/following'},{ico:'⚙️',label:'设置',path:'/settings'}]" :key="m.path" @click="$router.push(m.path)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;cursor:pointer;box-shadow:var(--sh)"><span style="font-size:20px;margin-right:12px">{{m.ico}}</span><span style="flex:1;font-size:15px">{{m.label}}</span><span style="color:var(--tm)">›</span></div><button class="btn bo bw" style="margin-top:12px;color:var(--e);border-color:var(--e)" @click="logout">退出登录</button></div></div>`
 };
 
 var EditProfilePage = {
@@ -1472,6 +1472,115 @@ var BlockListPage = {
 // ==== 圈子（S21-C2） ====
 // ==== 贵族装扮（S21-C3） ====
 // ==== 亲密关系（S21-C4） ====
+// ==== 破冰（S21-C6） ====
+var IcebreakerPage = {
+  data: function(){return {q:null,flip:false,loading:true,topics:[],matchId:null}},
+  methods: {
+    load: async function(){
+      var s=this;s.loading=true;
+      try{var r=await api("/icebreaker/question/random");s.q=r.data||null}catch(e){s.q=null}
+      try{s.matchId=s.$route.query.match||null;if(s.matchId){var t=await api("/icebreaker/topics/"+s.matchId);s.topics=t.data||[]}}catch(e){s.topics=[]}
+      s.loading=false;
+    },
+    next: async function(){
+      var s=this;s.flip=false;s.loading=true;
+      try{var r=await api("/icebreaker/question/random");s.q=r.data||null}catch(e){s.q=null}
+      s.loading=false;
+    },
+    toggle: function(){this.flip=!this.flip}
+  },
+  mounted: function(){this.load()},
+  template: `<div style="padding:16px">
+    <div style="text-align:center;margin-bottom:16px"><div style="font-size:44px">💬</div><h2 style="margin:6px 0">破冰话题</h2><p style="color:var(--tm);font-size:13px">打破尴尬，开启话题</p></div>
+    <div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div>
+    <div v-else-if="!q" class="empty"><div class="ei">🎴</div><div class="et">暂时没有话题</div></div>
+    <div v-else>
+      <div @click="toggle" style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;border-radius:var(--r);padding:32px 24px;text-align:center;cursor:pointer;min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(255,94,125,.25)">
+        <div v-if="!flip">
+          <div style="font-size:13px;opacity:.85;margin-bottom:12px">点击翻面看选项</div>
+          <div style="font-size:20px;font-weight:600;line-height:1.6">{{q.question}}</div>
+        </div>
+        <div v-else>
+          <div style="font-size:15px;font-weight:600;margin-bottom:8px">你的选择？</div>
+          <div style="display:flex;gap:12px;margin-top:12px">
+            <div style="flex:1;background:rgba(255,255,255,.18);border-radius:14px;padding:16px 12px"><div style="font-size:22px">A</div><div style="font-size:14px;margin-top:6px">{{q.option_a}}</div></div>
+            <div style="flex:1;background:rgba(255,255,255,.18);border-radius:14px;padding:16px 12px"><div style="font-size:22px">B</div><div style="font-size:14px;margin-top:6px">{{q.option_b}}</div></div>
+          </div>
+        </div>
+        <div v-if="q.category" style="font-size:11px;opacity:.75;margin-top:14px"># {{q.category}}</div>
+      </div>
+      <button class="btn bp bw bl" style="margin-top:16px" @click="next">换一题</button>
+    </div>
+    <div v-if="topics.length" style="margin-top:20px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:10px">💡 你们的话题</div>
+      <div v-for="(tp,i) in topics" :key="i" style="background:var(--w);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;box-shadow:var(--sh)">
+        <div style="font-size:13px;color:var(--ts)">{{tp.content}}</div>
+        <div v-if="tp.category" style="font-size:11px;color:var(--tm);margin-top:4px"># {{tp.category}}</div>
+      </div>
+    </div>
+  </div>`
+};
+
+// ==== 游戏（S21-C6） ====
+var GamePage = {
+  data: function(){return {tab:"guess",word:null,input:"",result:null,showHint:false,loading:true,leaderboard:[],gameType:"guess_word",recording:false}},
+  methods: {
+    loadWord: async function(){
+      var s=this;s.loading=true;s.result=null;s.showHint=false;s.input="";
+      try{var r=await api("/game/random-word");s.word=r.data||null}catch(e){s.word=null}
+      s.loading=false;
+    },
+    check: async function(){
+      var s=this;
+      if(!s.word||!s.word.word){toast("题目还没准备好","tinfo");return}
+      if(!s.input.trim()){toast("请输入你的答案","tinfo");return}
+      var correct=s.input.trim()===s.word.word;
+      s.result={correct:correct,reveal:correct?null:s.word.word};
+      s.recording=true;
+      try{await api("/game/record",{method:"POST",body:JSON.stringify({game_type:"guess_word",result:correct?"win":"lose",score:correct?10:0,opponent_id:null})})}catch(e){}
+      s.recording=false;
+      if(window.NotificationUtils){window.NotificationUtils.showToast(correct?'🎉 猜对了！':('答案是 '+s.word.word),correct?'success':'info')}else{toast(correct?"猜对了！":"答案是 "+s.word.word,correct?"tok":"tinfo")}
+    },
+    nextWord: function(){this.loadWord()},
+    loadBoard: async function(){
+      var s=this;
+      try{var r=await api("/game/leaderboard?game_type="+s.gameType);s.leaderboard=r.data||[]}catch(e){s.leaderboard=[]}
+    }
+  },
+  mounted: function(){this.loadWord();this.loadBoard()},
+  template: `<div style="padding:16px">
+    <div style="text-align:center;margin-bottom:16px"><div style="font-size:44px">🎮</div><h2 style="margin:6px 0">互动游戏</h2><p style="color:var(--tm);font-size:13px">猜词挑战，增进默契</p></div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn bs" :class=\"tab==='guess'?'bp':'bo'\" style="flex:1" @click="tab='guess'">猜词</button>
+      <button class="btn bs" :class=\"tab==='board'?'bp':'bo'\" style="flex:1" @click="tab='board';loadBoard()">排行榜</button>
+    </div>
+    <div v-if="tab==='guess'">
+      <div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div>
+      <div v-else-if="!word" class="empty"><div class="ei">🎲</div><div class="et">题目加载失败</div><button class="btn bp bs" @click="loadWord">重试</button></div>
+      <div v-else style="background:var(--w);border-radius:var(--r);padding:24px;text-align:center;box-shadow:var(--sh)">
+        <div style="font-size:13px;color:var(--tm)">猜猜这是哪个词？（{{word.category||'分类未知'}} · {{word.difficulty==1?'简单':word.difficulty==2?'中等':'困难'}}）</div>
+        <div style="font-size:28px;font-weight:700;margin:20px 0;letter-spacing:4px">{{word.word.replace(/./g,'＿')}}</div>
+        <div v-if="showHint" style="font-size:14px;color:var(--ts);margin-bottom:12px">💡 提示：{{word.hint}}</div>
+        <div v-else style="font-size:12px;color:var(--tm);margin-bottom:12px">猜不出来？<span style="color:var(--p);cursor:pointer" @click="showHint=true">查看提示</span></div>
+        <div class="inp" style="margin-bottom:14px"><span>📝</span><input v-model="input" maxlength="20" placeholder="输入你的答案" @keydown.enter="check"></div>
+        <div v-if="result" style="font-size:14px;margin-bottom:12px" :style="{color:result.correct?'var(--s)':'var(--e)'}">{{result.correct?'🎉 答对了！':'很遗憾，答案是 '+result.reveal}}</div>
+        <div style="display:flex;gap:10px">
+          <button class="btn bp" style="flex:1" @click="check" :disabled="recording">{{recording?'记录中...':'提交答案'}}</button>
+          <button class="btn bo" style="flex:1" @click="nextWord">下一题</button>
+        </div>
+      </div>
+    </div>
+    <div v-else>
+      <div v-if="leaderboard.length===0" class="empty"><div class="ei">🏆</div><div class="et">暂无排行榜</div><div class="ed">玩一局猜词来上榜吧</div></div>
+      <div v-else v-for="(row,i) in leaderboard" :key="row.user_id" style="display:flex;align-items:center;gap:12px;background:var(--w);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;box-shadow:var(--sh)">
+        <div style="width:28px;text-align:center;font-size:18px;font-weight:700" :style="{color:i===0?'#F6D365':i===1?'#C0C0C0':i===2?'#CD7F32':'var(--tm)'}">{{i+1}}</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:500">用户 #{{row.user_id}}</div><div style="font-size:11px;color:var(--tm)">共 {{row.games||0}} 局</div></div>
+        <div style="font-size:15px;font-weight:600;color:var(--s)">🏆 {{row.wins||0}}胜</div>
+      </div>
+    </div>
+  </div>`
+};
+
 var IntimacyPage = {
   data: function(){return {userId:0,rel:null,anniversaries:[],badges:[],loading:true,err:false}},
   methods: {
@@ -1796,10 +1905,12 @@ var routes = [
   {path:"/community",component:CommunityPage},
   {path:"/noble",component:NoblePage},
   {path:"/orders",component:OrdersPage},
-  {path:"/intimacy/:userId",component:IntimacyPage}
+  {path:"/intimacy/:userId",component:IntimacyPage},
+  {path:"/icebreaker",component:IcebreakerPage},
+  {path:"/game",component:GamePage}
 ];
 var router = VueRouter.createRouter({history:VueRouter.createWebHashHistory(),routes:routes});
-router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录",community:"圈子",noble:"贵族装扮",orders:"我的订单"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";next()});
+router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录",community:"圈子",noble:"贵族装扮",orders:"我的订单",icebreaker:"破冰",game:"游戏"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";next()});
 
 // ==== App ====
 // 简短提示音（Web Audio API，无需外部文件）
