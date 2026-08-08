@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260804a";
+var APP_VERSION = "v20260808a";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
@@ -51,7 +51,13 @@ async function api(url, opts) {
       var r=await fetch("/api"+url, Object.assign({},opts,{headers:Object.assign({},h,opts.headers||{}),signal:ctrl.signal}));
       clearTimeout(timer);
       var d=await r.json();
-      if(r.status===401){localStorage.clear();location.hash="#/login";throw new Error("登录已过期，请重新登录")}
+      if(r.status===401){
+        var here=location.hash.replace(/^#/,'');
+        localStorage.clear();try{ws&&ws.close()}catch(e){}
+        // 先清空再写入回跳地址，避免 clear 覆盖
+        if(here&&here!=="/login"&&here!=="/")localStorage.setItem("postLoginRedirect",here);
+        location.hash="#/login";throw new Error("登录已过期，请重新登录");
+      }
       if(d&&d.code!==undefined&&d.code!==0)throw new Error(d.message||"请求失败");
       return d;
     }catch(e){
@@ -80,6 +86,22 @@ function fmtImg(u){
   if(u.charAt(0)==="/")return "/uploads/"+u.slice(1);
   return u;
 }
+// 图片加载失败占位：置渐变底 + 去 src + 显 👤（避免列表留白）
+// 兼容两种调用：@error="imgFallback($event)"（模板）或全局 error 捕获（传 event）
+function imgFallback(e){
+  var el=e&&e.target?e.target:e;
+  if(!el||!el.dataset||el.tagName!=="IMG")return;
+  if(el.dataset.fallbackDone)return;
+  el.dataset.fallbackDone="1";
+  el.style.background="linear-gradient(135deg,#f2f2f2,#e6e6e6)";
+  el.style.color="#bbb";
+  el.style.fontSize="28px";
+  el.style.display="inline-flex";
+  el.style.alignItems="center";
+  el.style.justifyContent="center";
+  el.removeAttribute("src");
+  el.setAttribute("alt","👤");
+}
 
 // ==== 全局图片预览（点击放大 + 左右滑动 + 关闭） ====
 // 复用 index.html 已预留的 .image-preview-* CSS 类，用 Vue.reactive 保证模板响应
@@ -97,12 +119,12 @@ function previewNext(){ if(pv.list.length)pv.idx=(pv.idx+1)%pv.list.length; }
 // ==== 页面组件 ====
 var WelcomePage = {
   methods: { go: function(){ var t=token(); this.$router.replace(t?"/home":"/login"); } },
-  mounted: function(){ var s=this; setTimeout(function(){s.go()},2000); },
+  mounted: function(){ var s=this; setTimeout(function(){s.go()},500); },
   template: `<div class="welcome" @click="go"><div style="font-size:72px;animation:hp .6s">💕</div><h1 style="font-size:36px;margin:16px 0">遇见</h1><p style="font-size:16px;opacity:.9">同城交友，遇见心动</p><p style="font-size:13px;opacity:.6;margin-top:32px">点击屏幕进入</p></div>`
 };
 
 var LoginPage = {
-  data: function(){ return {phone:"",code:"",sent:false,countdown:0,loading:false}; },
+  data: function(){ return {phone:"",code:"",sent:false,countdown:0,loading:false,adult:false}; },
   methods: {
     sendCode: async function(){
       if(!/^1[3-9]\d{9}$/.test(this.phone)){toast("请输入正确的手机号","terr");return}
@@ -110,8 +132,9 @@ var LoginPage = {
     },
     doLogin: async function(){
       if(!this.phone||!this.code){toast("请输入手机号和验证码","terr");return}
+      if(!this.adult){toast("请先勾选「我已年满18周岁」","terr");return}
       this.loading=true;
-      try{var r=await api("/auth/login",{method:"POST",body:JSON.stringify({login:this.phone,code:this.code})});if(r.code===0&&r.data){localStorage.setItem("token",r.data.token);localStorage.setItem("userId",r.data.user.id);if(r.data.user.nickname)localStorage.setItem("uname",r.data.user.nickname);if(r.data.user.avatar)localStorage.setItem("uavatar",r.data.user.avatar);wsConnect();toast("登录成功","tok");this.$router.replace("/home")}else toast(r.message||"登录失败","terr")}catch(e){toast(e.message||"网络错误，请检查网络后重试","terr")}
+      try{var r=await api("/auth/login",{method:"POST",body:JSON.stringify({login:this.phone,code:this.code})});if(r.code===0&&r.data){localStorage.setItem("token",r.data.token);localStorage.setItem("userId",r.data.user.id);if(r.data.user.nickname)localStorage.setItem("uname",r.data.user.nickname);if(r.data.user.avatar)localStorage.setItem("uavatar",r.data.user.avatar);wsConnect();toast("登录成功","tok");var back=localStorage.getItem("postLoginRedirect");localStorage.removeItem("postLoginRedirect");this.$router.replace(back||"/home")}else toast(r.message||"登录失败","terr")}catch(e){toast(e.message||"网络错误，请检查网络后重试","terr")}
       this.loading=false;
     }
   },
@@ -119,8 +142,9 @@ var LoginPage = {
   <div style="text-align:center;margin-bottom:40px"><div style="font-size:56px">💕</div><h2 style="margin-top:8px">欢迎来到遇见</h2><p style="color:var(--tm);font-size:13px;margin-top:4px">手机号登录，即刻开启交友</p></div>
   <div class="inp" style="margin-bottom:12px"><span>📱</span><input v-model="phone" type="tel" maxlength="11" placeholder="请输入手机号" autocomplete="tel"></div>
   <div class="inp" style="margin-bottom:24px"><span>🔐</span><input v-model="code" type="text" maxlength="6" placeholder="验证码" autocomplete="one-time-code"><button class="btn bs" :class="sent&&countdown>0?'bo':'bp'" @click="sendCode" :disabled="sent&&countdown>0">{{sent&&countdown>0?countdown+'s':'获取验证码'}}</button></div>
-  <button class="btn bp bw bl" @click="doLogin" :disabled="loading">{{loading?'登录中...':'登录/注册'}}</button>
-  <p style="text-align:center;margin-top:24px;font-size:12px;color:var(--tm)">登录即表示同意<span style="color:var(--p)">用户协议</span>和<span style="color:var(--p)">隐私政策</span></p></div>`
+  <button class="btn bp bw bl" @click="doLogin" :disabled="loading||!adult">{{loading?'登录中...':'登录/注册'}}</button>
+  <label style="display:flex;align-items:center;gap:6px;justify-content:center;margin-top:16px;font-size:12px;color:var(--ts);cursor:pointer"><input type="checkbox" v-model="adult" style="width:16px;height:16px;accent-color:#FF5E7D">我已年满18周岁，并同意<span style="color:var(--p)">《用户协议》</span>和<span style="color:var(--p)">《隐私政策》</span></label>
+  <p style="text-align:center;margin-top:12px;font-size:12px;color:var(--tm)">登录即表示同意用户协议和隐私政策</p></div>`
 };
 
 var HomePage = {
@@ -764,11 +788,14 @@ var ChatDetailPage = {
         self.mediaRecorder.ondataavailable=function(e){if(e.data.size>0)self.audioChunks.push(e.data)};
         self.mediaRecorder.onstop=function(){self.sendVoice()};
         self.mediaRecorder.start();self.recording=true;
+        // 录音超过60秒自动停止（防止无限录音）
+        self._recTimer=setTimeout(function(){if(self.recording){toast("录音已达60秒上限","tinfo");self.stopRecording()}},60000);
       }catch(e){toast("无法访问麦克风","terr")}
     },
     stopRecording: function(){
       var self=this;if(self.mediaRecorder&&self.recording){self.mediaRecorder.stop();self.recording=false;
         self.mediaRecorder.stream.getTracks().forEach(function(t){t.stop()})}
+      if(self._recTimer){clearTimeout(self._recTimer);self._recTimer=null}
     },
     sendVoice: async function(){
       var self=this;if(self.audioChunks.length===0)return;
@@ -793,13 +820,6 @@ var ChatDetailPage = {
       self.callType="voice";self.callPartnerId=self.partnerId;
       self.callPartnerName=self.partner.nickname||"对方";
       self.doCall();
-    },
-    onVideoCall: function(){
-      var self=this;self.showPlusPanel=false;
-      // 视频通话暂未支持，保留"敬请期待"占位
-      if(window.NotificationUtils){
-        window.NotificationUtils.showToast('视频通话功能即将上线，敬请期待','info');
-      } else { toast("视频通话功能即将上线，敬请期待","tinfo"); }
     },
     doCall: function(){
       var self=this;
@@ -1300,10 +1320,6 @@ var ChatDetailPage = {
           <div style="width:62px;height:62px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 1px 3px rgba(0,0,0,.08)">📸</div>
           <span style="font-size:12px;color:#666">拍摄</span>
         </div>
-        <div @click="onVideoCall" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
-          <div style="width:62px;height:62px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 1px 3px rgba(0,0,0,.08);position:relative">📹<span style="position:absolute;top:-4px;right:-6px;background:#FF6B9D;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px">敬请期待</span></div>
-          <span style="font-size:12px;color:#666">视频通话</span>
-        </div>
         <div @click="onVoiceCall" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
           <div style="width:62px;height:62px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 1px 3px rgba(0,0,0,.08)">📞</div>
           <span style="font-size:12px;color:#666">语音通话</span>
@@ -1416,7 +1432,7 @@ var MyPage = {
   data: function(){return {user:null,social:{guarding:0,following:0,fans:0,viewers:0},loading:true,hasLoaded:false}},
   methods: {
     load: async function(){this.loading=true;try{var ur=await api("/user/info");this.user=ur.data;if(this.user){localStorage.setItem("uname",this.user.nickname||"");if(this.user.avatar)localStorage.setItem("uavatar",this.user.avatar)}}catch(e){}try{var sr=await api("/user/social-counts");if(sr.data)this.social=sr.data}catch(e){}this.loading=false;this.hasLoaded=true},
-    logout: function(){localStorage.clear();this.$router.replace("/login");toast("已退出登录","tinfo")}
+    logout: function(){if(!window.confirm("确定退出登录？登录态与本地缓存将一并清除"))return;localStorage.clear();try{ws&&ws.close()}catch(e){}this.$router.replace("/login");toast("已退出登录","tinfo")}
   },
   mounted: function(){this.load()},
   // keep-alive 缓存恢复时静默刷新用户信息/钱包余额/社交计数
@@ -1735,7 +1751,7 @@ var OrdersPage = {
 
 var SettingsPage = {
   methods: {clearCache:function(){try{localStorage.clear();if(typeof caches!=="undefined")caches.keys().then(function(k){k.forEach(function(c){caches.delete(c)})});toast("缓存已清除","tok")}catch(e){toast("清除失败","terr")}}},
-  template: `<div style="padding:12px 16px"><div v-for="item in [{i:'🛡️',l:'认证中心',p:'/verification'},{i:'🚫',l:'黑名单',p:'/blocklist'},{i:'🔒',l:'账号安全',p:'/account-security'},{i:'🔔',l:'消息通知',p:'/notifications'},{i:'❓',l:'帮助与反馈',p:'/help'},{i:'📄',l:'关于我们',d:APP_VERSION+' 公测版'}]" :key="item.l" @click="item.p&&$router.push(item.p)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh);cursor:pointer"><span style="font-size:20px;margin-right:12px">{{item.i}}</span><div style="flex:1"><div style="font-size:15px">{{item.l}}</div><div v-if="item.d" style="font-size:12px;color:var(--tm)">{{item.d}}</div></div><span style="color:var(--tm)">{{item.p?'›':''}}</span></div><button class="btn bo bw" style="margin-top:16px" @click="clearCache">清除缓存</button></div>`
+  template: `<div style="padding:12px 16px"><div v-for="item in [{i:'🛡️',l:'认证中心',p:'/verification'},{i:'🚫',l:'黑名单',p:'/blocklist'},{i:'🔒',l:'账号安全',p:'/account-security'},{i:'🔔',l:'消息通知',p:'/notifications'},{i:'❓',l:'帮助与反馈',p:'/help'},{i:'📄',l:'关于我们',d:APP_VERSION+' 公测版'},{i:'🗑️',l:'注销账号',p:'/deactivate'}]" :key="item.l" @click="item.p&&$router.push(item.p)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh);cursor:pointer"><span style="font-size:20px;margin-right:12px">{{item.i}}</span><div style="flex:1"><div style="font-size:15px">{{item.l}}</div><div v-if="item.d" style="font-size:12px;color:var(--tm)">{{item.d}}</div></div><span style="color:var(--tm)">{{item.p?'›':''}}</span></div><button class="btn bo bw" style="margin-top:16px" @click="clearCache">清除缓存</button></div>`
 };
 
 var VerificationPage = {
@@ -2418,6 +2434,28 @@ var PlaceholderPage = {
   template: `<div style="padding:48px 24px;text-align:center"><div style="font-size:56px;margin-bottom:16px">{{icon}}</div><div style="font-size:20px;font-weight:600;color:var(--t);margin-bottom:8px">{{title}}</div><div style="font-size:14px;color:var(--tm);margin-bottom:24px">该功能正在建设中，敬请期待{{appVersion}}</div><button class="btn bp bs" @click="$router.back()">返回</button></div>`
 };
 
+var DeactivatePage = {
+  data: function(){return {submitting:false}},
+  methods: {
+    submit: async function(){
+      var s=this;
+      if(!window.confirm("确认注销账号？注销后进入14天冷静期，期间可联系客服恢复。此操作不可逆转，请谨慎操作。"))return;
+      s.submitting=true;
+      try{
+        var r=await api("/user/deactivate",{method:"POST",body:JSON.stringify({})});
+        if(r.code===0){toast(r.message||"已提交注销申请","tok");localStorage.clear();try{ws&&ws.close()}catch(e){}this.$router.replace("/login");}
+        else toast(r.message||"注销申请提交失败","terr");
+      }catch(e){toast(e.message||"注销功能筹备中，敬请期待","tinfo")}
+      s.submitting=false;
+    }
+  },
+  template: `<div style="padding:24px 16px"><div class="card" style="padding:24px"><div style="font-size:40px;text-align:center;margin-bottom:12px">🗑️</div><div style="font-size:18px;font-weight:600;text-align:center;margin-bottom:12px">注销账号</div><div style="font-size:13px;color:var(--tm);line-height:1.7;margin-bottom:20px">注销后账号资料将被冻结，进入 <b>14 天冷静期</b>，期间可联系客服恢复。冷静期满后账号及所有数据将被永久删除，不可恢复。请谨慎操作。</div><button class="btn bp bs bw" style="width:100%" @click="submit" :disabled="submitting">{{submitting?'提交中...':'申请注销'}}</button></div></div>`
+};
+
+var NotFoundPage = {
+  template: `<div style="padding:48px 24px;text-align:center"><div style="font-size:56px;margin-bottom:16px">🚧</div><div style="font-size:20px;font-weight:600;color:var(--t);margin-bottom:8px">页面不存在</div><div style="font-size:14px;color:var(--tm);margin-bottom:24px">你访问的页面找不到了</div><button class="btn bp bs" @click="$router.replace('/home')">返回首页</button></div>`
+};
+
 var routes = [
   {path:"/",component:WelcomePage},{path:"/login",component:LoginPage},
   {path:"/home",component:HomePage},{path:"/discover",component:DiscoverPage},
@@ -2425,6 +2463,7 @@ var routes = [
   {path:"/post/:id",component:PostDetailPage},{path:"/user/:id",component:UserProfilePage},
   {path:"/edit-profile",component:EditProfilePage},{path:"/vip",component:VipPage},
   {path:"/settings",component:SettingsPage},{path:"/my",component:MyPage},
+  {path:"/deactivate",component:DeactivatePage},
   {path:"/checkin",component:CheckinPage},
   {path:"/verification",component:VerificationPage},
   {path:"/blocklist",component:BlockListPage},
@@ -2441,10 +2480,11 @@ var routes = [
   {path:"/orders",component:OrdersPage},
   {path:"/intimacy/:userId",component:IntimacyPage},
   {path:"/icebreaker",component:IcebreakerPage},
-  {path:"/game",component:GamePage}
+  {path:"/game",component:GamePage},
+  {path:'/:pathMatch(.*)*',component:NotFoundPage}
 ];
 var router = VueRouter.createRouter({history:VueRouter.createWebHashHistory(),routes:routes});
-router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录",community:"圈子",noble:"贵族装扮",orders:"我的订单",wallet:"我的钱包",icebreaker:"破冰",game:"游戏",guarding:"我的守护",viewers:"最近访客",fans:"我的粉丝",following:"我的关注"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";previewClose();next()});
+router.beforeEach(function(to,from,next){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录",community:"圈子",noble:"贵族装扮",orders:"我的订单",wallet:"我的钱包",icebreaker:"破冰",game:"游戏",guarding:"我的守护",viewers:"最近访客",fans:"我的粉丝",following:"我的关注"};document.title=(m[to.path.replace("/","")]||"遇见")+" - 遇见";previewClose();if(to.path!=="/"&&from.path==="/"){next(true);return}next()});
 // 换页后重置共享滚动容器 .pg 的滚动位置，避免新页面停在旧滚动位置
 router.afterEach(function(){var el=document.querySelector(".pg");if(el)el.scrollTop=0});
 
@@ -2452,7 +2492,7 @@ router.afterEach(function(){var el=document.querySelector(".pg");if(el)el.scroll
 // 简短提示音（Web Audio API，无需外部文件）
 function _playBeep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=800;o.type="sine";g.gain.setValueAtTime(0.25,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);}catch(e){}}
 var AppRoot = {
-  data: function(){return {toasts:toasts,uiState:uiState,appVersion:APP_VERSION,unreadCount:0,pv:pv}},
+  data: function(){return {toasts:toasts,uiState:uiState,appVersion:APP_VERSION,unreadCount:0,pv:pv,online:navigator.onLine}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
@@ -2547,6 +2587,14 @@ var AppRoot = {
   },
   mounted: function(){
     var self=this;
+    // 全局图片加载失败兜底（捕获阶段拦截所有 IMG error）
+    self._imgErrFn=function(e){if(e&&e.target&&e.target.tagName==="IMG")imgFallback(e)};
+    document.addEventListener("error",self._imgErrFn,true);
+    // 离线状态监听
+    self._onlineFn=function(){self.online=true};
+    self._offlineFn=function(){self.online=false};
+    window.addEventListener("online",self._onlineFn);
+    window.addEventListener("offline",self._offlineFn);
     // 消息通知
     self._gMsgFn=function(d){self.onGlobalMsg(d)};
     wsOn("message",self._gMsgFn);
@@ -2570,12 +2618,15 @@ var AppRoot = {
     self.registerPushToken();
   },
   beforeUnmount: function(){
+    if(this._imgErrFn)document.removeEventListener("error",this._imgErrFn,true);
+    if(this._onlineFn)window.removeEventListener("online",this._onlineFn);
+    if(this._offlineFn)window.removeEventListener("offline",this._offlineFn);
     wsOff("message",this._gMsgFn);
     wsOff("match_success",this._matchFn);
     wsOff("super_like_received",this._superLikeFn);
     if(this._unreadTimer)clearInterval(this._unreadTimer);
   },
-  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">‹</button><span class="tt">{{pageTitle}}</span></header><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><keep-alive include=\"HomePage,DiscoverPage,ChatListPage,MyPage\"><component :is=\"Component\" :key=\"route.fullPath\"/></keep-alive></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\">💬<span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div><div v-if="pv.show" class="image-preview-overlay" @click="preview.close()"><img class="image-preview-img" :src="pv.list[pv.idx]" @click.stop><button class="image-preview-close" @click="preview.close()">✕</button><span v-if="pv.list.length>1" style="position:fixed;top:50%;left:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.prev()">‹</span><span v-if="pv.list.length>1" style="position:fixed;top:50%;right:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.next()">›</span><span class="image-preview-counter">{{pv.idx+1}}/{{pv.list.length}}</span></div></div>`
+  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">‹</button><span class="tt">{{pageTitle}}</span></header><div v-if="!online" class="offline-banner">📡 当前离线，部分功能暂不可用</div><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><keep-alive include=\"HomePage,DiscoverPage,ChatListPage,MyPage\"><component :is=\"Component\" :key=\"route.fullPath\"/></keep-alive></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\">💬<span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div><div v-if="pv.show" class="image-preview-overlay" @click="preview.close()"><img class="image-preview-img" :src="pv.list[pv.idx]" @click.stop><button class="image-preview-close" @click="preview.close()">✕</button><span v-if="pv.list.length>1" style="position:fixed;top:50%;left:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.prev()">‹</span><span v-if="pv.list.length>1" style="position:fixed;top:50%;right:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.next()">›</span><span class="image-preview-counter">{{pv.idx+1}}/{{pv.list.length}}</span></div></div>`
 };
 
 var app = Vue.createApp(AppRoot);
