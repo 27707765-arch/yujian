@@ -7,8 +7,11 @@ const { executeQuery } = require('../utils/database');
 const { success, serverError } = require('../utils/response');
 
 function safeRows(result) {
-  if (!result || !Array.isArray(result)) return [];
-  return result;
+  if (!result) return [];
+  // executeQuery 返回 [rows, fields]，取第一层 rows；内存降级时返回 [[], []]
+  if (Array.isArray(result) && Array.isArray(result[0])) return result[0] || [];
+  if (Array.isArray(result)) return result;
+  return [];
 }
 
 function safeFirst(result, defaultValue = {}) {
