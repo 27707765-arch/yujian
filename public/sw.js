@@ -1,5 +1,5 @@
 // 遇见APP Service Worker - v4 修复缓存和离线支持
-const CACHE_VERSION = 'yujian-v7';
+const CACHE_VERSION = 'yujian-v8';
 const STATIC_PREFIX = '/js/';
 const UPLOAD_PREFIX = '/uploads/';
 
@@ -82,5 +82,36 @@ self.addEventListener('fetch', event => {
         return new Response('Offline', { status: 503 });
       })
     )
+  );
+});
+
+// U30 WebPush 真注册：接收系统推送并展示通知
+self.addEventListener('push', event => {
+  let data = { title: '遇见', body: '你有一条新消息', icon: '/icon.png', url: '/chat' };
+  try {
+    if (event.data) data = Object.assign(data, event.data.json());
+  } catch (e) {}
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon || '/icon.png',
+      badge: '/icon.png',
+      tag: data.tag || 'yujian-push',
+      data: { url: data.url || '/chat' }
+    })
+  );
+});
+
+// 点击通知：聚焦并跳转
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/chat';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => {
+      for (const c of ws) {
+        if ('focus' in c) { c.focus(); c.navigate(url); return; }
+      }
+      return clients.openWindow(url);
+    })
   );
 });

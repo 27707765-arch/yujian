@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260808c";
+var APP_VERSION = "v20260808d";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
@@ -340,7 +340,7 @@ var HomePage = {
     <button class="btn bp bs bw" @click="load();showFilter=false">应用</button>
   </div>
   <div v-if="loading" style="padding:4px 0">
-    <div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div style="flex:1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div>
+    <div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div class="flex1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div>
   </div>
   <div v-else-if="err" class="empty" style="padding:48px 24px"><div style="font-size:48px;margin-bottom:12px">😵</div><div style="color:var(--ts);margin-bottom:16px;font-size:14px">{{errMsg}}</div><button class="btn bp bs" @click="load">重试</button></div>
   <div v-else-if="users.length===0" class="empty"><div class="ei">🔍</div><div class="et">{{tab==='city'?'暂无同城用户':'暂无附近用户'}}</div><div class="ed">换个时间再来或调整筛选条件</div><button class="btn bp bs" @click="load">刷新</button></div>
@@ -374,7 +374,7 @@ var HomePage = {
   <div v-if="matchModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center">
     <div style="background:#fff;border-radius:20px;padding:28px 24px;width:300px;text-align:center;position:relative">
       <button @click="closeMatchModal" style="position:absolute;top:10px;right:14px;border:none;background:none;font-size:18px;cursor:pointer;color:var(--tm)">✕</button>
-      <div style="font-size:40px">💕</div>
+      <div style="position:relative;height:60px"><div class="heart-anim" style="font-size:40px;position:absolute;left:50%;top:0;transform:translateX(-50%)">💕</div><span v-for="n in 6" :key="'mh'+n" class="match-particle" :style="{left:(16+n*12)+'%',animationDelay:(n*0.15)+'s'}">❤️</span></div>
       <h2 style="margin:10px 0 4px">匹配成功！</h2>
       <p style="color:var(--tm);font-size:13px;margin-bottom:14px">你和{{matchModal.partner.nickname||'TA'}}互相喜欢</p>
       <div class="avatar av-lg" style="margin:0 auto 14px"><img loading="lazy" v-if="matchModal.partner.avatar" :src="matchModal.partner.avatar"><span v-else>👤</span></div>
@@ -592,7 +592,7 @@ var PostDetailPage = {
     <div style="padding:0 16px;margin-bottom:80px">
       <h4 style="margin-bottom:12px;font-size:14px;color:var(--ts)">评论 ({{comments.length}})</h4>
       <div v-if="comments.length===0" class="empty" style="padding:24px"><div style="font-size:32px;opacity:.4">💬</div><p style="color:var(--tm);font-size:13px">还没有评论</p></div>
-      <div v-for="c in comments" :key="c.id||Math.random()" style="display:flex;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--b)"><div class="avatar av-sm"><img loading="lazy" v-if="c.avatar" :src="c.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-weight:500;font-size:13px;margin-bottom:4px">{{c.nickname}}<span style="font-size:11px;color:var(--tm);margin-left:8px">{{timeAgo(c.created_at)}}</span></div><p style="font-size:14px;line-height:1.5">{{c.content}}</p></div></div>
+      <div v-for="c in comments" :key="c.id||Math.random()" style="display:flex;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--b)"><div class="avatar av-sm"><img loading="lazy" v-if="c.avatar" :src="c.avatar"><span v-else>👤</span></div><div class="flex1"><div style="font-weight:500;font-size:13px;margin-bottom:4px">{{c.nickname}}<span style="font-size:11px;color:var(--tm);margin-left:8px">{{timeAgo(c.created_at)}}</span></div><p style="font-size:14px;line-height:1.5">{{c.content}}</p></div></div>
     </div>
     <div style="position:fixed;bottom:0;left:0;right:0;padding:10px 16px;background:var(--w);border-top:1px solid var(--b);display:flex;gap:10px;z-index:100;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))"><div class="inp" style="flex:1;border-radius:20px"><input v-model="text" placeholder="写评论..." @keydown.enter="addComment"></div><button class="btn bp bs" @click="addComment" :disabled="!text.trim()">发送</button></div>
   </div></div>`
@@ -741,7 +741,7 @@ var ChatListPage = {
     wsOff("message",this._clWsFn);
     wsOff("online_status",this._clOnlineFn);
   },
-  template: `<div><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div style="flex:1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else><div v-if="convs.length===0" class="empty" style="margin-top:8px"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" class="conv-swipe" style="position:relative;overflow:hidden"><div class="conv-actions" style="position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1"><button style="border:none;background:#F6D365;color:#5b4a00;font-size:12px;padding:0 18px;cursor:pointer" @click.stop="delConv(c)">删除</button></div><div class="conv-item" :style="{transform:'translateX('+((c._swipeOffset||0)+'px')+')',transition:c._swipeOffset&&c._swipeOffset!==0?'transform .2s':'transform .2s'}" @touchstart.prevent="onTouchStart($event,c)" @touchmove.prevent="onTouchMove($event,c)" @touchend.prevent="onTouchEnd($event,c)" @touchcancel.prevent="onTouchEnd($event,c)" @click="open(c)"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><div class="conv-name-line"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span v-if="c.is_pinned" class="tag tp" style="font-size:10px;padding:0 4px;margin-left:4px">📌</span></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="conv-time">{{fmtTime(c.last_message_time)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span></div></div></div></div></div><div v-if="sheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300" @click="sheet=null"><div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;padding:12px 16px calc(16px + var(--safe-b))" @click.stop><div style="display:flex;align-items:center;padding:14px 8px;border-bottom:1px solid #f2f2f2;margin-bottom:8px"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="sheet.conv.other_avatar" :src="sheet.conv.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div></div><span style="font-size:16px;font-weight:600;margin-left:12px">{{sheet.conv.other_nickname||'用户'}}</span></div><div v-for="op in [{i:'✔️',l:'标为已读',f:function(){markRead(sheet.conv)}},{i:'📌',l:sheet.conv.is_pinned?'取消置顶':'置顶会话',f:function(){pinConv(sheet.conv)}},{i:'🗑️',l:'删除会话',f:function(){delConv(sheet.conv)}},{i:'🚫',l:'拉黑',f:function(){blockConv(sheet.conv)}}]" :key="op.l" style="display:flex;align-items:center;padding:14px 8px;border-radius:10px;cursor:pointer" @click="op.f"><span style="font-size:18px;margin-right:12px">{{op.i}}</span><span style="font-size:15px">{{op.l}}</span></div><button style="width:100%;margin-top:12px;padding:12px;border:none;background:#f5f5f5;border-radius:12px;font-size:15px;cursor:pointer;color:var(--tm)" @click="sheet=null">取消</button></div></div></div></div></div>`
+  template: `<div><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div class="flex1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else><div v-if="convs.length===0" class="empty" style="margin-top:8px"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" class="conv-swipe" style="position:relative;overflow:hidden"><div class="conv-actions" style="position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1"><button style="border:none;background:#F6D365;color:#5b4a00;font-size:12px;padding:0 18px;cursor:pointer" @click.stop="delConv(c)">删除</button></div><div class="conv-item" :style="{transform:'translateX('+((c._swipeOffset||0)+'px')+')',transition:c._swipeOffset&&c._swipeOffset!==0?'transform .2s':'transform .2s'}" @touchstart.prevent="onTouchStart($event,c)" @touchmove.prevent="onTouchMove($event,c)" @touchend.prevent="onTouchEnd($event,c)" @touchcancel.prevent="onTouchEnd($event,c)" @click="open(c)"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><div class="conv-name-line"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span v-if="c.is_pinned" class="tag tp" style="font-size:10px;padding:0 4px;margin-left:4px">📌</span></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="conv-time">{{fmtTime(c.last_message_time)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span></div></div></div></div></div><div v-if="sheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300" @click="sheet=null"><div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;padding:12px 16px calc(16px + var(--safe-b))" @click.stop><div style="display:flex;align-items:center;padding:14px 8px;border-bottom:1px solid #f2f2f2;margin-bottom:8px"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="sheet.conv.other_avatar" :src="sheet.conv.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div></div><span style="font-size:16px;font-weight:600;margin-left:12px">{{sheet.conv.other_nickname||'用户'}}</span></div><div v-for="op in [{i:'✔️',l:'标为已读',f:function(){markRead(sheet.conv)}},{i:'📌',l:sheet.conv.is_pinned?'取消置顶':'置顶会话',f:function(){pinConv(sheet.conv)}},{i:'🗑️',l:'删除会话',f:function(){delConv(sheet.conv)}},{i:'🚫',l:'拉黑',f:function(){blockConv(sheet.conv)}}]" :key="op.l" style="display:flex;align-items:center;padding:14px 8px;border-radius:10px;cursor:pointer" @click="op.f"><span style="font-size:18px;margin-right:12px">{{op.i}}</span><span style="font-size:15px">{{op.l}}</span></div><button style="width:100%;margin-top:12px;padding:12px;border:none;background:#f5f5f5;border-radius:12px;font-size:15px;cursor:pointer;color:var(--tm)" @click="sheet=null">取消</button></div></div></div></div></div>`
 };
 
 
@@ -751,7 +751,7 @@ var ChatDetailPage = {
     userId:parseInt(localStorage.getItem("userId")),hasMore:true,
     loadingMore:false,uploading:false,sending:false,
     voiceMode:false,showEmojiPanel:false,showPlusPanel:false,
-    recording:false,mediaRecorder:null,audioChunks:[],
+    recording:false,mediaRecorder:null,audioChunks:[],recordingCancel:false,voiceRate:1,
     playingMsgId:null,voiceProgress:0,voicePlayTime:0,
     showGiftPanel:false,gifts:[],giftLoading:false,
     showStickerPanel:false,stickers:[],stickerLoading:false,stickersById:{},stickerCat:"",stickerVipOnly:false,
@@ -988,22 +988,32 @@ var ChatDetailPage = {
     },
     togglePlus: function(){this.showPlusPanel=!this.showPlusPanel;this.showEmojiPanel=false;this.showGiftPanel=false;this.showStickerPanel=false;if(this.showPlusPanel)this.blurInput();var self=this;Vue.nextTick(function(){self._resizeBottom(true)})},
     toggleEmoji: function(){this.showEmojiPanel=!this.showEmojiPanel;this.showPlusPanel=false;this.showGiftPanel=false;this.showStickerPanel=false;if(this.showEmojiPanel)this.blurInput();var self=this;Vue.nextTick(function(){self._resizeBottom(true)})},
-    startRecording: async function(){
+    startRecording: async function(e){
       var self=this;
+      self.recordingCancel=false;self.recStartY=e&&e.changedTouches?e.changedTouches[0].clientY:null;
       try{
         var stream=await navigator.mediaDevices.getUserMedia({audio:true});
         self.mediaRecorder=new MediaRecorder(stream);self.audioChunks=[];
         self.mediaRecorder.ondataavailable=function(e){if(e.data.size>0)self.audioChunks.push(e.data)};
-        self.mediaRecorder.onstop=function(){self.sendVoice()};
+        self.mediaRecorder.onstop=function(){if(!self.recordingCancel)self.sendVoice()};
         self.mediaRecorder.start();self.recording=true;
         // 录音超过60秒自动停止（防止无限录音）
         self._recTimer=setTimeout(function(){if(self.recording){toast("录音已达60秒上限","tinfo");self.stopRecording()}},60000);
       }catch(e){toast("无法访问麦克风","terr")}
     },
-    stopRecording: function(){
+    // 录音中移动：上滑>120px 标记取消（松手不发送）
+    onRecMove: function(e){
+      var self=this;
+      if(!self.recording||self.recStartY===null)return;
+      var y=e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].clientY:self.recStartY;
+      var dy=self.recStartY-y;
+      self.recordingCancel=dy>120;
+    },
+    stopRecording: function(e){
       var self=this;if(self.mediaRecorder&&self.recording){self.mediaRecorder.stop();self.recording=false;
         self.mediaRecorder.stream.getTracks().forEach(function(t){t.stop()})}
       if(self._recTimer){clearTimeout(self._recTimer);self._recTimer=null}
+      if(self.recordingCancel){toast("已取消发送","tinfo");self.audioChunks=[]}
     },
     sendVoice: async function(){
       var self=this;if(self.audioChunks.length===0)return;
@@ -1141,6 +1151,7 @@ var ChatDetailPage = {
       self.stopVoice(); // 同一时间只播一条，先停旧的
       var a=new Audio(self.voiceSrc(m.voice_url));
       a.preload="metadata";
+      a.playbackRate=self.voiceRate;
       self._audio=a;
       self.playingMsgId=m.id;self.voiceProgress=0;self.voicePlayTime=0;
       a.addEventListener("timeupdate",function(){
@@ -1158,6 +1169,17 @@ var ChatDetailPage = {
       var self=this;
       if(self._audio){try{self._audio.pause()}catch(e){}self._audio=null}
       self.playingMsgId=null;self.voiceProgress=0;self.voicePlayTime=0;
+    },
+    // 语音气泡长按：弹倍速选择
+    onVoiceRateMenu: function(m){
+      var self=this;
+      var rates=[0.75,1,1.5,2];
+      // 用当前消息的倍速快捷切换（循环：长按依次切 0.75→1→1.5→2）
+      var idx=rates.indexOf(self.voiceRate);
+      var next=rates[(idx+1)%rates.length];
+      self.voiceRate=next;
+      if(self._audio&&!self._audio.paused&&self.playingMsgId===m.id){self._audio.playbackRate=next}
+      toast("倍速 "+next+"×","tinfo");
     },
     openGiftPanel: function(){
       var self=this;self.showPlusPanel=false;self.showGiftPanel=true;self.blurInput();
@@ -1462,7 +1484,7 @@ var ChatDetailPage = {
               <img loading="lazy" :src="m.content" class="msg-img" style="max-width:200px;border-radius:6px;display:block" @load="scrollBottom" @click="preview.open([m.content],0)">
               <div v-if="m._sending" class="mstate"><span style="color:var(--tm)">⏳</span></div>
             </div>
-            <div v-else-if="m.type===2" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']" @click="playVoice(m)" style="cursor:pointer;position:relative">
+            <div v-else-if="m.type===2" :class="['msg-b',m.sender_id===userId?'msg-my':'msg-ot']" @click="playVoice(m)" @contextmenu.prevent="onVoiceRateMenu(m)" style="cursor:pointer;position:relative">
               <div style="display:flex;align-items:center;gap:8px">
                 <svg v-if="playingMsgId===m.id" viewBox="0 0 24 24" style="width:22px;height:22px;flex-shrink:0" :style="{fill:'none',stroke:m.sender_id===userId?'#fff':'#4a4a4a',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'}"><line x1="4" y1="9" x2="4" y2="15"></line><line x1="9" y1="4" x2="9" y2="20"></line><line x1="14" y1="9" x2="14" y2="15"></line><line x1="19" y1="4" x2="19" y2="20"></line></svg>
                 <svg v-else viewBox="0 0 24 24" style="width:22px;height:22px;flex-shrink:0" :style="{fill:'none',stroke:m.sender_id===userId?'#fff':'#4a4a4a',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'}"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>
@@ -1488,7 +1510,7 @@ var ChatDetailPage = {
         <svg v-if="!voiceMode" viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#1a1a1a;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10v1a7 7 0 0 0 14 0v-1"></path><line x1="12" y1="18" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg>
         <svg v-else viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#1a1a1a;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><rect x="6" y="4" width="12" height="16" rx="2"></rect><path d="M8 11h8"></path></svg>
       </button>
-      <button v-if="voiceMode" @pointerdown.prevent="startRecording" @pointerup.prevent="stopRecording" @pointerleave="stopRecording" style="flex:1;height:40px;border-radius:6px;border:1px solid #ddd;font-size:17px;cursor:pointer;color:#1a1a1a;transition:background .15s" :style="{background:recording?'#e0e0e0':'#fff'}">{{recording?'松开发送':'按住说话'}}</button>
+      <button v-if="voiceMode" @touchstart.prevent="startRecording($event)" @touchmove.prevent="onRecMove($event)" @touchend.prevent="stopRecording" @touchcancel.prevent="stopRecording" @pointerdown.prevent="startRecording($event)" @pointermove.prevent="onRecMove($event)" @pointerup.prevent="stopRecording" @pointerleave="stopRecording" style="flex:1;height:40px;border-radius:6px;border:1px solid #ddd;font-size:17px;cursor:pointer;color:#1a1a1a;transition:background .15s" :style="{background:recordingCancel?'#ffd1d1':(recording?'#e0e0e0':'#fff'),color:recordingCancel?'#ff4757':'#1a1a1a'}">{{recordingCancel?'松手取消发送':(recording?'上滑取消·松开发送':'按住说话')}}</button>
       <div v-else style="flex:1;border-radius:6px;display:flex;align-items:center;background:#fff;border:1px solid #E5E5E5">
         <input ref="chatInput" v-model="text" placeholder="输入消息..." @keydown.enter="sendMsg" @input="sendTyping" @blur="sendStopTyping" @focus="onInputFocus" style="flex:1;border:none;background:none;outline:none;padding:9px 12px;font-size:17px">
       </div>
@@ -1651,7 +1673,7 @@ var CheckinPage = {
         <div v-if="tasks.length===0" style="text-align:center;color:var(--tm);font-size:13px;padding:16px">暂无任务</div>
         <div v-for="t in tasks" :key="t.key" style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--b)">
           <div :style="{width:'40px',height:'40px',borderRadius:'12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',background:t.completed?'linear-gradient(135deg,#FF6B9D,#FF8E53)':'var(--bg-page)'}">{{t.completed?'✅':'🎯'}}</div>
-          <div style="flex:1">
+          <div class="flex1">
             <div style="font-size:14px;font-weight:500">{{t.name}}</div>
             <div style="font-size:12px;color:var(--tm);margin-top:2px">{{t.progress||0}}/{{t.max}}</div>
           </div>
@@ -1816,14 +1838,14 @@ var EditProfilePage = {
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openDatePicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">出生日期</label><span style="font-size:14px" :style="{color:form.birth_date?'var(--p)':'var(--tm)'}">{{form.birth_date||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div></div>
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openHeightPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">身高</label><span style="font-size:14px" :style="{color:form.height?'var(--p)':'var(--tm)'}">{{form.height?form.height+'cm':'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div><p v-if="errors.height" style="font-size:11px;color:var(--e);margin-top:4px">{{errors.height}}</p></div>
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openHomePicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">家乡</label><span style="font-size:14px" :style="{color:form.city||form.location?'var(--p)':'var(--tm)'}">{{form.city||form.location||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div></div>
-  <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openOccPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">职业</label><span style="font-size:14px" :style="{color:form.occupation?'var(--p)':'var(--tm)'}">{{form.occupation||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div><div v-if="showOccOther" style="display:flex;gap:8px;margin-top:8px"><div class="inp" style="flex:1"><input v-model="customOcc" placeholder="输入你的职业"></div><button class="btn bp bs" @click="saveOcc">确定</button></div></div>
+  <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openOccPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">职业</label><span style="font-size:14px" :style="{color:form.occupation?'var(--p)':'var(--tm)'}">{{form.occupation||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div><div v-if="showOccOther" style="display:flex;gap:8px;margin-top:8px"><div class="inp" class="flex1"><input v-model="customOcc" placeholder="输入你的职业"></div><button class="btn bp bs" @click="saveOcc">确定</button></div></div>
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openEduPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">学历</label><span style="font-size:14px" :style="{color:form.education?'var(--p)':'var(--tm)'}">{{form.education||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div></div>
   <div style="margin-bottom:12px"><label style="font-size:13px;color:var(--ts);display:block;margin-bottom:6px">个性签名</label><div class="inp"><input v-model="form.bio" placeholder="写一句话介绍自己" maxlength="500"></div></div></div>
   <!-- ===== 4. 兴趣标签（点击进入全屏弹层选择） ===== -->
   <div style="margin-bottom:24px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openTagPanel"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">兴趣标签</label><span style="font-size:11px;color:var(--tm);margin-right:4px">已选{{form.tags.length}}/10</span><span style="font-size:11px;color:var(--tm)">›</span></div><div v-if="form.tags.length" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span v-for="t in form.tags" :key="t" class="tag tp">{{t}}</span></div></div>
   <button class="btn bp bw bl" @click="save" :disabled="saving">{{saving?'保存中...':'保存资料'}}</button>
   <!-- ===== 滚轮选择弹层 ===== -->
-  <transition name="slide-up"><div v-if="pickerVisible" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:300;display:flex;flex-direction:column;justify-content:flex-end"><div style="flex:1" @click.self="pickerCancel"></div><div style="background:#fff;border-radius:16px 16px 0 0;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)"><div style="display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--b)"><span style="font-size:14px;color:var(--tm);cursor:pointer" @click="pickerCancel">取消</span><span style="flex:1;text-align:center;font-size:16px;font-weight:600;color:var(--ts)">{{pickerTitle}}</span><span style="font-size:14px;color:var(--p);font-weight:600;cursor:pointer" @click="pickerConfirm">确定</span></div><div style="display:flex;height:220px;position:relative"><div style="position:absolute;left:0;right:0;top:50%;height:36px;transform:translateY(-50%);border-top:1px solid var(--b);border-bottom:1px solid var(--b);pointer-events:none"></div><div style="position:absolute;left:0;right:0;top:0;bottom:0;background:linear-gradient(180deg,#fff 0%,rgba(255,255,255,0) 38%,rgba(255,255,255,0) 62%,#fff 100%);pointer-events:none"></div><div v-for="col in pickerCols" :key="col.key" :data-col="col.key" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth" @touchend.self="onWheelTouchEnd(col.key,$event)"><div style="height:92px"></div><div v-for="opt in col.options" :key="opt.v" @click="wheelTap(col.key,opt)" style="height:36px;line-height:36px;text-align:center;font-size:15px;font-weight:500" :style="{color:opt.v===col.value?'#000':'#B0B0B6'}">{{opt.l}}</div><div style="height:92px"></div></div></div></div></div></transition>
+  <transition name="slide-up"><div v-if="pickerVisible" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:300;display:flex;flex-direction:column;justify-content:flex-end"><div class="flex1" @click.self="pickerCancel"></div><div style="background:#fff;border-radius:16px 16px 0 0;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)"><div style="display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--b)"><span style="font-size:14px;color:var(--tm);cursor:pointer" @click="pickerCancel">取消</span><span style="flex:1;text-align:center;font-size:16px;font-weight:600;color:var(--ts)">{{pickerTitle}}</span><span style="font-size:14px;color:var(--p);font-weight:600;cursor:pointer" @click="pickerConfirm">确定</span></div><div style="display:flex;height:220px;position:relative"><div style="position:absolute;left:0;right:0;top:50%;height:36px;transform:translateY(-50%);border-top:1px solid var(--b);border-bottom:1px solid var(--b);pointer-events:none"></div><div style="position:absolute;left:0;right:0;top:0;bottom:0;background:linear-gradient(180deg,#fff 0%,rgba(255,255,255,0) 38%,rgba(255,255,255,0) 62%,#fff 100%);pointer-events:none"></div><div v-for="col in pickerCols" :key="col.key" :data-col="col.key" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth" @touchend.self="onWheelTouchEnd(col.key,$event)"><div style="height:92px"></div><div v-for="opt in col.options" :key="opt.v" @click="wheelTap(col.key,opt)" style="height:36px;line-height:36px;text-align:center;font-size:15px;font-weight:500" :style="{color:opt.v===col.value?'#000':'#B0B0B6'}">{{opt.l}}</div><div style="height:92px"></div></div></div></div></div></transition>
   <!-- ===== 兴趣标签全屏弹层 ===== -->
   <div v-if="tagPanelVisible" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:350;display:flex;flex-direction:column;background:var(--bg-page)"><div style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-bottom:1px solid var(--b);flex-shrink:0"><span style="font-size:14px;color:var(--tm);cursor:pointer" @click="closeTagPanel">取消</span><span style="flex:1;text-align:center;font-size:17px;font-weight:700;color:var(--ts)">选择兴趣标签</span><span style="width:28px"></span></div><div style="height:25vh;min-height:140px;overflow-y:auto;background:var(--w);border-bottom:1px solid var(--b);flex-shrink:0;padding:12px 16px;box-sizing:border-box"><div v-if="draftTags.length===0" style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--tm);font-size:13px">点击下方标签选择你的兴趣，最多选10个</div><div v-else style="display:flex;gap:6px;flex-wrap:wrap;align-content:flex-start"><span v-for="t in draftTags" :key="t" class="tag tp">{{t}}</span></div></div><div style="display:flex;gap:8px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;background:var(--w);border-bottom:1px solid var(--b)"><span v-for="cat in Object.keys(tagGroups)" :key="cat" @click="toggleCat(cat)" :style="{background:expandedCat===cat?'var(--p)':'var(--bg-page)',color:expandedCat===cat?'#fff':'var(--ts)',borderRadius:'18px',padding:'6px 16px',fontSize:'13px',fontWeight:'600',flexShrink:0,cursor:'pointer'}">{{cat}}<span v-if="catSelected(cat)" style="margin-left:4px;opacity:.85">({{catSelected(cat).replace('已选','')}})</span></span></div><div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;gap:8px;flex-wrap:wrap;align-content:flex-start"><span v-for="t in (tagGroups[expandedCat]||[])" :key="t" :class=\"['tag',draftTags.includes(t)?'tp':'']\" style="cursor:pointer;border:1px solid var(--b);border-radius:16px;padding:8px 16px;font-size:14px" @click="toggleTag(t)">{{t}}</span></div><div style="flex-shrink:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--w);border-top:1px solid var(--b)"><button class="btn bp bw bl" @click="confirmTags">确认</button></div></div></div>`
 };
@@ -1918,7 +1940,7 @@ var UserProfilePage = {
     }
   },
   mounted: function(){this.load()},
-  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;padding:32px 20px 24px;text-align:center;position:relative"><button class="btn bs" :class=\"profile.is_guarded?'guard-on':'guard-off'\" style="position:absolute;top:14px;right:14px;padding:6px 16px;font-size:13px;border-radius:18px" @click="toggleGuard" :disabled="guardBusy">{{profile.is_guarded?'🛡️ 已守护':'🛡️ 守护'}}</button><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5);cursor:pointer" @click="profile.avatar&&preview.open([fmtImg(profile.avatar)],0)"><img loading="lazy" v-if="profile.avatar" :src="fmtImg(profile.avatar)"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:13px;opacity:.85;margin-top:4px">{{profile.bio||'TA还没有写个性签名'}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="font-size:14px;font-weight:600;color:var(--ts);margin-bottom:10px">基本信息</div><div style="display:flex;flex-wrap:wrap;gap:8px;font-size:14px"><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.gender!==undefined&&profile.gender!==null">{{genderText(profile.gender)}}</span><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.age">{{profile.age}}岁</span><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.height">{{profile.height}}cm</span><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.occupation">{{profile.occupation}}</span><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.location">📍 {{profile.location}}</span></div></div><div style="margin:0 16px 12px;padding:14px 16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);cursor:pointer" @click="$router.push('/intimacy/'+profile.id)"><div style="display:flex;align-items:center"><span style="font-size:20px;margin-right:10px">💗</span><div style="flex:1"><div style="font-size:14px;font-weight:600">亲密关系</div><div style="font-size:11px;color:var(--tm);margin-top:2px">查看你们的心动值、徽章与纪念日</div></div><span style="color:var(--tm)">›</span></div></div><div v-if="profile.tags&&profile.tags.length" style="margin:0 16px 12px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="font-size:14px;color:var(--ts);margin-bottom:8px">兴趣标签</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div v-if="profile.photos&&profile.photos.length" style="margin:0 16px 12px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="font-size:14px;color:var(--ts);margin-bottom:8px">相册 ({{profile.photos.length}})</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"><img loading="lazy" v-for="(p,i) in profile.photos" :key="p.id||i" :src="p.url" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px" @click="preview.open(profile.photos.map(function(x){return x.url}),i)"></div></div><div style="margin:0 16px 12px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="font-size:14px;color:var(--ts);margin-bottom:8px">动态 ({{profile.posts_count||posts.length}})</div><div v-if="loadingPosts" style="text-align:center;padding:12px"><div class="spin" style="width:20px;height:20px;margin:0 auto 4px"></div></div><div v-else-if="posts.length===0" style="text-align:center;color:var(--tm);font-size:13px;padding:12px">TA还没有发布动态</div><div v-else v-for="p in posts" :key="p.id" class="card" style="padding:14px;margin-bottom:10px;cursor:pointer" @click="$router.push('/post/'+p.id)"><p v-if="p.content" style="font-size:14px;line-height:1.6;margin-bottom:8px">{{p.content}}</p><div v-if="p.images&&p.images.length" :style="{display:'grid',gridTemplateColumns:'repeat('+Math.min(p.images.length,3)+',1fr)',gap:4+'px',marginBottom:'8px'}"><img loading="lazy" v-for="(img,i) in p.images.slice(0,9)" :key="i" :src="img" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px" @click.stop="preview.open(p.images,i)"></div><div style="display:flex;gap:16px;font-size:12px;color:var(--tm)"><span>{{timeAgo(p.created_at)}}</span><span>❤️ {{p.like_count||0}}</span><span>💬 {{p.comment_count||0}}</span></div></div></div><div v-if="showReport" style="margin:0 16px 16px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
+  template: `<div><div v-if="loading" style="text-align:center;padding:64px"><div class="spin"></div></div><div v-else-if="!profile" class="empty"><div class="ei">😕</div><div class="et">用户不存在</div></div><div v-else><div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;padding:32px 20px 24px;text-align:center;position:relative"><button class="btn bs" :class=\"profile.is_guarded?'guard-on':'guard-off'\" style="position:absolute;top:14px;right:14px;padding:6px 16px;font-size:13px;border-radius:18px" @click="toggleGuard" :disabled="guardBusy">{{profile.is_guarded?'🛡️ 已守护':'🛡️ 守护'}}</button><div class="avatar av-lg" style="margin:0 auto;border:3px solid rgba(255,255,255,.5);cursor:pointer" @click="profile.avatar&&preview.open([fmtImg(profile.avatar)],0)"><img loading="lazy" v-if="profile.avatar" :src="fmtImg(profile.avatar)"><span v-else>👤</span></div><div style="font-size:22px;font-weight:600;margin-top:12px">{{profile.nickname}}</div><div style="font-size:13px;opacity:.85;margin-top:4px">{{profile.bio||'TA还没有写个性签名'}}</div></div><div style="margin:12px 16px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="font-size:14px;font-weight:600;color:var(--ts);margin-bottom:10px">基本信息</div><div style="display:flex;flex-wrap:wrap;gap:8px;font-size:14px"><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.gender!==undefined&&profile.gender!==null">{{genderText(profile.gender)}}</span><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.age">{{profile.age}}岁</span><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.height">{{profile.height}}cm</span><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.occupation">{{profile.occupation}}</span><span style="background:var(--bg-page);padding:6px 14px;border-radius:16px" v-if="profile.location">📍 {{profile.location}}</span></div></div><div style="margin:0 16px 12px;padding:14px 16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);cursor:pointer" @click="$router.push('/intimacy/'+profile.id)"><div style="display:flex;align-items:center"><span style="font-size:20px;margin-right:10px">💗</span><div class="flex1"><div style="font-size:14px;font-weight:600">亲密关系</div><div style="font-size:11px;color:var(--tm);margin-top:2px">查看你们的心动值、徽章与纪念日</div></div><span style="color:var(--tm)">›</span></div></div><div v-if="profile.tags&&profile.tags.length" style="margin:0 16px 12px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="font-size:14px;color:var(--ts);margin-bottom:8px">兴趣标签</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in (typeof profile.tags==='string'?JSON.parse(profile.tags):profile.tags)" class="tag tp">{{t}}</span></div></div><div v-if="profile.photos&&profile.photos.length" style="margin:0 16px 12px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="font-size:14px;color:var(--ts);margin-bottom:8px">相册 ({{profile.photos.length}})</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"><img loading="lazy" v-for="(p,i) in profile.photos" :key="p.id||i" :src="p.url" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px" @click="preview.open(profile.photos.map(function(x){return x.url}),i)"></div></div><div style="margin:0 16px 12px;padding:16px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)"><div style="font-size:14px;color:var(--ts);margin-bottom:8px">动态 ({{profile.posts_count||posts.length}})</div><div v-if="loadingPosts" style="text-align:center;padding:12px"><div class="spin" style="width:20px;height:20px;margin:0 auto 4px"></div></div><div v-else-if="posts.length===0" style="text-align:center;color:var(--tm);font-size:13px;padding:12px">TA还没有发布动态</div><div v-else v-for="p in posts" :key="p.id" class="card" style="padding:14px;margin-bottom:10px;cursor:pointer" @click="$router.push('/post/'+p.id)"><p v-if="p.content" style="font-size:14px;line-height:1.6;margin-bottom:8px">{{p.content}}</p><div v-if="p.images&&p.images.length" :style="{display:'grid',gridTemplateColumns:'repeat('+Math.min(p.images.length,3)+',1fr)',gap:4+'px',marginBottom:'8px'}"><img loading="lazy" v-for="(img,i) in p.images.slice(0,9)" :key="i" :src="img" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px" @click.stop="preview.open(p.images,i)"></div><div style="display:flex;gap:16px;font-size:12px;color:var(--tm)"><span>{{timeAgo(p.created_at)}}</span><span>❤️ {{p.like_count||0}}</span><span>💬 {{p.comment_count||0}}</span></div></div></div><div v-if="showReport" style="margin:0 16px 16px;padding:14px;background:var(--w);border-radius:var(--rs);box-shadow:var(--sh)">
     <div style="font-size:14px;font-weight:600;margin-bottom:10px">举报该用户</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><span v-for="rr in ['骚扰','虚假资料','广告营销','违法违规','其他']" :key="rr" @click="reportReason=rr" :class=\"['tag',reportReason===rr?'tp':'']\" style="cursor:pointer;border:1px solid var(--b);border-radius:16px;padding:6px 12px;font-size:13px">{{rr}}</span></div>
     <button class="btn bp bs" style="width:100%" @click="submitReport" :disabled="!reportReason">提交举报</button>
@@ -1926,7 +1948,7 @@ var UserProfilePage = {
   <div v-if="matchModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center">
     <div style="background:#fff;border-radius:20px;padding:28px 24px;width:300px;text-align:center;position:relative">
       <button @click="closeMatchModal" style="position:absolute;top:10px;right:14px;border:none;background:none;font-size:18px;cursor:pointer;color:var(--tm)">✕</button>
-      <div style="font-size:40px">💕</div>
+      <div style="position:relative;height:60px"><div class="heart-anim" style="font-size:40px;position:absolute;left:50%;top:0;transform:translateX(-50%)">💕</div><span v-for="n in 6" :key="'mh'+n" class="match-particle" :style="{left:(16+n*12)+'%',animationDelay:(n*0.15)+'s'}">❤️</span></div>
       <h2 style="margin:10px 0 4px">匹配成功！</h2>
       <p style="color:var(--tm);font-size:13px;margin-bottom:14px">你和{{matchModal.partner.nickname||'TA'}}互相喜欢</p>
       <div class="avatar av-lg" style="margin:0 auto 14px"><img loading="lazy" v-if="matchModal.partner.avatar" :src="matchModal.partner.avatar"><span v-else>👤</span></div>
@@ -1962,7 +1984,7 @@ var VipPage = {
 var RechargePage = {
   data: function(){return {amounts:[6,18,30,68,128,298],sel:null,loading:false,pay:"wechat"}},
   methods: {go:async function(){if(!this.sel){toast("请选择金额","tinfo");return}this.loading=true;try{var r=await api("/orders/recharge",{method:"POST",body:JSON.stringify({amount:this.sel})});toast("充值成功！获得"+r.data.coins+"金币","tok");this.sel=null}catch(e){toast(e.message,"terr")}this.loading=false}},
-  template: `<div style="padding:20px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:48px">💰</div><h2>金币充值</h2><p style="color:var(--tm);font-size:13px">1元=100金币</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div v-for="a in amounts" :key="a" @click="sel=a" :style="{background:sel===a?'var(--p)':'var(--w)',color:sel===a?'#fff':'var(--t)',padding:'20px',borderRadius:'var(--r)',textAlign:'center',cursor:'pointer',border:'2px solid '+(sel===a?'var(--p)':'var(--b)'),transition:'all .2s'}"><div style="font-size:24px;font-weight:700">¥{{a}}</div><div :style=\"{fontSize:'12px',marginTop:'4px',color:sel===a?'rgba(255,255,255,.8)':'var(--tm)'}\">{{a*100}}金币</div></div></div><div style="display:flex;gap:12px;margin-top:20px"><button class="btn bs" :class=\"pay==='wechat'?'bp':'bo'\" @click=\"pay='wechat'\" style="flex:1">💚微信</button><button class="btn bs" :class=\"pay==='alipay'?'bp':'bo'\" @click=\"pay='alipay'\" style="flex:1">💙支付宝</button></div><button class="btn bp bw bl" style="margin-top:20px" @click="go" :disabled="loading||!sel">{{loading?'处理中...':'确认支付 ¥'+(sel||0)}}</button><p style="text-align:center;color:var(--tm);font-size:11px;margin-top:12px">当前为模拟支付，公测期间不会真实扣款</p></div>`
+  template: `<div style="padding:20px"><div style="text-align:center;margin-bottom:24px"><div style="font-size:48px">💰</div><h2>金币充值</h2><p style="color:var(--tm);font-size:13px">1元=100金币</p></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div v-for="a in amounts" :key="a" @click="sel=a" :style="{background:sel===a?'var(--p)':'var(--w)',color:sel===a?'#fff':'var(--t)',padding:'20px',borderRadius:'var(--r)',textAlign:'center',cursor:'pointer',border:'2px solid '+(sel===a?'var(--p)':'var(--b)'),transition:'all .2s'}"><div style="font-size:24px;font-weight:700">¥{{a}}</div><div :style=\"{fontSize:'12px',marginTop:'4px',color:sel===a?'rgba(255,255,255,.8)':'var(--tm)'}\">{{a*100}}金币</div></div></div><div style="display:flex;gap:12px;margin-top:20px"><button class="btn bs" :class=\"pay==='wechat'?'bp':'bo'\" @click=\"pay='wechat'\" class="flex1">💚微信</button><button class="btn bs" :class=\"pay==='alipay'?'bp':'bo'\" @click=\"pay='alipay'\" class="flex1">💙支付宝</button></div><button class="btn bp bw bl" style="margin-top:20px" @click="go" :disabled="loading||!sel">{{loading?'处理中...':'确认支付 ¥'+(sel||0)}}</button><p style="text-align:center;color:var(--tm);font-size:11px;margin-top:12px">当前为模拟支付，公测期间不会真实扣款</p></div>`
 };
 
 // ==== 我的订单（S23 预留，展示历史订单） ====
@@ -1997,7 +2019,7 @@ var OrdersPage = {
 
 var SettingsPage = {
   methods: {clearCache:function(){try{localStorage.clear();if(typeof caches!=="undefined")caches.keys().then(function(k){k.forEach(function(c){caches.delete(c)})});toast("缓存已清除","tok")}catch(e){toast("清除失败","terr")}}},
-  template: `<div style="padding:12px 16px"><div v-for="item in [{i:'🛡️',l:'认证中心',p:'/verification'},{i:'🚫',l:'黑名单',p:'/blocklist'},{i:'🔒',l:'账号安全',p:'/account-security'},{i:'🔔',l:'消息通知',p:'/notifications'},{i:'❓',l:'帮助与反馈',p:'/help'},{i:'📄',l:'关于我们',d:APP_VERSION+' 公测版'},{i:'🗑️',l:'注销账号',p:'/deactivate'}]" :key="item.l" @click="item.p&&$router.push(item.p)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh);cursor:pointer"><span style="font-size:20px;margin-right:12px">{{item.i}}</span><div style="flex:1"><div style="font-size:15px">{{item.l}}</div><div v-if="item.d" style="font-size:12px;color:var(--tm)">{{item.d}}</div></div><span style="color:var(--tm)">{{item.p?'›':''}}</span></div><button class="btn bo bw" style="margin-top:16px" @click="clearCache">清除缓存</button></div>`
+  template: `<div style="padding:12px 16px"><div v-for="item in [{i:'🛡️',l:'认证中心',p:'/verification'},{i:'🚫',l:'黑名单',p:'/blocklist'},{i:'🔒',l:'账号安全',p:'/account-security'},{i:'🔔',l:'消息通知',p:'/notifications'},{i:'❓',l:'帮助与反馈',p:'/help'},{i:'📄',l:'关于我们',d:APP_VERSION+' 公测版'},{i:'🗑️',l:'注销账号',p:'/deactivate'}]" :key="item.l" @click="item.p&&$router.push(item.p)" style="display:flex;align-items:center;padding:14px 16px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh);cursor:pointer"><span style="font-size:20px;margin-right:12px">{{item.i}}</span><div class="flex1"><div style="font-size:15px">{{item.l}}</div><div v-if="item.d" style="font-size:12px;color:var(--tm)">{{item.d}}</div></div><span style="color:var(--tm)">{{item.p?'›':''}}</span></div><button class="btn bo bw" style="margin-top:16px" @click="clearCache">清除缓存</button></div>`
 };
 
 var VerificationPage = {
@@ -2074,7 +2096,7 @@ var VerificationPage = {
     <div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div>
     <div v-else>
       <div style="background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);padding:16px;margin-bottom:12px">
-        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🪪</span><div style="flex:1"><div style="font-size:15px;font-weight:600">实名认证</div><div style="font-size:12px;color:var(--tm)">提升可信度，解锁更多特权</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('real_name'))}">{{statusText(typeStatus('real_name'))}}</span></div>
+        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🪪</span><div class="flex1"><div style="font-size:15px;font-weight:600">实名认证</div><div style="font-size:12px;color:var(--tm)">提升可信度，解锁更多特权</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('real_name'))}">{{statusText(typeStatus('real_name'))}}</span></div>
         <template v-if="typeStatus('real_name')==='none'">
           <input v-model="realName.real_name" placeholder="真实姓名" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
           <input v-model="realName.id_card_number" placeholder="身份证号" maxlength="18" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
@@ -2084,7 +2106,7 @@ var VerificationPage = {
         </template>
       </div>
       <div style="background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);padding:16px;margin-bottom:12px">
-        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🎓</span><div style="flex:1"><div style="font-size:15px;font-weight:600">学历认证</div><div style="font-size:12px;color:var(--tm)">验证教育背景</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('education'))}">{{statusText(typeStatus('education'))}}</span></div>
+        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🎓</span><div class="flex1"><div style="font-size:15px;font-weight:600">学历认证</div><div style="font-size:12px;color:var(--tm)">验证教育背景</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('education'))}">{{statusText(typeStatus('education'))}}</span></div>
         <template v-if="typeStatus('education')==='none'">
           <input v-model="education.school_name" placeholder="学校名称" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
           <div style="display:flex;gap:8px;margin-bottom:8px"><select v-model="education.education_level" style="flex:1;padding:10px;border:1px solid var(--b);border-radius:8px;font-size:14px"><option>大专</option><option>本科</option><option>硕士</option><option>博士</option></select><input v-model.number="education.graduation_year" type="number" min="1950" :max="new Date().getFullYear()" style="flex:1;padding:10px;border:1px solid var(--b);border-radius:8px;font-size:14px" placeholder="毕业年份"></div>
@@ -2094,7 +2116,7 @@ var VerificationPage = {
         </template>
       </div>
       <div style="background:var(--w);border-radius:var(--rs);box-shadow:var(--sh);padding:16px;margin-bottom:12px">
-        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🚗</span><div style="flex:1"><div style="font-size:15px;font-weight:600">车辆认证</div><div style="font-size:12px;color:var(--tm)">验证车辆信息</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('vehicle'))}">{{statusText(typeStatus('vehicle'))}}</span></div>
+        <div style="display:flex;align-items:center;margin-bottom:14px"><span style="font-size:22px;margin-right:10px">🚗</span><div class="flex1"><div style="font-size:15px;font-weight:600">车辆认证</div><div style="font-size:12px;color:var(--tm)">验证车辆信息</div></div><span :style="{fontSize:'13px',fontWeight:'600',color:statusColor(typeStatus('vehicle'))}">{{statusText(typeStatus('vehicle'))}}</span></div>
         <template v-if="typeStatus('vehicle')==='none'">
           <input v-model="vehicle.car_brand" placeholder="车辆品牌" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
           <input v-model="vehicle.car_model" placeholder="车辆型号(选填)" style="width:100%;padding:10px;border:1px solid var(--b);border-radius:8px;margin-bottom:8px;font-size:14px">
@@ -2123,7 +2145,7 @@ var BlockListPage = {
     }
   },
   mounted: function(){this.load()},
-  template: `<div style="padding:12px 16px"><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="list.length===0" class="empty"><div class="ei">🚫</div><div class="et">黑名单为空</div><div class="ed">拉黑的用户会出现在这里</div></div><div v-else v-for="u in list" :key="u.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;gap:12px;box-shadow:var(--sh)"><div class="avatar av-sm"><img loading="lazy" v-if="u.avatar" :src="u.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-weight:500">{{u.nickname}}</div><div style="font-size:12px;color:var(--tm)">{{u.location||""}}</div></div><button class="btn bs" style="font-size:13px;border:1px solid var(--b)" @click="unblock(u)">解除</button></div></div>`
+  template: `<div style="padding:12px 16px"><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="list.length===0" class="empty"><div class="ei">🚫</div><div class="et">黑名单为空</div><div class="ed">拉黑的用户会出现在这里</div></div><div v-else v-for="u in list" :key="u.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;gap:12px;box-shadow:var(--sh)"><div class="avatar av-sm"><img loading="lazy" v-if="u.avatar" :src="u.avatar"><span v-else>👤</span></div><div class="flex1"><div style="font-weight:500">{{u.nickname}}</div><div style="font-size:12px;color:var(--tm)">{{u.location||""}}</div></div><button class="btn bs" style="font-size:13px;border:1px solid var(--b)" @click="unblock(u)">解除</button></div></div>`
 };
 
 // ==== 圈子（S21-C2） ====
@@ -2208,8 +2230,8 @@ var GamePage = {
   template: `<div style="padding:16px">
     <div style="text-align:center;margin-bottom:16px"><div style="font-size:44px">🎮</div><h2 style="margin:6px 0">互动游戏</h2><p style="color:var(--tm);font-size:13px">猜词挑战，增进默契</p></div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button class="btn bs" :class=\"tab==='guess'?'bp':'bo'\" style="flex:1" @click="tab='guess'">猜词</button>
-      <button class="btn bs" :class=\"tab==='board'?'bp':'bo'\" style="flex:1" @click="tab='board';loadBoard()">排行榜</button>
+      <button class="btn bs" :class=\"tab==='guess'?'bp':'bo'\" class="flex1" @click="tab='guess'">猜词</button>
+      <button class="btn bs" :class=\"tab==='board'?'bp':'bo'\" class="flex1" @click="tab='board';loadBoard()">排行榜</button>
     </div>
     <div v-if="tab==='guess'">
       <div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div>
@@ -2222,8 +2244,8 @@ var GamePage = {
         <div class="inp" style="margin-bottom:14px"><span>📝</span><input v-model="input" maxlength="20" placeholder="输入你的答案" @keydown.enter="check"></div>
         <div v-if="result" style="font-size:14px;margin-bottom:12px" :style="{color:result.correct?'var(--s)':'var(--e)'}">{{result.correct?'🎉 答对了！':'很遗憾，答案是 '+result.reveal}}</div>
         <div style="display:flex;gap:10px">
-          <button class="btn bp" style="flex:1" @click="check" :disabled="recording">{{recording?'记录中...':'提交答案'}}</button>
-          <button class="btn bo" style="flex:1" @click="nextWord">下一题</button>
+          <button class="btn bp" class="flex1" @click="check" :disabled="recording">{{recording?'记录中...':'提交答案'}}</button>
+          <button class="btn bo" class="flex1" @click="nextWord">下一题</button>
         </div>
       </div>
     </div>
@@ -2231,7 +2253,7 @@ var GamePage = {
       <div v-if="leaderboard.length===0" class="empty"><div class="ei">🏆</div><div class="et">暂无排行榜</div><div class="ed">玩一局猜词来上榜吧</div></div>
       <div v-else v-for="(row,i) in leaderboard" :key="row.user_id" style="display:flex;align-items:center;gap:12px;background:var(--w);border-radius:var(--rs);padding:12px 14px;margin-bottom:8px;box-shadow:var(--sh)">
         <div style="width:28px;text-align:center;font-size:18px;font-weight:700" :style="{color:i===0?'#F6D365':i===1?'#C0C0C0':i===2?'#CD7F32':'var(--tm)'}">{{i+1}}</div>
-        <div style="flex:1"><div style="font-size:14px;font-weight:500">用户 #{{row.user_id}}</div><div style="font-size:11px;color:var(--tm)">共 {{row.games||0}} 局</div></div>
+        <div class="flex1"><div style="font-size:14px;font-weight:500">用户 #{{row.user_id}}</div><div style="font-size:11px;color:var(--tm)">共 {{row.games||0}} 局</div></div>
         <div style="font-size:15px;font-weight:600;color:var(--s)">🏆 {{row.wins||0}}胜</div>
       </div>
     </div>
@@ -2288,7 +2310,7 @@ var IntimacyPage = {
       <div v-if="anniversaries.length===0" style="color:var(--tm);font-size:13px">还没有纪念日，一起创造第一个吧</div>
       <div v-else v-for="a in anniversaries" :key="a.id" style="display:flex;align-items:center;gap:12px;background:var(--w);border-radius:var(--rs);padding:12px;margin-bottom:8px;box-shadow:var(--sh)">
         <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px">📌</div>
-        <div style="flex:1"><div style="font-size:14px;font-weight:500">{{annText(a)}}</div><div style="font-size:12px;color:var(--tm);margin-top:2px">{{fmtDate(a.event_date)}}</div></div>
+        <div class="flex1"><div style="font-size:14px;font-weight:500">{{annText(a)}}</div><div style="font-size:12px;color:var(--tm);margin-top:2px">{{fmtDate(a.event_date)}}</div></div>
       </div>
     </div>
   </div>`
@@ -2331,7 +2353,7 @@ var NoblePage = {
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button v-for="tb in tabs" :key="tb.k" class="btn bs" :class=\"tab===tb.k?'bp':'bo'\" @click="switchTab(tb.k)" style="flex:1">{{tb.l}}</button>
+        <button v-for="tb in tabs" :key="tb.k" class="btn bs" :class=\"tab===tb.k?'bp':'bo'\" @click="switchTab(tb.k)" class="flex1">{{tb.l}}</button>
       </div>
       <div v-if="items.length===0" class="empty"><div class="ei">🎨</div><div class="et">暂无装扮</div><div class="ed">该分类还没有可购买的装扮</div></div>
       <div v-else style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -2352,7 +2374,7 @@ var NoblePage = {
         <div style="font-weight:600;margin-bottom:6px">✨ 我的装扮</div>
         <div v-if="myItems.length===0" style="color:var(--tm)">还没有拥有装扮，去购买心仪的一款吧</div>
         <div v-else v-for="m in myItems" :key="m.id" style="display:flex;align-items:center;gap:8px;padding:6px 0">
-          <span>{{m.preview_url?'': '🎨'}}</span><span style="flex:1">{{m.name}}</span>
+          <span>{{m.preview_url?'': '🎨'}}</span><span class="flex1">{{m.name}}</span>
           <span style="font-size:11px;color:var(--s)" v-if="m.is_using===1||m.is_using==='1'">使用中</span>
         </div>
       </div>
@@ -2483,7 +2505,7 @@ var CommunityPage = {
     </div>
     <div v-else>
       <div style="background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));color:#fff;padding:24px 20px">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><button @click="back" style="border:none;background:none;color:#fff;font-size:40px;line-height:1;cursor:pointer">‹</button><div style="flex:1"><div style="font-size:20px;font-weight:600">{{current.name}}</div><div style="font-size:13px;opacity:.85;margin-top:2px">{{current.member_count||0}}人 · {{current.post_count||0}}帖</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><button @click="back" style="border:none;background:none;color:#fff;font-size:40px;line-height:1;cursor:pointer">‹</button><div class="flex1"><div style="font-size:20px;font-weight:600">{{current.name}}</div><div style="font-size:13px;opacity:.85;margin-top:2px">{{current.member_count||0}}人 · {{current.post_count||0}}帖</div></div></div>
         <button class="btn" style="background:rgba(255,255,255,.2);color:#fff;border-radius:18px;padding:6px 18px;font-size:13px;cursor:pointer" @click="member?leave():join()">{{member?'退出圈子':'加入圈子'}}</button>
       </div>
       <div style="padding:16px">
@@ -2528,7 +2550,7 @@ var CommunityPage = {
         <div v-for="p in posts" :key="p.id" style="background:var(--w);border-radius:var(--rs);padding:14px;margin-bottom:10px;box-shadow:var(--sh)">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
             <div class="avatar av-sm"><img loading="lazy" v-if="p.avatar" :src="p.avatar"><span v-else>👤</span></div>
-            <div style="flex:1"><div style="font-size:14px;font-weight:500">{{p.nickname||'用户'}}</div><div style="font-size:11px;color:var(--tm)">{{timeAgo(p.created_at)}}</div></div>
+            <div class="flex1"><div style="font-size:14px;font-weight:500">{{p.nickname||'用户'}}</div><div style="font-size:11px;color:var(--tm)">{{timeAgo(p.created_at)}}</div></div>
             <button class="btn bs" style="font-size:12px;border:1px solid var(--b)" @click="likePost(p)">❤️ {{p.like_count||0}}</button>
           </div>
           <div style="font-size:14px;line-height:1.6;word-break:break-word" v-html="highlightTags(p.content)"></div>
@@ -2543,13 +2565,13 @@ var MeetPage = {
   data: function(){return {tab:"viewers",list:[],loading:true}},
   methods: {load:async function(t){this.tab=t;this.loading=true;var ep=t==="viewers"?"/user/viewers":"/user/fans";try{var r=await api(ep);this.list=r.data||[]}catch(e){}this.loading=false}},
   mounted: function(){this.load("viewers")},
-  template: `<div style="padding:12px 16px"><div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn bs" :class=\"tab==='viewers'?'bp':'bo'\" @click=\"load('viewers')\">看过我的</button><button class="btn bs" :class=\"tab==='fans'?'bp':'bo'\" @click=\"load('fans')\">喜欢我的</button></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="list.length===0" class="empty"><div class="ei">🔍</div><div class="et">暂无数据</div></div><div v-else v-for="item in list" :key="item.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;gap:12px;box-shadow:var(--sh)"><div class="avatar av-sm"><img loading="lazy" v-if="item.avatar" :src="item.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-weight:500">{{item.nickname}}</div><div style="font-size:12px;color:var(--tm)">{{item.age?item.age+'岁 ':''}}{{item.location||''}}</div></div><span v-if="tab==='viewers'&&item.visit_count>1" style="font-size:11px;color:var(--p);background:var(--bg-page);padding:3px 8px;border-radius:10px">访问×{{item.visit_count}}</span></div></div>`
+  template: `<div style="padding:12px 16px"><div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn bs" :class=\"tab==='viewers'?'bp':'bo'\" @click=\"load('viewers')\">看过我的</button><button class="btn bs" :class=\"tab==='fans'?'bp':'bo'\" @click=\"load('fans')\">喜欢我的</button></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="list.length===0" class="empty"><div class="ei">🔍</div><div class="et">暂无数据</div></div><div v-else v-for="item in list" :key="item.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;gap:12px;box-shadow:var(--sh)"><div class="avatar av-sm"><img loading="lazy" v-if="item.avatar" :src="item.avatar"><span v-else>👤</span></div><div class="flex1"><div style="font-weight:500">{{item.nickname}}</div><div style="font-size:12px;color:var(--tm)">{{item.age?item.age+'岁 ':''}}{{item.location||''}}</div></div><span v-if="tab==='viewers'&&item.visit_count>1" style="font-size:11px;color:var(--p);background:var(--bg-page);padding:3px 8px;border-radius:10px">访问×{{item.visit_count}}</span></div></div>`
 };
 
 var EarningsPage = {
   data: function(){return {wallet:{balance:0,total_earned:0},txs:[],loading:true}},
   mounted: async function(){try{var wr=await api("/wallet/info");var tr=await api("/wallet/transactions?limit=50");if(wr.data)this.wallet=wr.data;if(tr.data)this.txs=tr.data}catch(e){}this.loading=false},
-  template: `<div style="padding:16px"><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:24px;border-radius:var(--r);text-align:center;margin-bottom:16px"><div style="font-size:13px;opacity:.8">累计收益</div><div style="font-size:36px;font-weight:700;margin:8px 0">🪙{{wallet.total_earned||0}}</div><div style="font-size:13px;opacity:.8">余额:{{wallet.balance||0}}金币</div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="txs.length===0" class="empty"><div class="ei">📊</div><div class="et">暂无记录</div></div><div v-else v-for="tx in txs" :key="tx.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh)"><span style="font-size:24px;margin-right:12px">{{tx.type==='gift_receive'?'🎁':tx.type==='recharge'?'💳':'💰'}}</span><div style="flex:1"><div style="font-size:14px">{{tx.description||tx.type}}</div><div style="font-size:11px;color:var(--tm)">{{new Date(tx.created_at).toLocaleString('zh-CN')}}</div></div><span :style=\"{fontWeight:'600',color:tx.amount>0?'var(--s)':'var(--e)'}\">{{tx.amount>0?'+'+tx.amount:tx.amount}}</span></div></div>`
+  template: `<div style="padding:16px"><div style="background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;padding:24px;border-radius:var(--r);text-align:center;margin-bottom:16px"><div style="font-size:13px;opacity:.8">累计收益</div><div style="font-size:36px;font-weight:700;margin:8px 0">🪙{{wallet.total_earned||0}}</div><div style="font-size:13px;opacity:.8">余额:{{wallet.balance||0}}金币</div></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="txs.length===0" class="empty"><div class="ei">📊</div><div class="et">暂无记录</div></div><div v-else v-for="tx in txs" :key="tx.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh)"><span style="font-size:24px;margin-right:12px">{{tx.type==='gift_receive'?'🎁':tx.type==='recharge'?'💳':'💰'}}</span><div class="flex1"><div style="font-size:14px">{{tx.description||tx.type}}</div><div style="font-size:11px;color:var(--tm)">{{new Date(tx.created_at).toLocaleString('zh-CN')}}</div></div><span :style=\"{fontWeight:'600',color:tx.amount>0?'var(--s)':'var(--e)'}\">{{tx.amount>0?'+'+tx.amount:tx.amount}}</span></div></div>`
 };
 
 var WalletPage = {
@@ -2593,8 +2615,8 @@ var WalletPage = {
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:14px">
-      <button class="btn bp bs" style="flex:1" @click="go('/recharge')">💰 充值</button>
-      <button class="btn bo bs" style="flex:1" @click="openWithdraw">🏦 提现</button>
+      <button class="btn bp bs" class="flex1" @click="go('/recharge')">💰 充值</button>
+      <button class="btn bo bs" class="flex1" @click="openWithdraw">🏦 提现</button>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:14px">
       <div style="flex:1;background:var(--w);border-radius:var(--rs);padding:14px 12px;text-align:center;cursor:pointer;box-shadow:var(--sh)" @click="go('/orders')"><div style="font-size:22px">🧾</div><div style="font-size:12px;margin-top:4px">我的订单</div><div style="font-size:11px;color:var(--tm);margin-top:2px">{{orders.length}}笔</div></div>
@@ -2609,7 +2631,7 @@ var WalletPage = {
       <div v-if="txs.length===0" class="empty"><div class="ei">📭</div><div class="et">暂无交易记录</div></div>
       <div v-else v-for="tx in txs" :key="tx.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh)">
         <span style="font-size:24px;margin-right:12px">{{txIcon(tx)}}</span>
-        <div style="flex:1"><div style="font-size:14px">{{txText(tx)}}</div><div style="font-size:11px;color:var(--tm)">{{fmtTime(tx.created_at)}}</div></div>
+        <div class="flex1"><div style="font-size:14px">{{txText(tx)}}</div><div style="font-size:11px;color:var(--tm)">{{fmtTime(tx.created_at)}}</div></div>
         <span :style="{fontWeight:'600',color:tx.amount>0?'var(--s)':'var(--e)'}">{{tx.amount>0?'+'+tx.amount:tx.amount}}</span>
       </div>
     </template>
@@ -2617,11 +2639,11 @@ var WalletPage = {
       <div v-if="withdraws.length===0" class="empty"><div class="ei">🏦</div><div class="et">暂无提现记录</div></div>
       <div v-else v-for="w in withdraws" :key="w.id" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;box-shadow:var(--sh)">
         <span style="font-size:24px;margin-right:12px">🏦</span>
-        <div style="flex:1"><div style="font-size:14px">提现 {{w.amount}} 金币</div><div style="font-size:11px;color:var(--tm)">{{fmtTime(w.created_at)}}</div></div>
+        <div class="flex1"><div style="font-size:14px">提现 {{w.amount}} 金币</div><div style="font-size:11px;color:var(--tm)">{{fmtTime(w.created_at)}}</div></div>
         <span style="font-size:12px;font-weight:600;color:var(--s)">{{wdStatus(w.status)}}</span>
       </div>
     </template>
-    <transition name="slide-up"><div v-if="showWithdraw" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:300;display:flex;flex-direction:column;justify-content:flex-end"><div style="flex:1" @click="closeWithdraw"></div><div style="background:#fff;border-radius:16px 16px 0 0;overflow:hidden;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px))"><div style="display:flex;align-items:center;margin-bottom:16px"><span style="font-size:14px;color:var(--tm);cursor:pointer" @click="closeWithdraw">取消</span><span style="flex:1;text-align:center;font-size:16px;font-weight:600">提现</span><span style="width:28px"></span></div><div style="text-align:center;font-size:13px;color:var(--tm);margin-bottom:16px">当前余额：🪙{{wallet.balance||0}} 金币，最低提现100金币</div><div class="inp" style="margin-bottom:16px"><input v-model="wdAmount" type="number" inputmode="numeric" placeholder="请输入提现金额（金币）"></div><button class="btn bp bw bl" @click="doWithdraw" :disabled="wdBusy">{{wdBusy?'处理中...':'确认提现'}}</button><p style="text-align:center;color:var(--tm);font-size:11px;margin-top:12px">公测期间为模拟提现，不涉及真实转账</p></div></div></transition>
+    <transition name="slide-up"><div v-if="showWithdraw" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:300;display:flex;flex-direction:column;justify-content:flex-end"><div class="flex1" @click="closeWithdraw"></div><div style="background:#fff;border-radius:16px 16px 0 0;overflow:hidden;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px))"><div style="display:flex;align-items:center;margin-bottom:16px"><span style="font-size:14px;color:var(--tm);cursor:pointer" @click="closeWithdraw">取消</span><span style="flex:1;text-align:center;font-size:16px;font-weight:600">提现</span><span style="width:28px"></span></div><div style="text-align:center;font-size:13px;color:var(--tm);margin-bottom:16px">当前余额：🪙{{wallet.balance||0}} 金币，最低提现100金币</div><div class="inp" style="margin-bottom:16px"><input v-model="wdAmount" type="number" inputmode="numeric" placeholder="请输入提现金额（金币）"></div><button class="btn bp bw bl" @click="doWithdraw" :disabled="wdBusy">{{wdBusy?'处理中...':'确认提现'}}</button><p style="text-align:center;color:var(--tm);font-size:11px;margin-top:12px">公测期间为模拟提现，不涉及真实转账</p></div></div></transition>
   </div>`
 };
 
@@ -2644,7 +2666,7 @@ var GuardPage = {
     openUser:function(item){if(item&&item.target_user_id)this.$router.push("/user/"+item.target_user_id)}
   },
   mounted: function(){this.load("guarding")},
-  template: `<div style="padding:12px 16px"><div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn bs" :class=\"tab==='guarding'?'bp':'bo'\" @click="load('guarding')">我守护的</button><button class="btn bs" :class=\"tab==='guarders'?'bp':'bo'\" @click="load('guarders')">守护我的</button></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="list.length===0" class="empty"><div class="ei">🛡️</div><div class="et">暂无数据</div></div><div v-else v-for="item in list" :key="item.id" @click="openUser(item)" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;gap:12px;box-shadow:var(--sh);cursor:pointer"><div class="avatar av-sm"><img loading="lazy" v-if="item.avatar" :src="item.avatar"><span v-else>👤</span></div><div style="flex:1"><div style="font-weight:500">{{item.nickname}}</div><div style="font-size:12px;color:var(--tm)">{{item.age?item.age+'岁 ':''}}{{item.location||''}}</div></div><span style="color:var(--tm)">›</span></div></div>`
+  template: `<div style="padding:12px 16px"><div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn bs" :class=\"tab==='guarding'?'bp':'bo'\" @click="load('guarding')">我守护的</button><button class="btn bs" :class=\"tab==='guarders'?'bp':'bo'\" @click="load('guarders')">守护我的</button></div><div v-if="loading" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="list.length===0" class="empty"><div class="ei">🛡️</div><div class="et">暂无数据</div></div><div v-else v-for="item in list" :key="item.id" @click="openUser(item)" style="display:flex;align-items:center;padding:12px;background:var(--w);border-radius:var(--rs);margin-bottom:6px;gap:12px;box-shadow:var(--sh);cursor:pointer"><div class="avatar av-sm"><img loading="lazy" v-if="item.avatar" :src="item.avatar"><span v-else>👤</span></div><div class="flex1"><div style="font-weight:500">{{item.nickname}}</div><div style="font-size:12px;color:var(--tm)">{{item.age?item.age+'岁 ':''}}{{item.location||''}}</div></div><span style="color:var(--tm)">›</span></div></div>`
 };
 
 var ViewersPage = {
@@ -2766,7 +2788,7 @@ router.afterEach(function(){var el=document.querySelector(".pg");if(el)el.scroll
 // 简短提示音（Web Audio API，无需外部文件）
 function _playBeep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=800;o.type="sine";g.gain.setValueAtTime(0.25,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+0.3);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.3);}catch(e){}}
 var AppRoot = {
-  data: function(){return {toasts:toasts,uiState:uiState,appVersion:APP_VERSION,unreadCount:0,pv:pv,online:navigator.onLine}},
+  data: function(){return {toasts:toasts,uiState:uiState,appVersion:APP_VERSION,unreadCount:0,pv:pv,online:navigator.onLine,showInstall:false}},
   computed: {
     showNav: function(){var p=this.$route.path;return p==="/home"||p==="/discover"||p==="/chat"||p==="/my"},
     pageTitle: function(){var m={home:"遇见",discover:"动态",chat:"消息",my:"我的",login:"登录"};return m[this.$route.path.replace("/","")]||"遇见"},
@@ -2783,6 +2805,7 @@ var AppRoot = {
         }
       }catch(e){}
     },
+    // 多 tab 通知去重：仅「活跃 tab」弹提示，后台 tab 静默更新未读数
     onGlobalMsg: function(d){
       // 只处理收到的消息，忽略自己发出的消息确认
       if(d.type!=="message"||!d.data)return;
@@ -2793,6 +2816,8 @@ var AppRoot = {
       if(self.$route.path!=="/chat"&&!self.$route.path.startsWith("/chat/")){
         self.unreadCount=(self.unreadCount||0)+1;
       }
+      // 仅活跃 tab 弹提示（后台 tab 不打扰），避免多 tab 重复通知
+      if(self._activeTabId!==self._myTabId)return;
       // 不在聊天详情页时提示
       if(!self.$route.path.startsWith("/chat/")){
         var nick=d.data.sender_nickname||"用户";
@@ -2857,6 +2882,20 @@ var AppRoot = {
       api("/push/register",{method:"POST",body:JSON.stringify({platform:"web",device_token:devId})}).then(function(r){
         if(r.code===0){localStorage.setItem("pushToken",devId)}
       }).catch(function(){});
+    },
+    // U34 A2HS：显示安装提示
+    dismissInstall: function(){this.showInstall=false;localStorage.setItem("a2hsDismissed","1")},
+    installApp: function(){
+      var self=this;
+      if(self._deferredPrompt){
+        self._deferredPrompt.prompt();
+        self._deferredPrompt.userChoice.then(function(){
+          self.showInstall=false;localStorage.setItem("a2hsDismissed","1");
+          self._deferredPrompt=null;
+        }).catch(function(){});
+      } else {
+        toast("请在浏览器菜单中选择「添加到主屏幕」","tinfo");
+      }
     }
   },
   mounted: function(){
@@ -2878,6 +2917,24 @@ var AppRoot = {
     // 超级喜欢通知
     self._superLikeFn=function(d){self.onSuperLike(d)};
     wsOn("super_like_received",self._superLikeFn);
+    // 多 tab 去重：BroadcastChannel 同步「活跃 tab」，仅活跃 tab 弹通知
+    if(typeof BroadcastChannel!=="undefined"){
+      try{
+        self._myTabId="t"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+        self._activeTabId=self._myTabId; // 默认自己是活跃 tab
+        self._bc=new BroadcastChannel("yujian_tab");
+        self._bc.onmessage=function(ev){
+          if(ev&&ev.data&&ev.data.active)self._activeTabId=ev.data.active;
+        };
+        // 页面获得焦点时声明自己是活跃 tab
+        self._focusFn=function(){
+          self._activeTabId=self._myTabId;
+          if(self._bc)self._bc.postMessage({active:self._myTabId});
+        };
+        window.addEventListener("focus",self._focusFn);
+        self._focusFn();
+      }catch(e){self._bc=null}
+    }
     // 请求桌面通知权限
     if(window.NotificationUtils){
       window.NotificationUtils.requestNotificationPermission();
@@ -2890,6 +2947,15 @@ var AppRoot = {
     self._unreadTimer=setInterval(function(){self.loadUnreadCount()},30000);
     // App启动注册推送Token（S13：离线推送链路）
     self.registerPushToken();
+    // U34 A2HS：捕获安装提示事件，未拒绝过则显示横幅
+    self._installFn=function(e){
+      e.preventDefault();
+      self._deferredPrompt=e;
+      if(!localStorage.getItem("a2hsDismissed"))self.showInstall=true;
+    };
+    window.addEventListener("beforeinstallprompt",self._installFn);
+    // U28 PWA 已安装后不再提示
+    window.addEventListener("appinstalled",function(){self.showInstall=false;localStorage.setItem("a2hsDismissed","1")});
   },
   beforeUnmount: function(){
     if(this._imgErrFn)document.removeEventListener("error",this._imgErrFn,true);
@@ -2898,9 +2964,12 @@ var AppRoot = {
     wsOff("message",this._gMsgFn);
     wsOff("match_success",this._matchFn);
     wsOff("super_like_received",this._superLikeFn);
+    if(this._focusFn)window.removeEventListener("focus",this._focusFn);
+    if(this._bc)try{this._bc.close()}catch(e){}
+    if(this._installFn)window.removeEventListener("beforeinstallprompt",this._installFn);
     if(this._unreadTimer)clearInterval(this._unreadTimer);
   },
-  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">‹</button><span class="tt">{{pageTitle}}</span></header><div v-if="!online" class="offline-banner">📡 当前离线，部分功能暂不可用</div><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><keep-alive include=\"HomePage,DiscoverPage,ChatListPage,MyPage\"><component :is=\"Component\" :key=\"route.fullPath\"/></keep-alive></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z\"/></svg></div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 3l6.4 18.5 3.4-8 8-3.4z\"/></svg></div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z\"/></svg><span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/></svg></div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div v-if="pv.show" class="image-preview-overlay" @click="preview.close()" @touchstart="onPvTouchStart($event)" @touchend="onPvTouchEnd($event)"><img class="image-preview-img" :class="pv.scaled?'scale-2x':''" :src="pv.list[pv.idx]" @click.stop @dblclick="preview.toggleScale()"><button class="image-preview-close" @click="preview.close()">✕</button><span v-if="pv.list.length>1" style="position:fixed;top:50%;left:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.prev()">‹</span><span v-if="pv.list.length>1" style="position:fixed;top:50%;right:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.next()">›</span><span class="image-preview-counter">{{pv.idx+1}}/{{pv.list.length}}</span></div></div>`
+  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">‹</button><span class="tt">{{pageTitle}}</span></header><div v-if="!online" class="offline-banner">📡 当前离线，部分功能暂不可用</div><div v-if="showInstall" style="display:flex;align-items:center;gap:10px;background:#fff;padding:10px 14px;border-bottom:1px solid var(--border-light);flex-shrink:0;z-index:110"><span style="font-size:22px">📲</span><div style="flex:1;font-size:13px;color:var(--ts)">安装「遇见」到桌面，聊天更方便</div><button @click="dismissInstall" style="border:none;background:none;color:var(--tm);font-size:13px;cursor:pointer">暂不</button><button @click="installApp" style="border:none;background:var(--primary);color:#fff;border-radius:16px;padding:6px 16px;font-size:13px;cursor:pointer">安装</button></div><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><keep-alive include=\"HomePage,DiscoverPage,ChatListPage,MyPage\"><component :is=\"Component\" :key=\"route.fullPath\"/></keep-alive></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z\"/></svg></div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 3l6.4 18.5 3.4-8 8-3.4z\"/></svg></div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z\"/></svg><span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/></svg></div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div v-if="pv.show" class="image-preview-overlay" @click="preview.close()" @touchstart="onPvTouchStart($event)" @touchend="onPvTouchEnd($event)"><img class="image-preview-img" :class="pv.scaled?'scale-2x':''" :src="pv.list[pv.idx]" @click.stop @dblclick="preview.toggleScale()"><button class="image-preview-close" @click="preview.close()">✕</button><span v-if="pv.list.length>1" style="position:fixed;top:50%;left:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.prev()">‹</span><span v-if="pv.list.length>1" style="position:fixed;top:50%;right:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.next()">›</span><span class="image-preview-counter">{{pv.idx+1}}/{{pv.list.length}}</span></div></div>`
 };
 
 var app = Vue.createApp(AppRoot);
