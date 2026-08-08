@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260808a";
+var APP_VERSION = "v20260808b";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
@@ -102,6 +102,34 @@ function imgFallback(e){
   el.removeAttribute("src");
   el.setAttribute("alt","👤");
 }
+// 上传前客户端压缩：canvas 缩放到 maxW + 转 WebP（质量0.85），失败回退原图
+function compressImage(file,maxW,q){
+  maxW=maxW||1080;q=(q===undefined?0.85:q);
+  return new Promise(function(resolve){
+    if(!file||!(file.type||"").indexOf("image/")===0||!window.FileReader||!window.Image){resolve(file);return}
+    if(typeof file.size==="number"&&file.size<=800*1024){resolve(file);return} // 小图直接传
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var img=new Image();
+      img.onload=function(){
+        try{
+          var w=img.width,h=img.height,scale=Math.min(1,maxW/Math.max(w,h));
+          var canvas=document.createElement("canvas");
+          canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));
+          var ctx=canvas.getContext("2d");
+          ctx.drawImage(img,0,0,canvas.width,canvas.height);
+          canvas.toBlob(function(blob){
+            resolve(blob?new File([blob],file.name||"img.webp",{type:"image/webp"}):file);
+          },file.type==="image/png"?"image/png":"image/webp",q);
+        }catch(err){resolve(file)}
+      };
+      img.onerror=function(){resolve(file)};
+      img.src=ev.target.result;
+    };
+    reader.onerror=function(){resolve(file)};
+    reader.readAsDataURL(file);
+  });
+}
 
 // ==== 全局图片预览（点击放大 + 左右滑动 + 关闭） ====
 // 复用 index.html 已预留的 .image-preview-* CSS 类，用 Vue.reactive 保证模板响应
@@ -149,29 +177,92 @@ var LoginPage = {
 
 var HomePage = {
   name:"HomePage",
-  data: function(){ return {users:[],loading:true,err:false,errMsg:"",tab:"city",currentCity:"",showFilter:false,fAge:[18,35],matchModal:null,hasLoaded:false}; },
+  data: function(){ return {users:[],loading:true,err:false,errMsg:"",tab:"city",currentCity:"",showFilter:false,fAge:[18,35],matchModal:null,hasLoaded:false,quota:{likes:20,supers:5},locating:false,locDenied:false}; },
   methods: {
     load: async function(){ this.loading=true;this.err=false;try{var r=await api("/match/recommend?scope="+this.tab+"&ageMin="+this.fAge[0]+"&ageMax="+this.fAge[1]+"&limit=20");this.users=r.data||[];if(this.users.length===0)this.errMsg="暂无推荐用户"}catch(e){this.err=true;this.errMsg=e.message||"加载失败，请稍后重试"}this.loading=false;this.hasLoaded=true; },
-    // 定位上报：成功后不重复 load（首次 load 已并行发出），只更新城市显示；
+    // 定位上报（显式授权）：仅用户点「附近」或定位按钮时触发，不再挂载自动请求
+    // 成功后不重复 load（首次 load 已并行发出），只更新城市显示；
     // 若推荐结果为空（首次 load 在定位前返回），定位成功后补一次刷新
     initLocation: function(){
       var self=this;
-      if(!navigator.geolocation){return}
+      if(!navigator.geolocation){toast("当前浏览器不支持定位","terr");return}
+      self.locating=true;
       navigator.geolocation.getCurrentPosition(function(pos){
+        self.locating=false;
         var lat=pos.coords.latitude,lng=pos.coords.longitude;
         api("/user/location",{method:"POST",body:JSON.stringify({lat:lat,lng:lng})}).then(function(r){
-          if(r.code===0&&r.data&&r.data.city)self.currentCity=r.data.city;
+          if(r.code===0&&r.data&&r.data.city){self.currentCity=r.data.city;toast("已定位到 "+r.data.city,"tok")}
           if(self.users.length===0)self.load();
         }).catch(function(){});
       },function(err){
-        console.log('[定位] GPS获取失败:', err.message);
-      },{timeout:8000,enableHighAccuracy:false,maximumAge:30000});
+        self.locating=false;
+        var msg="定位失败，请重试";
+        if(err.code===1){msg="已拒绝定位权限，可在浏览器设置中开启";self.locDenied=true;}       // PERMISSION_DENIED
+        else if(err.code===3){msg="定位超时，请检查GPS或网络";}          // TIMEOUT
+        else if(err.code===2){msg="无法获取位置，请稍后重试";}           // POSITION_UNAVAILABLE
+        toast(msg,"terr");
+      },{timeout:12000,enableHighAccuracy:true,maximumAge:10000});
     },
-    switchTab: function(t){this.tab=t;this.load()},
+    switchTab: function(t){
+      this.tab=t;
+      // 首次点「附近」触发显式定位授权
+      if(t==="nearby"&&!this._located){this._located=true;this.initLocation();}
+      this.load();
+    },
     removeUser: function(u){
       var self=this;
       self.users=self.users.filter(function(x){return x.id!==u.id});
       if(self.users.length===0)self.load();
+    },
+    // 加载今日 like/super-like 配额（VIP 为 -1 表示无限）
+    loadQuota: function(){
+      var self=this;
+      api("/match/daily-quota").then(function(r){
+        if(r.code===0&&r.data){
+          var q=r.data;
+          self.quota.likes=(q.like_limit===-1?999:q.like_limit)-(q.like_used||0);
+          self.quota.supers=(q.super_like_limit===-1?999:q.super_like_limit)-(q.super_like_used||0);
+          if(self.quota.likes<0)self.quota.likes=0;
+          if(self.quota.supers<0)self.quota.supers=0;
+        }
+      }).catch(function(){});
+    },
+    like: async function(u){
+      if(!u)return;
+      if(this.quota.likes<=0){toast("今日喜欢次数已用完","tinfo");return}
+      var s=this;
+      try{
+        var r=await api("/match/like",{method:"POST",body:JSON.stringify({target_user_id:u.id})});
+        if(r.code===0){
+          this.quota.likes--;
+          if(r.data&&r.data.matched){
+            this.matchModal={partner:r.data.partner||u,conversation_id:r.data.conversation_id,common_tags:r.data.common_tags||[],icebreakers:r.data.icebreakers||[]};
+          }else{toast(r.message||"已喜欢","tok")}
+        }else{toast(r.message||"操作失败","terr")}
+      }catch(e){toast(e.message||"操作失败","terr")}
+      s.users=s.users.filter(function(x){return x.id!==u.id});
+      if(s.users.length===0)s.load();
+    },
+    skip: function(u){
+      if(!u)return;
+      var s=this;
+      api("/match/skip",{method:"POST",body:JSON.stringify({target_user_id:u.id})}).then(function(r){
+        if(r.code!==0&&r.message)toast(r.message,"terr");
+      }).catch(function(e){toast(e.message||"跳过失败","terr")});
+      s.users=s.users.filter(function(x){return x.id!==u.id});
+      if(s.users.length===0)s.load();
+    },
+    superLike: async function(u){
+      if(!u)return;
+      if(this.quota.supers<=0){toast("今日超级喜欢次数已用完","tinfo");return}
+      var s=this;
+      try{
+        var r=await api("/match/super-like",{method:"POST",body:JSON.stringify({target_user_id:u.id})});
+        if(r.code===0){this.quota.supers--;toast("⭐ 超级喜欢已发送","tok")}
+        else{toast(r.message||"操作失败","terr")}
+      }catch(e){toast(e.message||"操作失败","terr")}
+      s.users=s.users.filter(function(x){return x.id!==u.id});
+      if(s.users.length===0)s.load();
     },
     closeMatchModal: function(){this.matchModal=null},
     goChat: function(convId){
@@ -213,14 +304,19 @@ var HomePage = {
     },
     parseTags: function(t){if(!t)return[];if(Array.isArray(t))return t;try{return JSON.parse(t)}catch(e){return[]}}
   },
-  mounted: function(){this.load();this.initLocation()},
+  mounted: function(){this.load();this.loadQuota()},
   // keep-alive 缓存恢复时静默刷新（仅刷新用户列表，避免重复定位）
   activated: function(){if(this.hasLoaded)this.load()},
   template: `<div style="padding:12px 16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;background:var(--w);border-radius:var(--rs);padding:8px 12px;margin-bottom:10px;box-shadow:var(--sh)">
+    <span style="font-size:12px;color:var(--ts)">❤️ 今日 {{quota.likes>=999?'∞':quota.likes}}/{{quota.likes>=999?'∞':20}} · ⭐ {{quota.supers>=999?'∞':quota.supers}}/{{quota.supers>=999?'∞':5}}</span>
+    <span v-if="quota.likes>=999||quota.supers>=999" style="font-size:11px;color:var(--p)">👑 VIP无限</span>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn bs" :class="tab==='city'?'bp':'bo'" @click="switchTab('city')">{{currentCity?'同城·'+currentCity:'同城'}}</button>
-    <button class="btn bs" :class="tab==='nearby'?'bp':'bo'" @click="switchTab('nearby')">附近</button>
-    <button class="btn bs bo" style="margin-left:auto" @click="showFilter=!showFilter">🔍</button>
+    <button class="btn bs" :class="tab==='nearby'?'bp':'bo'" @click="switchTab('nearby')">{{locDenied?'附近（未开启定位）':'附近'}}</button>
+    <button class="btn bs bo" style="margin-left:auto" @click="$router.push('/search')">🔍</button>
+    <button class="btn bs bo" @click="showFilter=!showFilter">⛭</button>
   </div>
   <div v-if="showFilter" style="background:var(--w);padding:14px;border-radius:var(--r);margin-bottom:12px;box-shadow:var(--sh)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px">
@@ -256,8 +352,10 @@ var HomePage = {
         </div>
         <div v-if="parseTags(u.tags).length" style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in parseTags(u.tags).slice(0,3)" class="tag tp">{{t}}</span></div>
       </div>
-      <div style="flex-shrink:0">
-        <button @click.stop="chatUp(u)" style="border:none;background:none;padding:4px 0;font-size:11px;color:var(--p);cursor:pointer">{{u._has_conversation?'发消息':'打招呼'}}</button>
+      <div style="flex-shrink:0;display:flex;align-items:center;gap:6px">
+        <button @click.stop="skip(u)" title="跳过" style="width:32px;height:32px;border:none;border-radius:50%;background:#f1f1f1;color:#999;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+        <button @click.stop="superLike(u)" title="超级喜欢" :disabled="!quota.supers" style="width:32px;height:32px;border:none;border-radius:50%;background:#F6D365;color:#8a6d00;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:quota.supers>0?1:.35">⭐</button>
+        <button @click.stop="like(u)" title="喜欢" :disabled="!quota.likes" style="width:38px;height:38px;border:none;border-radius:50%;background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:quota.likes>0?1:.35">❤</button>
       </div>
     </div>
   </div>
@@ -323,11 +421,14 @@ var DiscoverPage = {
     },
     switchTab: function(t){this.tab=t;this.load()},
     // 多图选择（最多9张）
-    pubImageChange: function(e){
+    pubImageChange: async function(e){
       var self=this,files=Array.prototype.slice.call(e.target.files||[]);
       if(files.length===0)return;
       var room=9-self.pubImages.length;
       if(files.length>room){toast("最多选择9张图片","tinfo");files=files.slice(0,room)}
+      for(var i=0;i<files.length;i++){
+        try{files[i]=await compressImage(files[i])}catch(_){}
+      }
       files.forEach(function(f){self.pubImages.push(f);self.pubPreviews.push(URL.createObjectURL(f))});
       e.target.value=""; // 允许连续选择同一文件
     },
@@ -487,12 +588,92 @@ var PostDetailPage = {
 
 var ChatListPage = {
   name:"ChatListPage",
-  data: function(){return {convs:[],loading:true,hasLoaded:false}},
+  data: function(){return {convs:[],loading:true,hasLoaded:false,sheet:null,touchX:0,touchY:0,swipeId:null,swipeOffset:0}},
   methods: {
     load:async function(){this.loading=true;try{var r=await api("/chat/conversations");this.convs=r.data||[];this.syncGlobal()}catch(e){}this.loading=false;this.hasLoaded=true},
     // 将各会话未读数求和，同步到底部「消息」标签红点
     syncGlobal:function(){if(this.$root)this.$root.unreadCount=this.convs.reduce(function(a,c){return a+(c.unread_count||0)},0)},
     open:function(c){this.$router.push("/chat/"+c.id)},
+    // ===== 会话长按 / 滑动操作（统一 touch 处理链）=====
+    // touchstart：记录起点 + 起 750ms 长按定时器（弹底部 Sheet）
+    onTouchStart:function(e,c){
+      var t=e.touches?e.touches[0]:e.changedTouches[0];
+      if(!t)return;
+      var s=this;
+      s.touchX=t.clientX;s.touchY=t.clientY;
+      s._touchCid=c.id;
+      s._longPressed=false;
+      if(s._pressTimer){clearTimeout(s._pressTimer)}
+      s._pressTimer=setTimeout(function(){
+        s._longPressed=true;
+        s.sheet={conv:c};
+      },750);
+    },
+    // touchmove：位移>10 取消长按；横向滑动更新偏移，纵向滚动不干扰
+    onTouchMove:function(e,c){
+      var t=e.touches?e.touches[0]:e.changedTouches[0];
+      if(!t)return;
+      var dx=t.clientX-this.touchX,dy=t.clientY-this.touchY;
+      // 纵向滚动占优：取消长按并回正，交给页面滚动
+      if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>8){
+        if(this._pressTimer){clearTimeout(this._pressTimer);this._pressTimer=null}
+        c._swipeOffset=0;return;
+      }
+      // 横向位移：取消长按
+      if(Math.abs(dx)>10&&this._pressTimer){clearTimeout(this._pressTimer);this._pressTimer=null}
+      // 已长按弹出 Sheet 后不再滑动
+      if(this._longPressed)return;
+      // 只允许左滑露出右侧删除（单方向，避免与返回手势冲突）
+      if(dx<0)c._swipeOffset=Math.max(-140,dx);
+      else c._swipeOffset=0;
+    },
+    // touchend：取消长按；左滑>80px 触发删除，否则回正
+    onTouchEnd:function(e,c){
+      var s=this;
+      if(s._pressTimer){clearTimeout(s._pressTimer);s._pressTimer=null}
+      if(s._longPressed){s._longPressed=false;return}
+      var t=e.changedTouches?e.changedTouches[0]:null;
+      var dx=t?t.clientX-s.touchX:0;
+      if(dx<-80){c._swipeOffset=-140;s.delConv(c);}
+      else{c._swipeOffset=0;}
+      s._touchCid=null;
+    },
+    // 删除会话
+    delConv:function(c){
+      var s=this;
+      s.sheet=null;
+      api("/chat/conversations/"+c.id,{method:"DELETE"}).then(function(r){
+        if(r.code===0){s.convs=s.convs.filter(function(x){return x.id!==c.id});s.syncGlobal();toast("会话已删除","tok")}
+        else toast(r.message||"删除失败","terr");
+      }).catch(function(e){toast(e.message||"删除失败","terr")});
+    },
+    // 标已读
+    markRead:function(c){
+      var s=this;s.sheet=null;
+      api("/chat/mark-read",{method:"POST",body:JSON.stringify({conversation_id:c.id})}).then(function(r){
+        if(r.code===0){c.unread_count=0;s.syncGlobal();toast("已标为已读","tok")}
+      }).catch(function(){});
+    },
+    // 置顶/取消置顶（调后端 togglePin，切换语义）
+    pinConv:function(c){
+      var s=this;s.sheet=null;
+      api("/chat/conversations/"+c.id+"/pin",{method:"PUT"}).then(function(r){
+        if(r.code===0){c.is_pinned=!c.is_pinned;toast(c.is_pinned?"已置顶":"已取消置顶","tok");
+          // 置顶会话排到最前
+          var i=s.convs.indexOf(c);if(c.is_pinned&&i>0){s.convs.splice(i,1);s.convs.unshift(c);}
+        }
+        else toast(r.message||"操作失败","terr");
+      }).catch(function(e){toast(e.message||"操作失败","terr")});
+    },
+    // 拉黑
+    blockConv:function(c){
+      var s=this;s.sheet=null;
+      if(!window.confirm("拉黑 "+(c.other_nickname||"TA")+" 后，将不再收到TA的消息，确定拉黑？"))return;
+      api("/block/add",{method:"POST",body:JSON.stringify({blocked_user_id:c.other_user_id})}).then(function(r){
+        if(r.code===0){s.convs=s.convs.filter(function(x){return x.id!==c.id});s.syncGlobal();toast("已拉黑","tok")}
+        else toast(r.message||"拉黑失败","terr");
+      }).catch(function(e){toast(e.message||"拉黑失败","terr")});
+    },
     fmtTime:function(t){if(!t)return"";var d=new Date(t),now=new Date();var sameDay=d.toDateString()===now.toDateString();if(sameDay)return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);var yes=new Date(now);yes.setDate(yes.getDate()-1);if(d.toDateString()===yes.toDateString())return"昨天";return ("0"+(d.getMonth()+1)).slice(-2)+"/"+("0"+d.getDate()).slice(-2)},
     fmtLastMsg:function(c){if(!c.last_message)return"暂无消息";if(c.last_msg_type===1)return"[图片]";if(c.last_msg_type===2)return"[语音]";if(c.last_msg_type===4)return"[贴纸]";if(c.last_msg_type===99)return c.last_message;return c.last_message},
     onWsMsg:function(d){
@@ -548,7 +729,7 @@ var ChatListPage = {
     wsOff("message",this._clWsFn);
     wsOff("online_status",this._clOnlineFn);
   },
-  template: `<div><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div style="flex:1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else><div v-if="convs.length===0" class="empty" style="margin-top:8px"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" @click="open(c)" class="conv-item"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><div class="conv-name-line"><span class="conv-name">{{c.other_nickname||'用户'}}</span></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="conv-time">{{fmtTime(c.last_message_time)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span></div></div></div></div></div></div>`
+  template: `<div><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div style="flex:1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else><div v-if="convs.length===0" class="empty" style="margin-top:8px"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" class="conv-swipe" style="position:relative;overflow:hidden"><div class="conv-actions" style="position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1"><button style="border:none;background:#F6D365;color:#5b4a00;font-size:12px;padding:0 18px;cursor:pointer" @click.stop="delConv(c)">删除</button></div><div class="conv-item" :style="{transform:'translateX('+((c._swipeOffset||0)+'px')+')',transition:c._swipeOffset&&c._swipeOffset!==0?'transform .2s':'transform .2s'}" @touchstart.prevent="onTouchStart($event,c)" @touchmove.prevent="onTouchMove($event,c)" @touchend.prevent="onTouchEnd($event,c)" @touchcancel.prevent="onTouchEnd($event,c)" @click="open(c)"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><div class="conv-name-line"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span v-if="c.is_pinned" class="tag tp" style="font-size:10px;padding:0 4px;margin-left:4px">📌</span></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="conv-time">{{fmtTime(c.last_message_time)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span></div></div></div></div></div><div v-if="sheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300" @click="sheet=null"><div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;padding:12px 16px calc(16px + var(--safe-b))" @click.stop><div style="display:flex;align-items:center;padding:14px 8px;border-bottom:1px solid #f2f2f2;margin-bottom:8px"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="sheet.conv.other_avatar" :src="sheet.conv.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div></div><span style="font-size:16px;font-weight:600;margin-left:12px">{{sheet.conv.other_nickname||'用户'}}</span></div><div v-for="op in [{i:'✔️',l:'标为已读',f:function(){markRead(sheet.conv)}},{i:'📌',l:sheet.conv.is_pinned?'取消置顶':'置顶会话',f:function(){pinConv(sheet.conv)}},{i:'🗑️',l:'删除会话',f:function(){delConv(sheet.conv)}},{i:'🚫',l:'拉黑',f:function(){blockConv(sheet.conv)}}]" :key="op.l" style="display:flex;align-items:center;padding:14px 8px;border-radius:10px;cursor:pointer" @click="op.f"><span style="font-size:18px;margin-right:12px">{{op.i}}</span><span style="font-size:15px">{{op.l}}</span></div><button style="width:100%;margin-top:12px;padding:12px;border:none;background:#f5f5f5;border-radius:12px;font-size:15px;cursor:pointer;color:var(--tm)" @click="sheet=null">取消</button></div></div></div></div></div>`
 };
 
 
@@ -736,6 +917,7 @@ var ChatDetailPage = {
     uploadImage: async function(file){
       var self=this;self.uploading=true;
       try{
+        file=await compressImage(file);
         var fd=new FormData();fd.append("image",file);
         var r=await api("/upload/image",{method:"POST",body:fd});
         if(r.code===0&&r.data){
@@ -1464,6 +1646,7 @@ var EditProfilePage = {
       var self=this,f=e.target.files[0];if(!f)return;
       self.photoUploading=true;
       try{
+        f=await compressImage(f);
         var fd=new FormData();fd.append("photo",f);
         var r=await api("/user/photos",{method:"POST",body:fd});
         if(r.code===0){toast("上传成功","tok");var pr=await api("/user/photos");self.photos=pr.data||[]}
@@ -2452,6 +2635,33 @@ var DeactivatePage = {
   template: `<div style="padding:24px 16px"><div class="card" style="padding:24px"><div style="font-size:40px;text-align:center;margin-bottom:12px">🗑️</div><div style="font-size:18px;font-weight:600;text-align:center;margin-bottom:12px">注销账号</div><div style="font-size:13px;color:var(--tm);line-height:1.7;margin-bottom:20px">注销后账号资料将被冻结，进入 <b>14 天冷静期</b>，期间可联系客服恢复。冷静期满后账号及所有数据将被永久删除，不可恢复。请谨慎操作。</div><button class="btn bp bs bw" style="width:100%" @click="submit" :disabled="submitting">{{submitting?'提交中...':'申请注销'}}</button></div></div>`
 };
 
+var SearchPage = {
+  name:"SearchPage",
+  data: function(){return {q:"",tab:"user",results:[],loading:false,err:"",hasMore:false,offset:0}},
+  methods: {
+    onSearch: function(){
+      this.results=[];this.offset=0;this.hasMore=false;this.doSearch();
+    },
+    doSearch: async function(){
+      var s=this;
+      if(!s.q.trim()){toast("请输入搜索关键词","tinfo");return}
+      s.loading=true;s.err="";
+      try{
+        var url="/user/search?q="+encodeURIComponent(s.q.trim())+"&limit=20&offset="+s.offset;
+        var r=await api(url);
+        var list=r.data||[];
+        s.results=s.results.concat(list);
+        s.offset+=list.length;
+        s.hasMore=list.length===20;
+      }catch(e){s.err=e.message||"搜索失败"}
+      s.loading=false;
+    },
+    loadMore: function(){this.doSearch()},
+    timeAgo:function(t){if(!t)return"";var s=(Date.now()-new Date(t).getTime())/1000;if(s<60)return"刚刚";if(s<3600)return Math.floor(s/60)+"分钟前";if(s<86400)return Math.floor(s/3600)+"小时前";return Math.floor(s/86400)+"天前"}
+  },
+  template: `<div style="padding:12px 16px"><div style="display:flex;gap:8px;margin-bottom:14px"><div style="flex:1;display:flex;align-items:center;background:var(--w);border-radius:20px;padding:0 14px;box-shadow:var(--sh)"><span style="color:var(--tm)">🔍</span><input v-model="q" @keyup.enter="onSearch" placeholder="搜索昵称或签名" style="flex:1;border:none;background:none;padding:10px 8px;font-size:15px;outline:none"></div><button class="btn bp bs" @click="onSearch">搜索</button></div><div v-if="loading&&results.length===0" style="text-align:center;padding:32px"><div class="spin"></div></div><div v-else-if="err&&results.length===0" style="text-align:center;padding:32px;color:var(--tm)">{{err}}</div><div v-else-if="results.length===0&&q" style="text-align:center;padding:32px"><div style="font-size:40px;margin-bottom:10px">🔍</div><div style="color:var(--tm)">没有找到相关用户</div></div><div v-else><div v-for="u in results" :key="u.id" class="card" style="display:flex;align-items:center;padding:12px;cursor:pointer" @click="$router.push('/user/'+u.id)"><div style="width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));display:flex;align-items:center;justify-content:center"><img loading="lazy" v-if="u.avatar" :src="u.avatar" style="width:100%;height:100%;object-fit:cover"><span v-else style="font-size:22px">👤</span></div><div style="flex:1;min-width:0;margin-left:12px"><div style="display:flex;align-items:center;gap:6px"><span style="font-size:15px;font-weight:600">{{u.nickname||'TA'}}</span><span style="font-size:12px;color:var(--ts)">{{u.age||'?'}}岁</span><span v-if="u.is_vip" class="tag tp" style="font-size:10px">VIP</span></div><div style="font-size:12px;color:var(--tm);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{u.bio||u.location||'未填写资料'}}</div></div><span style="color:var(--tm)">›</span></div><div v-if="hasMore" style="text-align:center;padding:14px"><button class="btn bo bs" @click="loadMore" :disabled="loading">{{loading?'加载中...':'加载更多'}}</button></div></div></div>`
+};
+
 var NotFoundPage = {
   template: `<div style="padding:48px 24px;text-align:center"><div style="font-size:56px;margin-bottom:16px">🚧</div><div style="font-size:20px;font-weight:600;color:var(--t);margin-bottom:8px">页面不存在</div><div style="font-size:14px;color:var(--tm);margin-bottom:24px">你访问的页面找不到了</div><button class="btn bp bs" @click="$router.replace('/home')">返回首页</button></div>`
 };
@@ -2459,6 +2669,7 @@ var NotFoundPage = {
 var routes = [
   {path:"/",component:WelcomePage},{path:"/login",component:LoginPage},
   {path:"/home",component:HomePage},{path:"/discover",component:DiscoverPage},
+  {path:"/search",component:SearchPage},
   {path:"/chat",component:ChatListPage},{path:"/chat/:id",component:ChatDetailPage},
   {path:"/post/:id",component:PostDetailPage},{path:"/user/:id",component:UserProfilePage},
   {path:"/edit-profile",component:EditProfilePage},{path:"/vip",component:VipPage},

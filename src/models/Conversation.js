@@ -152,8 +152,8 @@ class Conversation {
            FROM conversations c
            LEFT JOIN users u1 ON c.user1_id = u1.id
            LEFT JOIN users u2 ON c.user2_id = u2.id
-           WHERE c.user1_id = ? OR c.user2_id = ?
-           ORDER BY c.last_message_time IS NULL ASC, c.last_message_time DESC`,
+           WHERE (c.user1_id = ? OR c.user2_id = ?) AND c.status = 1
+           ORDER BY c.is_pinned DESC, c.last_message_time IS NULL ASC, c.last_message_time DESC`,
           [user_id, user_id, user_id, user_id, user_id, user_id, user_id, user_id]
         );
         // 按当前用户实时计算未读数：仅统计「别人发给我的未读」，自己发出的消息不计入
