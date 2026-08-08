@@ -117,9 +117,6 @@ async function recommendUsers(user_id, filters = {}) {
       Conversation.batchExists(user_id, candidateIds)
     ]);
 
-    // 收集待记录的浏览，在循环外批量处理
-    const viewPromises = [];
-
     // 循环内仅做内存判断，不再逐条查询数据库
     const recommendedUsers = [];
     for (const user of ageFiltered) {
@@ -138,19 +135,15 @@ async function recommendUsers(user_id, filters = {}) {
         userForRecommend._has_conversation = true;
       }
 
-      // 浏览记录异步写入（收集 Promise，不阻塞推荐返回）
-      viewPromises.push(
-        View.create(user_id, user.id).catch(err => {
-          console.error('浏览记录写入失败:', err.message);
-        })
-      );
-
       recommendedUsers.push(userForRecommend);
       if (recommendedUsers.length >= limit) break;
     }
 
-    // 异步写入浏览记录（不阻塞返回，静默失败）
-    Promise.allSettled(viewPromises).catch(() => {});
+    // 一次性批量写入浏览记录（一条 SQL，避免 N 条单次 INSERT 拖慢响应；不阻塞返回）
+    const viewedIds = recommendedUsers.map(u => u.id);
+    if (viewedIds.length > 0) {
+      View.bulkCreate(user_id, viewedIds).catch(() => {});
+    }
 
     // 结果不足5人时降级扩大搜索范围
     if (recommendedUsers.length === 0) {

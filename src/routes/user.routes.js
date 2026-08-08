@@ -88,6 +88,23 @@ router.get('/following', userController.getFollowing);
 // 获取看过我的人
 router.get('/viewers', userController.getViewers);
 
+// ==================== 守护关系 ====================
+
+// 守护用户
+router.post('/guard', userController.guardUser);
+
+// 取消守护
+router.post('/unguard', userController.unguardUser);
+
+// 我守护的列表
+router.get('/guarding', userController.getGuarding);
+
+// 守护我的列表
+router.get('/guarders', userController.getGuarders);
+
+// 社交关系计数（守护/关注/粉丝/访客）
+router.get('/social-counts', userController.getSocialCounts);
+
 // ==================== 新手引导 ====================
 
 // 获取引导完成状态

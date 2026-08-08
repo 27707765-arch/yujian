@@ -38,6 +38,7 @@ function isWithinDistance(lat1, lng1, lat2, lng2, maxDistance) {
 // User.update() 允许更新的列白名单（防止任意列注入）
 const ALLOWED_UPDATE_COLUMNS = new Set([
   'nickname', 'avatar', 'gender', 'age', 'height', 'occupation',
+  'birth_date', 'education',
   'location', 'province', 'city', 'district', 'lat', 'lng', 'bio',
   'tags', 'status', 'is_vip', 'vip_expire_time', 'onboarding_completed',
   'email', 'email_verified', 'password_hash',

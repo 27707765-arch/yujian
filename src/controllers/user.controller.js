@@ -7,6 +7,7 @@ const User = require('../models/User');
 const UserPhoto = require('../models/UserPhoto');
 const UserSettings = require('../models/UserSettings');
 const Like = require('../models/Like');
+const Guard = require('../models/Guard');
 const View = require('../models/View');
 const { getRandomAvatar } = require('../utils/avatar');
 const Checkin = require('../models/Checkin');
@@ -14,6 +15,7 @@ const Wallet = require('../models/Wallet');
 const { success, error, serverError } = require('../utils/response');
 const { validateMagicBytes } = require('../services/upload.service');
 const { executeQuery, isDbAvailable } = require('../utils/database');
+const { formatBirthDate, calcAgeFromBirth } = require('../utils/date');
 const path = require('path');
 
 /**
@@ -78,6 +80,8 @@ async function getUserInfo(req, res) {
       age: user.age,
       height: user.height,
       occupation: user.occupation,
+      birth_date: formatBirthDate(user.birth_date),
+      education: user.education || null,
       location: user.location,
       province: user.province || null,
       city: user.city || null,
@@ -112,7 +116,7 @@ async function getUserInfo(req, res) {
 async function updateUserInfo(req, res) {
   try {
     const { id } = req.user;
-    const { nickname, gender, age, height, occupation, location, lat, lng, bio, tags } = req.body;
+    const { nickname, gender, age, height, occupation, location, lat, lng, bio, tags, birth_date, province, city, education } = req.body;
 
     if (nickname && (nickname.length < 2 || nickname.length > 50)) {
       return error(res, 400, '昵称长度必须在2-50之间');
@@ -127,7 +131,35 @@ async function updateUserInfo(req, res) {
       return error(res, 400, '标签最多选择10个');
     }
 
-    const updateData = { nickname, gender, age, height, occupation, location, bio };
+    // 出生日期：格式校验 + 非未来，并同步派生 age（age 列保留供现有匹配/推荐/展示使用）
+    let derivedAge = null;
+    if (birth_date) {
+      if (typeof birth_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(birth_date)) {
+        return error(res, 400, '出生日期格式不正确');
+      }
+      derivedAge = calcAgeFromBirth(birth_date);
+      if (derivedAge < 0) {
+        return error(res, 400, '出生日期不能是未来');
+      }
+      if (derivedAge < 18) {
+        return error(res, 400, '仅支持18岁以上用户完善生日');
+      }
+    }
+
+    const updateData = { nickname, gender, height, occupation, location, bio };
+    // 年龄：优先由出生日期派生；无生日时保留前端传的 age（兼容旧客户端）
+    if (derivedAge !== null) {
+      updateData.age = derivedAge;
+      updateData.birth_date = birth_date;
+    } else if (age !== undefined) {
+      updateData.age = age;
+    }
+    if (birth_date && derivedAge === null) {
+      updateData.birth_date = birth_date;
+    }
+    if (education !== undefined) updateData.education = education;
+    if (province != null) updateData.province = province;
+    if (city != null) updateData.city = city;
     // lat/lng 单独处理：有值才传，防止前端传 undefined 覆盖数据库已有的坐标
     if (lat != null) updateData.lat = parseFloat(lat);
     if (lng != null) updateData.lng = parseFloat(lng);
@@ -178,6 +210,8 @@ async function updateUserInfo(req, res) {
       age: updatedUser.age,
       height: updatedUser.height,
       occupation: updatedUser.occupation,
+      birth_date: formatBirthDate(updatedUser.birth_date),
+      education: updatedUser.education || null,
       location: updatedUser.location,
       province: updatedUser.province || null,
       city: updatedUser.city || null,
@@ -256,7 +290,7 @@ async function uploadAvatar(req, res) {
       return error(res, 400, '文件类型不合法，仅支持 JPG/PNG/GIF/WEBP 格式');
     }
 
-    const avatarUrl = `/${req.file.filename}`;
+    const avatarUrl = `/uploads/${req.file.filename}`;
     const updatedUser = await User.update(id, { avatar: avatarUrl });
 
     success(res, { avatar: updatedUser.avatar }, '头像上传成功');
@@ -290,13 +324,11 @@ async function uploadPhoto(req, res) {
       return error(res, 400, '文件类型不合法，仅支持 JPG/PNG/GIF/WEBP 格式');
     }
 
-    const photoUrl = `/${req.file.filename}`;
+    const photoUrl = `/uploads/${req.file.filename}`;
     const photo = await UserPhoto.create(id, photoUrl, count);
 
-    // 如果这是用户的第一张照片，自动设为头像
-    if (count === 0) {
-      await UserPhoto.setCover(photo.id, id);
-    }
+    // 相册上传与头像完全独立：不自动设为封面，也不影响 users.avatar
+    // 头像只能通过 /user/avatar 单独上传
 
     // 触发每日任务：上传照片（每张+1进度）
     Checkin.updateTaskProgress(id, 'upload_photo').catch(() => {});
@@ -427,11 +459,11 @@ async function getAllTags(req, res) {
       { id: 2, name: '旅行', category: '生活' },
       { id: 3, name: '美食', category: '生活' },
       { id: 4, name: '摄影', category: '生活' },
-      { id: 5, name: '音乐', category: '文化' },
-      { id: 6, name: '电影', category: '文化' },
+      { id: 5, name: '音乐', category: '娱乐' },
+      { id: 6, name: '电影', category: '娱乐' },
       { id: 7, name: '宠物', category: '生活' },
       { id: 8, name: '游戏', category: '娱乐' },
-      { id: 9, name: '阅读', category: '文化' },
+      { id: 9, name: '阅读', category: '娱乐' },
       { id: 10, name: '跑步', category: '运动' }
     ]);
   } catch (err) {
@@ -458,12 +490,27 @@ async function getUserProfile(req, res) {
     // 获取动态数和粉丝数
     let postsCount = 0;
     let fansCount = 0;
+    let followingCount = 0;
+    let guardersCount = 0;
+    let guardingCount = 0;
+    let viewersCount = 0;
+    let isGuarded = false;
     try {
       if (isDbAvailable()) {
         const [[pc]] = await executeQuery('SELECT COUNT(*) as cnt FROM posts WHERE user_id = ? AND status = 1', [userId]);
         postsCount = pc?.cnt || 0;
         const [[fc]] = await executeQuery('SELECT COUNT(*) as cnt FROM likes WHERE target_user_id = ?', [userId]);
         fansCount = fc?.cnt || 0;
+        const [[oc]] = await executeQuery('SELECT COUNT(*) as cnt FROM likes WHERE user_id = ?', [userId]);
+        followingCount = oc?.cnt || 0;
+        const [[gc]] = await executeQuery('SELECT COUNT(*) as cnt FROM user_guards WHERE guarded_user_id = ?', [userId]);
+        guardersCount = gc?.cnt || 0;
+        const [[ggc]] = await executeQuery('SELECT COUNT(*) as cnt FROM user_guards WHERE guard_user_id = ?', [userId]);
+        guardingCount = ggc?.cnt || 0;
+        const [[vc]] = await executeQuery('SELECT COUNT(DISTINCT user_id) as cnt FROM user_views WHERE target_user_id = ?', [userId]);
+        viewersCount = vc?.cnt || 0;
+        const [[ig]] = await executeQuery('SELECT id FROM user_guards WHERE guard_user_id = ? AND guarded_user_id = ? LIMIT 1', [req.user.id, userId]);
+        isGuarded = !!ig;
       }
     } catch (e) { /* 静默 */ }
 
@@ -481,6 +528,11 @@ async function getUserProfile(req, res) {
       is_vip: user.is_vip,
       posts_count: postsCount,
       fans_count: fansCount,
+      following_count: followingCount,
+      guarders_count: guardersCount,
+      guarding_count: guardingCount,
+      viewers_count: viewersCount,
+      is_guarded: isGuarded,
       gifts_received_count: user.gifts_received_count || 0,
       photos: photos
     });
@@ -524,10 +576,127 @@ async function getViewers(req, res) {
   try {
     const { id } = req.user;
     const { limit = 20, offset = 0 } = req.query;
-    const viewers = await View.getViewers(id, parseInt(limit), parseInt(offset));
+    // 获取当前用户坐标，用于计算访客距离（访客位置 → 我的位置）
+    let myLat = null, myLng = null;
+    try {
+      const me = await User.findById(id);
+      if (me) {
+        myLat = me.lat || null;
+        myLng = me.lng || null;
+      }
+    } catch (e) { /* 坐标获取失败不阻塞，距离为 null */ }
+    const viewers = await View.getViewers(id, parseInt(limit), parseInt(offset), myLat, myLng);
     success(res, viewers);
   } catch (err) {
     serverError(res, err, '获取浏览记录失败');
+  }
+}
+
+// ==================== 守护关系 ====================
+
+/**
+ * 守护用户（幂等：重复守护直接返回成功）
+ */
+async function guardUser(req, res) {
+  try {
+    const { id } = req.user;
+    const targetUserId = parseInt(req.body.target_user_id);
+    if (!targetUserId) return error(res, 400, '目标用户ID无效');
+
+    if (targetUserId === id) return error(res, 400, '不能守护自己');
+
+    const target = await User.findById(targetUserId);
+    if (!target) return error(res, 404, '用户不存在');
+
+    const guard = await Guard.create(id, targetUserId);
+    const isNew = !!guard; // 已存在时返回 null（幂等）
+    success(res, { is_guarded: true, is_new: isNew }, isNew ? '守护成功' : '已守护过');
+  } catch (err) {
+    serverError(res, err, '守护失败');
+  }
+}
+
+/**
+ * 取消守护
+ */
+async function unguardUser(req, res) {
+  try {
+    const { id } = req.user;
+    const targetUserId = parseInt(req.body.target_user_id);
+    if (!targetUserId) return error(res, 400, '目标用户ID无效');
+
+    await Guard.remove(id, targetUserId);
+    success(res, { is_guarded: false }, '已取消守护');
+  } catch (err) {
+    serverError(res, err, '取消守护失败');
+  }
+}
+
+/**
+ * 我守护的列表
+ */
+async function getGuarding(req, res) {
+  try {
+    const { id } = req.user;
+    const { limit = 20, offset = 0 } = req.query;
+    const list = await Guard.getGuarding(id, parseInt(limit), parseInt(offset));
+    success(res, list);
+  } catch (err) {
+    serverError(res, err, '获取守护列表失败');
+  }
+}
+
+/**
+ * 守护我的列表
+ */
+async function getGuarders(req, res) {
+  try {
+    const { id } = req.user;
+    const { limit = 20, offset = 0 } = req.query;
+    const list = await Guard.getGuarders(id, parseInt(limit), parseInt(offset));
+    success(res, list);
+  } catch (err) {
+    serverError(res, err, '获取守护者列表失败');
+  }
+}
+
+/**
+ * 社交关系计数（守护/关注/粉丝/访客），我的页面四标签徽标数据源
+ */
+async function getSocialCounts(req, res) {
+  try {
+    const { id } = req.user;
+    const [guardingCount, guardersCount, viewersCount] = await Promise.all([
+      Guard.countGuarding(id),
+      Guard.countGuarders(id),
+      View.countViewers(id)
+    ]);
+
+    // 关注/粉丝数用 COUNT 查询取总数
+    let following = 0;
+    let fans = 0;
+    try {
+      if (isDbAvailable()) {
+        const [[oc]] = await executeQuery('SELECT COUNT(*) as cnt FROM likes WHERE user_id = ?', [id]);
+        following = oc?.cnt || 0;
+        const [[fc]] = await executeQuery('SELECT COUNT(*) as cnt FROM likes WHERE target_user_id = ?', [id]);
+        fans = fc?.cnt || 0;
+      } else {
+        // 数据库不可用时用内存降级计数
+        following = (await Like.getUserLikes(id)).length;
+        fans = (await Like.getLikedByUsers(id)).length;
+      }
+    } catch (e) { /* 静默，保留降级值 */ }
+
+    success(res, {
+      guarding: guardingCount,
+      guarders: guardersCount,
+      following,
+      fans,
+      viewers: viewersCount
+    });
+  } catch (err) {
+    serverError(res, err, '获取社交计数失败');
   }
 }
 
@@ -671,6 +840,11 @@ module.exports = {
   getFans,
   getFollowing,
   getViewers,
+  guardUser,
+  unguardUser,
+  getGuarding,
+  getGuarders,
+  getSocialCounts,
   searchUsers,
   getOnboardingStatus,
   completeOnboarding

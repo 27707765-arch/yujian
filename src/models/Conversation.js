@@ -136,18 +136,18 @@ class Conversation {
     try {
       if (isDbAvailable()) {
         const [rows] = await executeQuery(
-          `SELECT c.*, 
-           CASE 
+          `SELECT c.*,
+           CASE
              WHEN c.user1_id = ? THEN u2.id ELSE u1.id END as other_user_id,
-           CASE 
+           CASE
              WHEN c.user1_id = ? THEN u2.nickname ELSE u1.nickname END as other_user_nickname,
-           CASE 
+           CASE
              WHEN c.user1_id = ? THEN u2.nickname ELSE u1.nickname END as nickname,
-           CASE 
+           CASE
              WHEN c.user1_id = ? THEN u2.nickname ELSE u1.nickname END as other_nickname,
-           CASE 
+           CASE
              WHEN c.user1_id = ? THEN u2.avatar ELSE u1.avatar END as other_user_avatar,
-           CASE 
+           CASE
              WHEN c.user1_id = ? THEN u2.avatar ELSE u1.avatar END as other_avatar
            FROM conversations c
            LEFT JOIN users u1 ON c.user1_id = u1.id
@@ -156,6 +156,19 @@ class Conversation {
            ORDER BY c.last_message_time IS NULL ASC, c.last_message_time DESC`,
           [user_id, user_id, user_id, user_id, user_id, user_id, user_id, user_id]
         );
+        // 按当前用户实时计算未读数：仅统计「别人发给我的未读」，自己发出的消息不计入
+        // （避免会话级 unread_count 单值把发送方的消息也计成自己的未读红点）
+        for (const row of rows) {
+          try {
+            const [cnt] = await executeQuery(
+              'SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ? AND receiver_id = ? AND status = 0',
+              [row.id, user_id]
+            );
+            row.unread_count = (cnt && cnt.n) ? cnt.n : 0;
+          } catch (e) {
+            row.unread_count = row.unread_count || 0;
+          }
+        }
         // 批量附加对方在线状态
         try {
           const ws = require('../services/websocket.service');
