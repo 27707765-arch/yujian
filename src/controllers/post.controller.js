@@ -17,7 +17,7 @@ async function createPost(req, res) {
       const filePath = path.resolve(file.path);
       const isValid = await validateMagicBytes(filePath);
       if (isValid) {
-        images.push(`/${file.filename}`);
+        images.push(`/uploads/${file.filename}`);
       }
     }
 
@@ -26,7 +26,7 @@ async function createPost(req, res) {
     let video_cover = null;
     const uploadedVideo = req.files && req.files.video ? req.files.video[0] : null;
     if (uploadedVideo) {
-      video_url = `/${uploadedVideo.filename}`;
+      video_url = `/uploads/${uploadedVideo.filename}`;
     }
 
     // 处理视频封面
@@ -35,7 +35,7 @@ async function createPost(req, res) {
       const filePath = path.resolve(uploadedCover.path);
       const isValid = await validateMagicBytes(filePath);
       if (isValid) {
-        video_cover = `/${uploadedCover.filename}`;
+        video_cover = `/uploads/${uploadedCover.filename}`;
       }
     }
 
@@ -82,7 +82,7 @@ async function updatePost(req, res) {
       const filePath = path.resolve(file.path);
       const isValid = await validateMagicBytes(filePath);
       if (isValid) {
-        images.push(`/${file.filename}`);
+        images.push(`/uploads/${file.filename}`);
       }
     }
 

@@ -26,7 +26,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || '123456',
   database: process.env.DB_NAME || 'yujian',
   waitForConnections: true,
-  connectionLimit: parseInt(process.env.DB_POOL_SIZE, 10) || 20,  // 公测提升至20连接
+  connectionLimit: parseInt(process.env.DB_POOL_SIZE, 10) || 50,  // 公测提升至50连接（max_connections=151 余量充足）
   queueLimit: 0,
   connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT, 10) || 10000,   // 10秒连接超时
   // mysql2 v3 连接池获取超时（通过 waitForConnections + 回调超时实现）

@@ -154,7 +154,13 @@ async function ensureConnected() {
 
     // redis v4: 如果客户端从未连接过或已断开，调用 connect()
     if (!redisClient.isOpen) {
-      await redisClient.connect();
+      // 关键：connect() 在 ECONNREFUSED 时会按 reconnectStrategy 持续重连且永不 reject，
+      // 导致 await 永久挂起（本地无 Redis 时服务卡死）。
+      // 这里加 5 秒超时兜底，超时后走内存降级。
+      await Promise.race([
+        redisClient.connect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Redis连接超时（自动降级到内存存储）')), 5000))
+      ]);
     }
 
     isConnected = true;

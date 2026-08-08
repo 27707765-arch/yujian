@@ -2,6 +2,7 @@
  * 圈子帖子模型
  */
 const { executeQuery, isDbAvailable } = require('../utils/database');
+const { parseImagesField } = require('../utils/upload');
 
 const memoryStore = new Map();
 let autoIncrementId = 1;
@@ -31,6 +32,7 @@ class CommunityPost {
           'SELECT p.*, u.nickname, u.avatar FROM community_posts p LEFT JOIN users u ON p.user_id = u.id WHERE p.community_id = ? AND p.status = 1 ORDER BY p.is_pinned DESC, p.created_at DESC LIMIT ? OFFSET ?',
           [communityId, limit, offset]
         );
+        rows.forEach(r => { r.images = parseImagesField(r.images); });
         return rows;
       }
     } catch (e) {}
@@ -44,6 +46,7 @@ class CommunityPost {
         const [rows] = await executeQuery(
           'SELECT p.*, u.nickname, u.avatar FROM community_posts p LEFT JOIN users u ON p.user_id = u.id WHERE p.id = ?', [id]
         );
+        if (rows[0]) rows[0].images = parseImagesField(rows[0].images);
         return rows[0] || null;
       }
     } catch (e) {}

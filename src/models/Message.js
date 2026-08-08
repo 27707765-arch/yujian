@@ -2,6 +2,7 @@
 // 用途：消息模型
 
 const { executeQuery, isDbAvailable } = require('../utils/database');
+const { normalizeUploadUrl } = require('../utils/upload');
 
 // 内存存储（当数据库不可用时使用）
 const memoryStore = new Map();
@@ -129,6 +130,11 @@ class Message {
           );
           rows.forEach(r => {
             r.content = r.display_content; // 映射回 content 字段
+            // 图片消息 content 存的是图片 URL，做 /uploads/ 前缀归一（兼容历史裸路径）
+            if (r.type === 1) r.content = normalizeUploadUrl(r.content);
+            r.voice_url = normalizeUploadUrl(r.voice_url);
+            r.video_url = normalizeUploadUrl(r.video_url);
+            r.video_cover = normalizeUploadUrl(r.video_cover);
             if (r.is_recalled) { r._recalled = true; }
             if (!r.is_recalled) {
               if (r.type === 2 && r.voice_url) { r._render_text = '[语音 ' + (r.voice_duration || 0) + 's]'; }

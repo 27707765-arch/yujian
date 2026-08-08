@@ -18,9 +18,17 @@ async function isMember(communityId, userId) {
 async function createCommunity(req, res) {
   try {
     const { id } = req.user;
-    const { name, description, cover_url, tags, join_type } = req.body;
+    const { name, description, tags, join_type } = req.body;
     if (!name || name.length < 2) return error(res, 400, '圈子名称至少2个字');
-    const c = await Community.create({ name, description, cover_url, tags, join_type, creator_id: id });
+    // tags 兼容两种来源：JSON 字符串（multipart）或数组（JSON body）
+    let tagsArr = tags;
+    if (typeof tags === 'string') {
+      try { tagsArr = JSON.parse(tags); } catch (e) { tagsArr = tags.split(/[,，\s]+/).filter(Boolean); }
+    }
+    let cover_url = req.body.cover_url || null;
+    // 有封面上传文件时优先使用文件（已通过 cover 单图过滤器）
+    if (req.file) cover_url = '/uploads/' + req.file.filename;
+    const c = await Community.create({ name, description, cover_url, tags: tagsArr, join_type, creator_id: id });
     // 创建者自动加入
     await Community.join(c.id, id);
     success(res, c, '圈子创建成功');
@@ -71,9 +79,22 @@ async function createPost(req, res) {
   try {
     const { id } = req.user;
     const communityId = parseInt(req.params.id);
-    const { content, images } = req.body;
-    if (!content || !content.trim()) return error(res, 400, '内容不能为空');
+    const content = req.body.content || '';
+    if (!content.trim()) return error(res, 400, '内容不能为空');
     if (!await isMember(communityId, id)) return error(res, 403, '请先加入圈子再发帖');
+
+    // 处理多图上传（magic byte 校验，拼 /uploads/ 前缀）
+    const { validateMagicBytes } = require('../services/upload.service');
+    const path = require('path');
+    const images = [];
+    const uploadedImages = req.files && req.files.images ? req.files.images : [];
+    for (const file of uploadedImages) {
+      const filePath = path.resolve(file.path);
+      if (await validateMagicBytes(filePath)) {
+        images.push('/uploads/' + file.filename);
+      }
+    }
+
     const post = await CommunityPost.create(communityId, id, content.trim(), images);
     success(res, post, '发布成功');
   } catch (err) { serverError(res, err, '发布帖子失败'); }

@@ -50,6 +50,12 @@ if (process.env.NODE_ENV === 'production') {
 // 防止慢请求/网络抖动导致连接堆积
 const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS, 10) || 30000; // 默认30秒
 
+// ==================== 反向代理信任配置 ====================
+// 生产环境由 Nginx 反代（nginx.conf 已设置 X-Forwarded-For），
+// 必须启用 trust proxy，否则 req.ip 恒为 127.0.0.1，
+// 限流中间件会把所有用户识别为同一 IP，导致登录限流误伤偶发 429。
+app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
+
 app.use((req, res, next) => {
   // 设置请求超时（Node.js 原生支持）
   req.setTimeout(REQUEST_TIMEOUT_MS, () => {
@@ -173,7 +179,7 @@ app.post('/api/upload/image', authMiddleware, uploadService.singleUpload('image'
   if (!isValid) {
     return res.status(400).json({ code: 400, message: '文件类型不合法，仅支持 JPG/PNG/GIF/WEBP 格式' });
   }
-  const url = '/' + req.file.filename;
+  const url = '/uploads/' + req.file.filename;
   res.json({ code: 0, message: '上传成功', data: { url, filename: req.file.filename } });
 });
 
@@ -211,7 +217,7 @@ app.use(rateLimit({
 // 认证路由 - 登录限流（防止暴力破解验证码）
 const authRateLimit = rateLimit({
   windowMs: 60000,    // 1分钟窗口
-  max: 15,            // 最多15次登录尝试（防止误触被锁）
+  max: 30,            // 最多30次登录尝试（放宽：trust proxy 已按真实IP区分，且公测期需容忍误触/重发）
   message: '登录尝试过于频繁，请稍后再试',
   keyPrefix: 'rate_limit_login'
 });
@@ -222,7 +228,7 @@ const isSmsSimulate = process.env.SMS_SIMULATE === 'true' || process.env.NODE_EN
 if (!isSmsSimulate) {
   const smsRateLimit = rateLimit({
     windowMs: 60000,
-    max: 1,
+    max: 3,           // 每IP每分钟最多3次（容忍验证码填错重发，仍防刷）
     message: '验证码发送过于频繁，请稍后再试',
     keyPrefix: 'rate_limit_sms'
   });
@@ -295,7 +301,7 @@ app.post('/api/upload/voice', authMiddleware, uploadService.audioUploadMiddlewar
   if (!isValid) {
     return res.status(400).json({ code: 400, message: '文件类型不合法，仅支持 MP3/AAC/WAV/M4A/OGG 格式' });
   }
-  const url = '/' + req.file.filename;
+  const url = '/uploads/' + req.file.filename;
   res.json({ code: 0, message: '上传成功', data: { url, filename: req.file.filename } });
 });
 
@@ -454,9 +460,10 @@ async function startServer() {
       console.error('❌ 生产环境禁止开启短信模拟（SMS_SIMULATE=true），请将 SMS_SIMULATE 设为 false 或去除该配置');
       process.exit(1);
     }
+    // 支付模拟护栏：生产环境开启模拟支付时仅告警不拒绝（公测期临时放开模拟支付，便于充值/提现演示；
+    // 正式对接真实支付 SDK 后必须将 SIMULATE_PAYMENT 恢复为 false）
     if (process.env.NODE_ENV === 'production' && process.env.SIMULATE_PAYMENT === 'true') {
-      console.error('❌ 生产环境禁止开启模拟支付（SIMULATE_PAYMENT=true），请将 SIMULATE_PAYMENT 设为 false 或去除该配置');
-      process.exit(1);
+      console.warn('⚠️  警告: 生产环境开启了模拟支付（SIMULATE_PAYMENT=true）——公测临时放开，正式上线前务必关闭！');
     }
     console.log('正在启动服务器...');
 

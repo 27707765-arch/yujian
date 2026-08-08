@@ -210,36 +210,39 @@ function videoUploadMiddleware(fieldName) {
 
 /**
  * 混合上传中间件：图片走imageFilter，视频走videoFilter，封面走coverFilter
- * 解决原 mediaUpload 用图片过滤器拒绝视频的问题
+ * 修复：原实现将 multer 拆成两次调用（先 videoUpload 再 upload），
+ * 第一次会消费整个 multipart body 并因字段名不匹配抛 LIMIT_UNEXPECTED_FILE，
+ * 导致第二次无法解析（图片收不全、文本字段丢失）。
+ * 现改为单次 multer 调用 + 按字段名动态选择文件过滤器。
  */
 function mixedUpload(fields) {
-  return (req, res, next) => {
-    const imageFields = fields.filter(f => f.name === 'images' || f.name === 'video_cover');
-    const videoFields = fields.filter(f => f.name === 'video');
+  // 记录哪些字段需要视频/封面过滤器
+  const videoFieldNames = fields.filter(f => f.name === 'video').map(f => f.name);
+  const coverFieldNames = fields.filter(f => f.name === 'video_cover').map(f => f.name);
 
-    const finalNext = (err) => {
+  // 动态 fileFilter：按字段名分派到对应过滤器
+  const mixedFileFilter = (req, file, cb) => {
+    if (videoFieldNames.includes(file.fieldname)) {
+      return videoFileFilter(req, file, cb);
+    }
+    if (coverFieldNames.includes(file.fieldname)) {
+      return coverFileFilter(req, file, cb);
+    }
+    // 其余字段走图片过滤器
+    return fileFilter(req, file, cb);
+  };
+
+  const mixedMulter = multer({
+    storage,
+    limits: { fileSize: VIDEO_MAX_SIZE }, // 上限取最大值（50MB），视频/图片各自校验
+    fileFilter: mixedFileFilter
+  });
+
+  return (req, res, next) => {
+    mixedMulter.fields(fields)(req, res, (err) => {
       if (err) return handleMulterError(err, res);
       next();
-    };
-
-    const processImages = () => {
-      if (imageFields.length > 0) {
-        upload.fields(imageFields)(req, res, finalNext);
-      } else {
-        finalNext(null);
-      }
-    };
-
-    if (videoFields.length > 0) {
-      videoUpload.fields(videoFields)(req, res, (videoErr) => {
-        if (videoErr && videoErr.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ code: 400, message: '视频文件大小超出限制（最大50MB）', data: null });
-        }
-        processImages();
-      });
-    } else {
-      processImages();
-    }
+    });
   };
 }
 
@@ -267,7 +270,7 @@ function handleMulterError(err, res) {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
       code: 400,
-      message: '文件大小超出限制（最大10MB）',
+      message: err.field === 'video' ? '视频文件大小超出限制（最大50MB）' : '文件大小超出限制（图片最大10MB）',
       data: null
     });
   }

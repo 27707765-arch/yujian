@@ -2,6 +2,7 @@
  * 社群/圈子模型
  */
 const { executeQuery, isDbAvailable } = require('../utils/database');
+const { normalizeUploadUrl } = require('../utils/upload');
 const memoryStore = new Map();
 let autoIncrementId = 1;
 
@@ -26,6 +27,7 @@ class Community {
     try {
       if (isDbAvailable()) {
         const [rows] = await executeQuery('SELECT * FROM communities WHERE id = ? AND status = 1', [id]);
+        if (rows[0]) rows[0].cover_url = normalizeUploadUrl(rows[0].cover_url);
         return rows[0] || null;
       }
     } catch(e) {}
@@ -39,6 +41,7 @@ class Community {
         const [rows] = await executeQuery(
           `SELECT * FROM communities WHERE status = 1 ORDER BY ${orderBy} LIMIT ? OFFSET ?`, [limit, offset]
         );
+        rows.forEach(c => { c.cover_url = normalizeUploadUrl(c.cover_url); });
         return rows;
       }
     } catch(e) {}

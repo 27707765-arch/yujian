@@ -4,6 +4,7 @@
  */
 
 const { executeQuery, isDbAvailable } = require('../utils/database');
+const { normalizeUploadUrls, normalizeUploadUrl, parseImagesField } = require('../utils/upload');
 
 const memoryStore = new Map();
 let autoIncrementId = 1;
@@ -68,8 +69,10 @@ class Post {
            WHERE p.id = ? AND p.status = 1`, [id]
         );
         if (rows[0]) {
-          rows[0].images = rows[0].images ? JSON.parse(rows[0].images) : [];
-          rows[0].topics = rows[0].topics ? JSON.parse(rows[0].topics) : [];
+          rows[0].images = parseImagesField(rows[0].images);
+          rows[0].topics = rows[0].topics ? (typeof rows[0].topics === 'string' ? JSON.parse(rows[0].topics) : rows[0].topics) : [];
+          rows[0].video_url = normalizeUploadUrl(rows[0].video_url);
+          rows[0].video_cover = normalizeUploadUrl(rows[0].video_cover);
         }
         return rows[0] || null;
       }
@@ -99,7 +102,7 @@ class Post {
         query += ' LIMIT ? OFFSET ?';
         params.push(parseInt(limit), parseInt(offset));
         const [rows] = await executeQuery(query, params);
-        rows.forEach(r => { r.images = r.images ? JSON.parse(r.images) : []; r.topics = r.topics ? JSON.parse(r.topics) : []; });
+        rows.forEach(r => { r.images = parseImagesField(r.images); r.topics = r.topics ? (typeof r.topics === 'string' ? JSON.parse(r.topics) : r.topics) : []; r.video_url = normalizeUploadUrl(r.video_url); r.video_cover = normalizeUploadUrl(r.video_cover); });
         return rows;
       }
     } catch (err) { console.error('数据库查询失败:', err.message); }
@@ -136,7 +139,7 @@ class Post {
            WHERE f.user_id = ? AND p.status = 1 ORDER BY f.created_at DESC LIMIT ? OFFSET ?`,
           [userId, limit, offset]
         );
-        rows.forEach(r => { r.images = r.images ? JSON.parse(r.images) : []; r.topics = r.topics ? JSON.parse(r.topics) : []; });
+        rows.forEach(r => { r.images = parseImagesField(r.images); r.topics = r.topics ? (typeof r.topics === 'string' ? JSON.parse(r.topics) : r.topics) : []; r.video_url = normalizeUploadUrl(r.video_url); r.video_cover = normalizeUploadUrl(r.video_cover); });
         return rows;
       }
     } catch (e) {}

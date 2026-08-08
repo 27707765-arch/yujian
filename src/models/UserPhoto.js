@@ -4,6 +4,7 @@
  */
 
 const { executeQuery, isDbAvailable } = require('../utils/database');
+const { normalizeUploadUrl } = require('../utils/upload');
 
 // 内存存储（降级 fallback）
 const memoryStore = new Map();
@@ -52,6 +53,7 @@ class UserPhoto {
     try {
       if (isDbAvailable()) {
         const [rows] = await executeQuery('SELECT * FROM user_photos WHERE id = ?', [id]);
+        if (rows[0]) rows[0].url = normalizeUploadUrl(rows[0].url);
         return rows[0] || null;
       }
     } catch (err) {
@@ -76,6 +78,7 @@ class UserPhoto {
           'SELECT * FROM user_photos WHERE user_id = ? AND status = 1 ORDER BY sort_order ASC, created_at DESC',
           [userId]
         );
+        rows.forEach(p => { p.url = normalizeUploadUrl(p.url); });
         return rows;
       }
     } catch (err) {
@@ -86,6 +89,7 @@ class UserPhoto {
 
   /**
    * 设置封面照片
+   * 仅设置相册封面标记（is_cover），不修改 users.avatar（头像独立上传）
    * @param {number} id - 照片ID
    * @param {number} userId - 用户ID
    * @returns {Promise<boolean>}
@@ -97,11 +101,6 @@ class UserPhoto {
         await executeQuery('UPDATE user_photos SET is_cover = 0 WHERE user_id = ?', [userId]);
         // 设置新封面
         await executeQuery('UPDATE user_photos SET is_cover = 1 WHERE id = ? AND user_id = ?', [id, userId]);
-        // 同步更新用户头像
-        const [photo] = await executeQuery('SELECT url FROM user_photos WHERE id = ?', [id]);
-        if (photo.length > 0) {
-          await executeQuery('UPDATE users SET avatar = ? WHERE id = ?', [photo[0].url, userId]);
-        }
         return true;
       }
     } catch (err) {
