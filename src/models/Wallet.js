@@ -100,9 +100,10 @@ class Wallet {
    * @param {string} type - 消费类型
    * @param {string} referenceType - 关联类型
    * @param {number} referenceId - 关联记录ID
+   * @param {string} description - 交易描述（默认'赠送礼物'，提现等场景可自定义）
    * @returns {Promise<Object>} - { success, balance, message }
    */
-  static async spend(userId, amount, type = 'gift_send', referenceType = null, referenceId = null) {
+  static async spend(userId, amount, type = 'gift_send', referenceType = null, referenceId = null, description = '赠送礼物') {
     try {
       if (isDbAvailable()) {
         // 原子操作：balance = balance - amount，WHERE balance >= amount 保证不会超扣
@@ -118,7 +119,7 @@ class Wallet {
           }
         }
         const wallet = await this.getOrCreate(userId);
-        await this.addTransaction(userId, type, -amount, wallet.balance, referenceType, referenceId, '赠送礼物');
+        await this.addTransaction(userId, type, -amount, wallet.balance, referenceType, referenceId, description);
         return { success: true, balance: wallet.balance, message: '消费成功' };
       }
     } catch (err) {
@@ -137,7 +138,7 @@ class Wallet {
     transactionMemory.push({
       id: txAutoId++, user_id: userId, type, amount: -amount, balance_after: wallet.balance,
       reference_type: referenceType, reference_id: referenceId,
-      description: '赠送礼物', created_at: new Date()
+      description, created_at: new Date()
     });
     return { success: true, balance: wallet.balance, message: '消费成功' };
   }
@@ -262,6 +263,71 @@ class Wallet {
       gift_sent_count: 0, // TODO: count from gift_records
       gift_received_count: 0
     };
+  }
+  // ==================== 提现 ====================
+
+  /**
+   * 提现（模拟通道）：校验余额 → 扣减金币 → 写流水 → 生成提现单
+   * @param {number} userId - 用户ID
+   * @param {number} amount - 提现金额（金币）
+   * @param {string} account - 提现账户（预留）
+   * @returns {Promise<Object>} - { success, message, balance, withdraw }
+   */
+  static async withdraw(userId, amount, account = null) {
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return { success: false, message: '提现金额无效' };
+    }
+
+    // 扣减金币（写入流水 type='withdraw'）
+    const spent = await this.spend(userId, amount, 'withdraw', 'withdraw_order', null, '提现');
+    if (!spent.success) {
+      return { success: false, message: spent.message, balance: spent.balance };
+    }
+
+    const orderNo = 'WD' + Date.now() + Math.random().toString(36).slice(2, 8).toUpperCase();
+
+    try {
+      if (isDbAvailable()) {
+        const [result] = await executeQuery(
+          'INSERT INTO withdraw_orders (user_id, order_no, amount, status, account) VALUES (?, ?, ?, 1, ?)',
+          [userId, orderNo, amount, account]
+        );
+        const [rows] = await executeQuery(
+          'SELECT * FROM withdraw_orders WHERE id = ?', [result.insertId]
+        );
+        return { success: true, message: '提现成功', balance: spent.balance, withdraw: rows[0] };
+      }
+    } catch (err) {
+      console.error('提现单写入失败:', err.message);
+    }
+
+    // 内存降级：仅返回提现成功（无提现单持久化）
+    return {
+      success: true, message: '提现成功', balance: spent.balance,
+      withdraw: { order_no: orderNo, amount, status: 1, account, created_at: new Date() }
+    };
+  }
+
+  /**
+   * 获取提现记录
+   * @param {number} userId - 用户ID
+   * @param {number} limit - 限制数量
+   * @param {number} offset - 偏移量
+   * @returns {Promise<Array>}
+   */
+  static async getWithdraws(userId, limit = 20, offset = 0) {
+    try {
+      if (isDbAvailable()) {
+        const [rows] = await executeQuery(
+          'SELECT * FROM withdraw_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+          [userId, parseInt(limit), parseInt(offset)]
+        );
+        return rows;
+      }
+    } catch (err) {
+      console.error('数据库查询失败:', err.message);
+    }
+    return [];
   }
 }
 

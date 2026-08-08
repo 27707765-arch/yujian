@@ -86,4 +86,44 @@ async function getConsumptionStats(req, res) {
   }
 }
 
-module.exports = { getWallet, getTransactions, getConsumptionStats };
+/**
+ * 提现（模拟通道）
+ */
+async function withdraw(req, res) {
+  try {
+    const { id } = req.user;
+    const { amount, account } = req.body;
+
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || !Number.isInteger(numAmount) || numAmount <= 0) {
+      return error(res, 400, '请填写有效的提现金额');
+    }
+    if (numAmount < 100) {
+      return error(res, 400, '最低提现100金币');
+    }
+
+    const result = await Wallet.withdraw(id, numAmount, account || null);
+    if (!result.success) {
+      return error(res, 400, result.message || '提现失败');
+    }
+    success(res, { balance: result.balance, withdraw: result.withdraw }, result.message);
+  } catch (err) {
+    serverError(res, err, '提现失败');
+  }
+}
+
+/**
+ * 获取提现记录
+ */
+async function getWithdraws(req, res) {
+  try {
+    const { id } = req.user;
+    const { limit = 20, offset = 0 } = req.query;
+    const list = await Wallet.getWithdraws(id, parseInt(limit), parseInt(offset));
+    success(res, list);
+  } catch (err) {
+    serverError(res, err, '获取提现记录失败');
+  }
+}
+
+module.exports = { getWallet, getTransactions, getConsumptionStats, withdraw, getWithdraws };

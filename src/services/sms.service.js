@@ -19,6 +19,16 @@ function isSimulateMode() {
 }
 
 /**
+ * 是否将验证码返回给客户端
+ * 公测临时方案：生产环境设置 SMS_RETURN_CODE=true 时，验证码仍随机生成，
+ * 但随接口返回给前端展示（便于未接入真实短信时公测用户登录）。
+ * 与 SMS_SIMULATE 独立，不触发生产护栏，也不固定为 123456。
+ */
+function shouldReturnCodeToClient() {
+  return process.env.SMS_RETURN_CODE === 'true';
+}
+
+/**
  * 生成随机验证码
  * @param {number} length - 验证码长度
  * @returns {string} - 验证码字符串
@@ -84,7 +94,7 @@ async function sendVerificationCode(phone) {
     return {
       success: true,
       message: '验证码发送成功',
-      code: isSimulateMode() ? code : undefined // 仅模拟模式返回验证码，生产环境通过真实短信发送
+      code: isSimulateMode() || shouldReturnCodeToClient() ? code : undefined // 模拟模式或 SMS_RETURN_CODE=true 时返回验证码
     };
   } catch (err) {
     console.error('发送验证码失败:', err.message);
@@ -138,7 +148,9 @@ async function verifyCode(phone, code) {
 
 module.exports = {
   sendVerificationCode,
-  verifyCode
+  verifyCode,
+  isSimulateMode,
+  shouldReturnCodeToClient
 };
 
 

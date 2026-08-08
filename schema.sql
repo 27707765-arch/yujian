@@ -294,9 +294,9 @@ INSERT INTO tags (name, category, sort_order) VALUES
 ('美食', '生活', 11),
 ('摄影', '生活', 12),
 ('宠物', '生活', 13),
-('阅读', '文化', 20),
-('音乐', '文化', 21),
-('电影', '文化', 22),
+('阅读', '娱乐', 20),
+('音乐', '娱乐', 21),
+('电影', '娱乐', 22),
 ('游戏', '娱乐', 30),
 ('动漫', '娱乐', 31),
 ('桌游', '娱乐', 32),
@@ -304,7 +304,24 @@ INSERT INTO tags (name, category, sort_order) VALUES
 ('露营', '生活', 15),
 ('滑雪', '运动', 6),
 ('冲浪', '运动', 7),
-('设计', '文化', 23);
+('设计', '娱乐', 23),
+('和平精英', '娱乐', 50),
+('王者荣耀', '娱乐', 51),
+('原神', '娱乐', 52),
+('英雄联盟', '娱乐', 53),
+('永劫无间', '娱乐', 54),
+('金铲铲之战', '娱乐', 55),
+('第五人格', '娱乐', 56),
+('蛋仔派对', '娱乐', 57),
+('穿越火线', '娱乐', 58),
+('DOTA2', '娱乐', 59),
+('减肥超过20斤', '生活', 30),
+('大叔控', '社交', 70),
+('颜控', '社交', 71),
+('萌妹', '社交', 72),
+('御姐', '社交', 73),
+('职场女', '社交', 74),
+('职场男', '社交', 75);
 
 -- ==================== 第二阶段：礼物 & 钱包 & VIP ====================
 
@@ -363,6 +380,20 @@ CREATE TABLE IF NOT EXISTS coin_transactions (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '交易时间',
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='金币交易流水表';
+
+-- 提现申请表
+CREATE TABLE IF NOT EXISTS withdraw_orders (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL COMMENT '用户ID',
+    order_no VARCHAR(50) NOT NULL UNIQUE COMMENT '提现单号',
+    amount INT NOT NULL COMMENT '提现金额（金币）',
+    status TINYINT(1) DEFAULT 1 COMMENT '状态：0-处理中，1-已提现，2-已驳回',
+    account VARCHAR(100) DEFAULT NULL COMMENT '提现账户（预留：支付宝/微信/银行卡）',
+    remark VARCHAR(200) DEFAULT NULL COMMENT '备注',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '申请时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提现申请表';
 
 -- VIP特权配置表
 CREATE TABLE IF NOT EXISTS vip_privileges (
