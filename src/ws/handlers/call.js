@@ -51,7 +51,7 @@ async function handleCallRequest(userId, data) {
     return;
   }
 
-  // 4. 转发呼叫请求（携带Token和记录ID）
+  // 4. 转发呼叫请求（携带Token和记录ID + WebRTC offer）
   websocketService.sendToUser(receiver_id, {
     type: WsEvents.CALL_REQUEST,
     data: {
@@ -61,6 +61,7 @@ async function handleCallRequest(userId, data) {
       channel_name: callRecord.channel_name,
       agora_token: callRecord.token,
       simulate: callRecord.simulate,
+      offer: data.offer || null,
       timestamp: new Date().toISOString()
     }
   });
@@ -106,7 +107,8 @@ async function handleCallAccept(userId, data) {
       receiver_id: userId,
       call_id,
       channel_name: channelName,
-      agora_token: token
+      agora_token: token,
+      sdp: data.sdp || null
     }
   });
 }
@@ -146,6 +148,15 @@ async function handleCallEnd(userId, data) {
   // 计算通话时长并更新记录
   if (call_id) {
     try {
+      // 超时无人接听：把 ringing 状态的记录标记为 missed
+      if (end_reason === 'timeout') {
+        await callService.markMissed(call_id);
+        websocketService.sendToUser(peer_id, {
+          type: WsEvents.CALL_ENDED,
+          data: { user_id: userId, call_id, end_reason: 'timeout' }
+        });
+        return;
+      }
       const result = await callService.endCall(call_id, userId, end_reason || 'hangup');
       // 将通话时长传给对方
       websocketService.sendToUser(peer_id, {
