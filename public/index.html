@@ -412,7 +412,8 @@ input,textarea,[contenteditable="true"]{user-select:auto;-webkit-user-select:aut
   position:fixed;top:0;left:0;right:0;bottom:0;
   background:#000;z-index:10000;display:flex;align-items:center;justify-content:center
 }
-.image-preview-img{max-width:100%;max-height:100%;object-fit:contain;transition:transform .2s}
+.image-preview-img{max-width:100%;max-height:100%;object-fit:contain;transition:transform .2s;touch-action:pan-y}
+.image-preview-img.scale-2x{transform:scale(2);cursor:zoom-out}
 .image-preview-close{
   position:fixed;top:16px;right:16px;z-index:10001;
   width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);
@@ -679,11 +680,11 @@ input,textarea,[contenteditable="true"]{user-select:auto;-webkit-user-select:aut
 .nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);text-decoration:none;cursor:pointer;gap:2px;padding:8px 4px;border-radius:12px;transition:all .2s;max-width:80px;margin:0 auto}
 .nav a.on{color:var(--primary);background:var(--primary-bg)}
 .ni{font-size:22px;line-height:1;position:relative;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px}
+.ni svg{width:24px;height:24px;transition:all .2s}
+.nav a.on .ni svg{fill:var(--primary);transform:translateY(-2px)}
 .nl{font-size:11px;font-weight:500}
 
-/* Toast aliases */
-.tc{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:calc(100% - 32px);max-width:360px}
-.tm{padding:12px 20px;border-radius:var(--radius-sm);font-size:14px;color:#fff;text-align:center;animation:toastIn .3s;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+/* Toast aliases（旧 .tc/.tm 已下架，统一走 notification.js DOM toast） */
 
 /* Button aliases */
 
@@ -779,7 +780,7 @@ input,textarea,[contenteditable="true"]{user-select:auto;-webkit-user-select:aut
 <script src="/js/vue.global.js"></script>
 <script src="/js/vue-router.global.js"></script>
 <script src="/js/notification.js"></script>
-<script src="/js/yujian-app.js?v=v20260808b"></script>
+<script src="/js/yujian-app.js?v=v20260808c"></script>
 <script>
   // PWA Service Worker 注册（S20）
   if ('serviceWorker' in navigator) {

@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260808b";
+var APP_VERSION = "v20260808c";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
@@ -133,16 +133,28 @@ function compressImage(file,maxW,q){
 
 // ==== 全局图片预览（点击放大 + 左右滑动 + 关闭） ====
 // 复用 index.html 已预留的 .image-preview-* CSS 类，用 Vue.reactive 保证模板响应
-var pv = Vue.reactive({ show:false, idx:0, list:[] });
+var pv = Vue.reactive({ show:false, idx:0, list:[], scaled:false, _tx:0 });
 function previewOpen(list, idx){
   pv.list=(list||[]).filter(Boolean);
   pv.idx=Math.min(Math.max(idx||0,0),Math.max(pv.list.length-1,0));
   pv.show=pv.list.length>0;
+  pv.scaled=false;
   if(pv.show)document.body.style.overflow="hidden";
 }
-function previewClose(){ pv.show=false; document.body.style.overflow=""; }
+function previewClose(){ pv.show=false; document.body.style.overflow=""; pv.scaled=false; }
 function previewPrev(){ if(pv.list.length)pv.idx=(pv.idx-1+pv.list.length)%pv.list.length; }
 function previewNext(){ if(pv.list.length)pv.idx=(pv.idx+1)%pv.list.length; }
+function previewToggleScale(){ pv.scaled=!pv.scaled; }
+// 预览横向滑动翻页（>60px），已放大时不翻页（保留双击放大状态）
+function onPvTouchStart(e){ if(e.touches&&e.touches.length)pv._tx=e.touches[0].clientX; }
+function onPvTouchEnd(e){
+  if(pv.scaled)return;
+  var t=e.changedTouches&&e.changedTouches[0];
+  if(!t)return;
+  var dx=t.clientX-pv._tx;
+  if(Math.abs(dx)>60){ if(dx<0)previewNext(); else previewPrev(); }
+  pv._tx=0;
+}
 
 // ==== 页面组件 ====
 var WelcomePage = {
@@ -743,10 +755,10 @@ var ChatDetailPage = {
     playingMsgId:null,voiceProgress:0,voicePlayTime:0,
     showGiftPanel:false,gifts:[],giftLoading:false,
     showStickerPanel:false,stickers:[],stickerLoading:false,stickersById:{},stickerCat:"",stickerVipOnly:false,
-    calling:false,callType:"",callPartnerId:0,callPartnerName:"",callStatus:"",
+    calling:false,callType:"",callPartnerId:0,callPartnerName:"",callStatus:"",micMuted:false,speakerOn:false,
     showCallDialog:false,incomingCall:null,callDuration:0,callTimer:null,
     partner:{nickname:"",avatar:null,online:false},partnerId:0,myAvatar:"",
-    partnerTyping:false,_typingTimer:null,partnerReadTs:null,kbH:0,
+    partnerTyping:false,_typingTimer:null,partnerReadTs:null,kbH:0,giftBanner:null,
     emojis:["😀","😁","😂","🤣","😃","😄","😅","😆","😉","😊","😋","😎","😍","😘","😗","😙","😚","🙂","🤗","🤩","🤔","🤨","😐","😑","😶","🙄","😏","😣","😥","😮","🤐","😯","😪","😫","😴","😌","😛","😜","😝","😒","😓","😔","😕","🙃","🤑","😲","🙁","😖","😞","😟","😤","😢","😭","😦","😧","😨","😩","🤯","😬","😰","😱","🥵","🥶","😳","🤪","😵","🥴","😠","😡","🤬","😷","🤒","🤕","🤢","🤮","🥳","🥺","🤠","😇","🤡","🤥","🤫","🤭","🧐","🤓","😈","👻","💀","👽","🤖","💩","❤️","🧡","💛","💚","💙","💜","🖤","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","👍","👎","👊","✊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✌️","🤞","🤟","🤘","👌","🤌","🤏","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤙","💪","🦾","🖕","✍️","🎉","🎊","🎈","🎁","🎀","🌹","💐","🌸","💯","🔥","⭐","🌟","✨","⚡","💥","💫","🎵","🎶","🍺","🍻","🥂","🍷","🍰","🎂","🍜","🍔","🍟","🌙","☀️","🌈","⛄","🏆","🥇","🏅","🎯","🎮","🎲","🎰","🧧","💰","💵","💴","💶","💷","💸","🪙"]
   }},
   methods: {
@@ -795,12 +807,26 @@ var ChatDetailPage = {
       if(el){el.scrollTop=el.scrollHeight}
       // 图片懒加载后 scrollHeight 会变化：延迟二次定位到底部
       // 仅当用户没有手动上滑历史时执行（避免打扰用户浏览旧消息）
-      var self2=self;
-      if(!self._userScrolled){
+      var self2=self;      if(!self._userScrolled){
         clearTimeout(self._scrollBottomTimer);
         self._scrollBottomTimer=setTimeout(function(){
           if(!self2._userScrolled&&self2.$refs.chat)self2.$refs.chat.scrollTop=self2.$refs.chat.scrollHeight;
         },200);
+      }
+    },
+    // 点击礼物banner滚动定位到对应礼物气泡
+    scrollToGift: function(){
+      var self=this,el=self.$refs.chat;
+      if(!el)return;
+      var target=null;
+      for(var i=self.msgs.length-1;i>=0;i--){
+        if(self.msgs[i].type===6){target=self.msgs[i];break}
+      }
+      if(target){
+        var els=el.querySelectorAll(".msg-sy");
+        for(var j=0;j<els.length;j++){
+          if(els[j].textContent.indexOf(target.content)>-1){els[j].scrollIntoView({behavior:"smooth",block:"center"});break}
+        }
       }
     },
     onScroll: function(){
@@ -1067,6 +1093,23 @@ var ChatDetailPage = {
       wsSend({type:"call_end",peer_id:self.callPartnerId,call_id:self._callId||null,end_reason:reason||"hangup"});
       self._resetCall();
     },
+    // 静音/取消静音（本地音轨）
+    toggleMic: function(){
+      var self=this;
+      self.micMuted=!self.micMuted;
+      if(self._localStream){
+        var t=self._localStream.getAudioTracks();
+        for(var i=0;i<t.length;i++)t[i].enabled=!self.micMuted;
+      }
+      toast(self.micMuted?"已静音":"已取消静音","tinfo");
+    },
+    // 扬声器/听筒切换（浏览器无系统级切换，用 remoteAudio.muted 做听筒近似）
+    toggleSpeaker: function(){
+      var self=this;
+      self.speakerOn=!self.speakerOn;
+      if(self._remoteAudio)self._remoteAudio.muted=!self.speakerOn;
+      toast(self.speakerOn?"已切换扬声器":"已切换听筒","tinfo");
+    },
     _resetCall: function(){
       var self=this;
       if(self.callTimer){clearInterval(self.callTimer);self.callTimer=null}
@@ -1195,10 +1238,15 @@ var ChatDetailPage = {
       });
     },
     handleWs: function(d){
-      var self=this;
-      if(d.type==="message"&&d.data&&d.data.conversation_id===self.convId){        if(!d.data.id&&!d.data._local)return;
+      var self=this;      if(d.type==="message"&&d.data&&d.data.conversation_id===self.convId){        if(!d.data.id&&!d.data._local)return;
         if(self.msgs.some(function(m){return m.id&&m.id===d.data.id}))return;
         self.msgs.push(d.data);self.addTimeDividers();Vue.nextTick(function(){self.scrollBottom()});
+        // 对方送的礼物：顶部挂5s banner，点击定位该气泡
+        if(d.data.type===6&&d.data.sender_id!==self.userId&&d.data.content){
+          self.giftBanner=d.data.content;
+          if(self._giftTimer)clearTimeout(self._giftTimer);
+          self._giftTimer=setTimeout(function(){self.giftBanner=null},5000);
+        }
         // 收到对方消息时播放提示音（不打扰自己发送的消息确认）
         if(d.data.sender_id!==self.userId&&window.NotificationUtils){
           window.NotificationUtils.playSound("message");
@@ -1362,13 +1410,18 @@ var ChatDetailPage = {
         <div class="st" :class="{on:partner.online}">{{partnerTyping?"对方正在输入...":(partner.online?"● 在线":"离线")}}</div>
       </div>
     </div>
+    <div v-if="giftBanner" style="background:linear-gradient(135deg,#FFD700,#FF8E53);color:#fff;padding:10px 16px;font-size:14px;font-weight:600;text-align:center;cursor:pointer;flex-shrink:0;z-index:99" @click="scrollToGift">🎁 TA 送了你 {{giftBanner}}</div>
     <div v-if="calling" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(160deg,#1a1a2e,#16213e);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff">
       <div style="width:88px;height:88px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:16px">{{callType==="video"?"📹":"📞"}}</div>
       <div style="font-size:22px;font-weight:600;margin-bottom:6px">{{callPartnerName||"通话中"}}</div>
       <div style="font-size:14px;opacity:.65;margin-bottom:8px">{{callStatus==="connected"?"通话中":"正在呼叫..."}}</div>
       <div v-if="callStatus==='connected'" style="font-size:14px;opacity:.65;margin-bottom:40px">{{Math.floor(callDuration/60)}}:{{("0"+(callDuration%60)).slice(-2)}}</div>
       <div v-else style="font-size:14px;opacity:.65;margin-bottom:40px">{{callPartnerName||"对方"}} 响铃中...</div>
-      <button @click="endCall" style="width:64px;height:64px;border-radius:50%;background:#ff4757;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(255,71,87,.4)">📞</button>
+      <div style="display:flex;gap:24px;align-items:center">
+        <button @click="toggleMic" :style="{width:'52px',height:'52px',borderRadius:'50%',border:'none',fontSize:'22px',cursor:'pointer',background:micMuted?'#fff':'rgba(255,255,255,.15)',boxShadow:'0 4px 12px rgba(0,0,0,.3)'}">🎙️</button>
+        <button @click="endCall" style="width:64px;height:64px;border-radius:50%;background:#ff4757;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(255,71,87,.4)">📞</button>
+        <button @click="toggleSpeaker" :style="{width:'52px',height:'52px',borderRadius:'50%',border:'none',fontSize:'22px',cursor:'pointer',background:speakerOn?'#fff':'rgba(255,255,255,.15)',boxShadow:'0 4px 12px rgba(0,0,0,.3)'}">🔊</button>
+      </div>
     </div>
     <div v-if="showCallDialog" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:100;display:flex;align-items:center;justify-content:center">
       <div style="background:#fff;border-radius:20px;padding:32px 28px;width:280px;text-align:center">
@@ -1623,7 +1676,7 @@ var MyPage = {
 };
 
 var EditProfilePage = {
-  data: function(){return {form:{nickname:"",gender:null,age:null,height:null,occupation:"",location:"",birth_date:"",province:"",city:"",education:"",bio:"",tags:[]},avatarFile:null,avatarPreview:"",allTags:[],tagGroups:{},tagPanelVisible:false,draftTags:[],expandedCat:"",saving:false,photos:[],photoUploading:false,showOccOther:false,customOcc:"",pickerVisible:false,pickerTitle:"",pickerMode:"",pickerCols:[],pickerOnConfirm:null}},
+  data: function(){return {form:{nickname:"",gender:null,age:null,height:null,occupation:"",location:"",birth_date:"",province:"",city:"",education:"",bio:"",tags:[]},avatarFile:null,avatarPreview:"",allTags:[],tagGroups:{},tagPanelVisible:false,draftTags:[],expandedCat:"",saving:false,photos:[],photoUploading:false,showOccOther:false,customOcc:"",pickerVisible:false,pickerTitle:"",pickerMode:"",pickerCols:[],pickerOnConfirm:null,errors:{}}},
   methods: {
     load: async function(){try{var r=await api("/user/info");var u=r.data;if(u){this.form.nickname=u.nickname||"";this.form.gender=u.gender;this.form.age=u.age;this.form.height=u.height;this.form.occupation=u.occupation||"";this.form.location=u.location||"";this.form.birth_date=fmtBirthDate(u.birth_date)||"";this.form.province=u.province||"";this.form.city=u.city||"";this.form.education=u.education||"";this.form.bio=u.bio||"";this.form.tags=(typeof u.tags==="string"?JSON.parse(u.tags):(u.tags||[]));this.avatarPreview=u.avatar||""}}catch(e){}try{var tr=await api("/user/tags");if(tr.data&&tr.data.length){this.allTags=tr.data;this.tagGroups={};tr.data.forEach(function(t){if(!t||!t.name)return;var c=t.category||"其他";if(!this.tagGroups[c])this.tagGroups[c]=[];this.tagGroups[c].push(t.name)}.bind(this))}}catch(e){this.allTags=["健身","跑步","瑜伽","篮球","游泳","旅行","美食","摄影","宠物","音乐","电影","游戏","读书","画画","滑雪","和平精英","王者荣耀","减肥超过20斤","大叔控","颜控"];this.tagGroups={"运动":["健身","跑步","瑜伽","篮球","游泳"],"生活":["旅行","美食","摄影","宠物","减肥超过20斤"],"娱乐":["音乐","电影","游戏","读书","画画","和平精英","王者荣耀"],"社交":["大叔控","颜控","萌妹","御姐","职场女","职场男"]}}try{var pr=await api("/user/photos");if(pr.data&&Array.isArray(pr.data))this.photos=pr.data}catch(e){}},
     onAvatar: function(e){var f=e.target.files[0];if(f){this.avatarFile=f;this.avatarPreview=URL.createObjectURL(f)}},
@@ -1738,7 +1791,17 @@ var EditProfilePage = {
     openHomePicker: function(){var self=this;this.pickerOpen("province","家乡",null,function(vals){self.pickHome(vals)})},
     openOccPicker: function(){var self=this;this.pickerOpen("single","职业",{list:OCCUPATION_OPTS,value:this.form.occupation||""},function(vals){self.pickOcc(vals)})},
     openEduPicker: function(){var self=this;this.pickerOpen("single","学历",{list:EDU_OPTS,value:this.form.education||"本科"},function(vals){self.pickEdu(vals)})},
-    save: async function(){this.saving=true;try{if(this.avatarFile){var fd=new FormData();fd.append("avatar",this.avatarFile);var ar=await api("/user/avatar",{method:"POST",body:fd});if(ar.code===0&&ar.data)this.avatarPreview=ar.data.avatar}var derivedAge=this.form.birth_date?calcAge(this.form.birth_date):null;if(derivedAge!==null&&derivedAge<0)derivedAge=null;var d={nickname:this.form.nickname,gender:this.form.gender,age:derivedAge!==null?derivedAge:(this.form.age?parseInt(this.form.age):null),birth_date:this.form.birth_date||null,height:this.form.height?parseInt(this.form.height):null,occupation:this.form.occupation,location:this.form.city||this.form.location,province:this.form.province||null,city:this.form.city||null,education:this.form.education||null,bio:this.form.bio,tags:this.form.tags};await api("/user/info",{method:"PUT",body:JSON.stringify(d)});toast("保存成功","tok");this.$router.back()}catch(e){toast(e.message,"terr")}this.saving=false}
+    save: async function(){
+      // 字段级校验：昵称必填、身高范围
+      var errs={};
+      var nick=(this.form.nickname||"").trim();
+      if(!nick)errs.nickname="昵称不能为空";
+      else if(nick.length<2)errs.nickname="昵称至少2个字符";
+      else if(nick.length>50)errs.nickname="昵称最多50个字符";
+      if(this.form.height!==null&&this.form.height!==undefined&&this.form.height!==""&&(Number(this.form.height)<140||Number(this.form.height)>230))errs.height="身高需在140-230cm之间";
+      this.errors=errs;
+      if(Object.keys(errs).length>0){toast(Object.values(errs)[0],"terr");return}
+      this.saving=true;try{if(this.avatarFile){var fd=new FormData();fd.append("avatar",this.avatarFile);var ar=await api("/user/avatar",{method:"POST",body:fd});if(ar.code===0&&ar.data)this.avatarPreview=ar.data.avatar}var derivedAge=this.form.birth_date?calcAge(this.form.birth_date):null;if(derivedAge!==null&&derivedAge<0)derivedAge=null;var d={nickname:nick,gender:this.form.gender,age:derivedAge!==null?derivedAge:(this.form.age?parseInt(this.form.age):null),birth_date:this.form.birth_date||null,height:this.form.height?parseInt(this.form.height):null,occupation:this.form.occupation,location:this.form.city||this.form.location,province:this.form.province||null,city:this.form.city||null,education:this.form.education||null,bio:this.form.bio,tags:this.form.tags};await api("/user/info",{method:"PUT",body:JSON.stringify(d)});toast("保存成功","tok");this.$router.back()}catch(e){toast(e.message,"terr")}this.saving=false}
   },
   mounted: function(){this.load()},
   template: `<div style="padding:16px">
@@ -1748,10 +1811,10 @@ var EditProfilePage = {
   <div style="margin-bottom:20px"><div style="font-size:14px;font-weight:600;color:var(--ts);margin-bottom:8px">个人相册 ({{photos.length}}/9)</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"><div v-for="p in photos" :key="p.id" style="position:relative"><img loading="lazy" :src="p.url" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px" @click="preview.open(photos.map(function(x){return x.url}),photos.indexOf(p))"><span v-if="p.is_cover" style="position:absolute;left:4px;top:4px;background:rgba(255,94,125,.9);color:#fff;font-size:10px;padding:1px 6px;border-radius:8px">封面</span><div style="position:absolute;right:4px;bottom:4px;display:flex;gap:4px"><button v-if="!p.is_cover" @click="setCover(p)" style="background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;font-size:10px;padding:2px 6px;cursor:pointer">设封面</button><button @click="deletePhoto(p)" style="background:var(--e);color:#fff;border:none;border-radius:6px;font-size:10px;padding:2px 6px;cursor:pointer">删</button></div></div><label v-if="photos.length<9" style="width:100%;aspect-ratio:1;border:1px dashed var(--b);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--tm);cursor:pointer"><span v-if="photoUploading" class="spin" style="width:20px;height:20px;margin:0"></span><span v-else>＋</span><input type="file" accept="image/*" style="display:none" @change="onPhotoPick"></label></div><p style="font-size:11px;color:var(--tm);margin-top:6px">最多9张照片，封面仅用于相册展示，与头像相互独立</p></div>
   <!-- ===== 3. 基本信息 ===== -->
   <div style="margin-bottom:20px"><div style="font-size:14px;font-weight:600;color:var(--ts);margin-bottom:8px">基本信息</div>
-  <div style="margin-bottom:12px"><label style="font-size:13px;color:var(--ts);display:block;margin-bottom:6px">昵称</label><div class="inp"><input v-model="form.nickname" placeholder="2-50个字符" maxlength="50"></div></div>
+  <div style="margin-bottom:12px"><label style="font-size:13px;color:var(--ts);display:block;margin-bottom:6px">昵称</label><div class="inp" :style="errors.nickname?'border-color:var(--e)':''"><input v-model="form.nickname" placeholder="2-50个字符" maxlength="50"></div><p v-if="errors.nickname" style="font-size:11px;color:var(--e);margin-top:4px">{{errors.nickname}}</p></div>
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openGenderPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">性别</label><span style="font-size:14px" :style="{color:form.gender===0||form.gender===1?'var(--p)':'var(--tm)'}">{{form.gender===1?'男':(form.gender===0?'女':'请选择')}}</span><span style="font-size:11px;color:var(--tm)">›</span></div></div>
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openDatePicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">出生日期</label><span style="font-size:14px" :style="{color:form.birth_date?'var(--p)':'var(--tm)'}">{{form.birth_date||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div></div>
-  <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openHeightPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">身高</label><span style="font-size:14px" :style="{color:form.height?'var(--p)':'var(--tm)'}">{{form.height?form.height+'cm':'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div></div>
+  <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openHeightPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">身高</label><span style="font-size:14px" :style="{color:form.height?'var(--p)':'var(--tm)'}">{{form.height?form.height+'cm':'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div><p v-if="errors.height" style="font-size:11px;color:var(--e);margin-top:4px">{{errors.height}}</p></div>
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openHomePicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">家乡</label><span style="font-size:14px" :style="{color:form.city||form.location?'var(--p)':'var(--tm)'}">{{form.city||form.location||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div></div>
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openOccPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">职业</label><span style="font-size:14px" :style="{color:form.occupation?'var(--p)':'var(--tm)'}">{{form.occupation||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div><div v-if="showOccOther" style="display:flex;gap:8px;margin-top:8px"><div class="inp" style="flex:1"><input v-model="customOcc" placeholder="输入你的职业"></div><button class="btn bp bs" @click="saveOcc">确定</button></div></div>
   <div style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;cursor:pointer" @click="openEduPicker"><label style="font-size:13px;color:var(--ts);flex:1;margin-bottom:0">学历</label><span style="font-size:14px" :style="{color:form.education?'var(--p)':'var(--tm)'}">{{form.education||'请选择'}}</span><span style="font-size:11px;color:var(--tm)">›</span></div></div>
@@ -2837,7 +2900,7 @@ var AppRoot = {
     wsOff("super_like_received",this._superLikeFn);
     if(this._unreadTimer)clearInterval(this._unreadTimer);
   },
-  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">‹</button><span class="tt">{{pageTitle}}</span></header><div v-if="!online" class="offline-banner">📡 当前离线，部分功能暂不可用</div><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><keep-alive include=\"HomePage,DiscoverPage,ChatListPage,MyPage\"><component :is=\"Component\" :key=\"route.fullPath\"/></keep-alive></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\">💕</div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\">📱</div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\">💬<span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\">👤</div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div class=\"tc\"><div v-for=\"t in toasts\" :key=\"t.id\" :class=\"['tm',t.cls]\">{{t.msg}}</div></div><div v-if="pv.show" class="image-preview-overlay" @click="preview.close()"><img class="image-preview-img" :src="pv.list[pv.idx]" @click.stop><button class="image-preview-close" @click="preview.close()">✕</button><span v-if="pv.list.length>1" style="position:fixed;top:50%;left:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.prev()">‹</span><span v-if="pv.list.length>1" style="position:fixed;top:50%;right:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.next()">›</span><span class="image-preview-counter">{{pv.idx+1}}/{{pv.list.length}}</span></div></div>`
+  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">‹</button><span class="tt">{{pageTitle}}</span></header><div v-if="!online" class="offline-banner">📡 当前离线，部分功能暂不可用</div><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><keep-alive include=\"HomePage,DiscoverPage,ChatListPage,MyPage\"><component :is=\"Component\" :key=\"route.fullPath\"/></keep-alive></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z\"/></svg></div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 3l6.4 18.5 3.4-8 8-3.4z\"/></svg></div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z\"/></svg><span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/></svg></div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div v-if="pv.show" class="image-preview-overlay" @click="preview.close()" @touchstart="onPvTouchStart($event)" @touchend="onPvTouchEnd($event)"><img class="image-preview-img" :class="pv.scaled?'scale-2x':''" :src="pv.list[pv.idx]" @click.stop @dblclick="preview.toggleScale()"><button class="image-preview-close" @click="preview.close()">✕</button><span v-if="pv.list.length>1" style="position:fixed;top:50%;left:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.prev()">‹</span><span v-if="pv.list.length>1" style="position:fixed;top:50%;right:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.next()">›</span><span class="image-preview-counter">{{pv.idx+1}}/{{pv.list.length}}</span></div></div>`
 };
 
 var app = Vue.createApp(AppRoot);
@@ -2846,6 +2909,6 @@ app.use(router);
 app.config.globalProperties.timeStr = function(t) { if(!t)return""; var d=new Date(t); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); };
 app.config.globalProperties.timeAgo = function(t) { if(!t)return""; var d=Math.floor((Date.now()-new Date(t).getTime())/1000); if(d<60)return"刚刚"; if(d<3600)return Math.floor(d/60)+"分钟前"; if(d<86400)return Math.floor(d/3600)+"小时前"; return Math.floor(d/86400)+"天前"; };
 app.config.globalProperties.fmtImg = fmtImg;
-app.config.globalProperties.preview = { open: previewOpen, close: previewClose, next: previewNext, prev: previewPrev };
+app.config.globalProperties.preview = { open: previewOpen, close: previewClose, next: previewNext, prev: previewPrev, toggleScale: previewToggleScale };
 app.mount("#app");
 if(localStorage.getItem("token"))wsConnect();
