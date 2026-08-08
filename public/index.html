@@ -81,12 +81,14 @@ html,body{
 @keyframes slideDown{from{transform:translateY(0);opacity:1}to{transform:translateY(100%);opacity:0}}
 
 /* ============ Vue Transition Classes ============ */
-.slide-left-enter-active{animation:slideLeft .25s ease-out}
-.slide-left-leave-active{animation:fadeIn .15s ease-in reverse}
-.slide-up-enter-active{animation:slideUp .3s ease-out}
-.slide-up-leave-active{animation:slideDown .3s ease-in}
-.fade-enter-active{animation:fadeIn .2s ease-out}
-.fade-leave-active{animation:fadeIn .15s ease-in reverse}
+/* will-change 提前提示合成器，避免动画中出现闪烁/抖动 */
+/* 换页动画：缩短时长 + 离开动画先行，新页面立即进入，降低卡顿感 */
+.slide-left-enter-active{animation:slideLeft .12s cubic-bezier(.4,0,.2,1);will-change:transform,opacity}
+.slide-left-leave-active{animation:fadeIn .1s ease-in reverse;will-change:opacity}
+.slide-up-enter-active{animation:slideUp .18s cubic-bezier(.4,0,.2,1);will-change:transform,opacity}
+.slide-up-leave-active{animation:slideDown .18s cubic-bezier(.4,0,.2,1);will-change:transform,opacity}
+.fade-enter-active{animation:fadeIn .12s ease-out;will-change:opacity}
+.fade-leave-active{animation:fadeIn .1s ease-in reverse;will-change:opacity}
 
 /* ============ App Shell ============ */
 .app-container{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
@@ -344,7 +346,7 @@ html,body{
 
 /* 未读消息徽章 */
 .badge{
-  position:absolute;top:-6px;right:-8px;
+  position:absolute;top:-3px;right:-3px;
   min-width:18px;height:18px;padding:0 5px;
   background:var(--error);color:#fff;
   font-size:11px;font-weight:600;line-height:18px;
@@ -466,14 +468,16 @@ html,body{
   background:var(--success);border:2px solid var(--bg-white);border-radius:50%
 }
 .conv-info{flex:1;min-width:0}
-.conv-top-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.conv-top-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px}
 .conv-name{font-weight:600;font-size:15px}
-.conv-time{font-size:12px;color:var(--text-muted)}
+.conv-name-line{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.conv-name-line .conv-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conv-time{font-size:12px;color:var(--text-muted);flex-shrink:0}
 .conv-msg-row{display:flex;justify-content:space-between;align-items:center}
 .conv-preview{font-size:13px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80%}
 .conv-badge{
   background:var(--error);color:#fff;font-size:11px;min-width:18px;height:18px;
-  border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px
+  border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0
 }
 
 /* ============ Post Card (动态卡片) ============ */
@@ -662,14 +666,14 @@ html,body{
 .app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;max-width:500px;margin:0 auto}
 .hdr{height:var(--header-h);background:rgba(255,255,255,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:center;padding:0 16px;z-index:100;flex-shrink:0;position:relative}
 .hdr .tt{font-size:17px;font-weight:700;color:var(--text)}
-.bk{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:none;background:none;font-size:20px;color:var(--primary);cursor:pointer;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.bk{position:absolute;left:8px;top:50%;transform:translateY(-50%);height:var(--header-h);padding:0 6px;border:none;background:none;font-size:40px;line-height:var(--header-h);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
 .pg{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .pg-nav{padding-bottom:calc(var(--nav-h) + var(--safe-b) + 8px)}
 .pg-nonav{padding-bottom:8px}
 .nav{height:var(--nav-h);background:rgba(255,255,255,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-evenly;z-index:100;padding:4px 16px calc(4px + var(--safe-b));flex-shrink:0;position:fixed;bottom:0;left:0;right:0;width:100%;gap:4px}
 .nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);text-decoration:none;cursor:pointer;gap:2px;padding:8px 4px;border-radius:12px;transition:all .2s;max-width:80px;margin:0 auto}
 .nav a.on{color:var(--primary);background:var(--primary-bg)}
-.ni{font-size:22px;line-height:1}
+.ni{font-size:22px;line-height:1;position:relative;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px}
 .nl{font-size:11px;font-weight:500}
 
 /* Toast aliases */
@@ -685,6 +689,9 @@ html,body{
 .bw{width:100%}
 .bl{padding:16px 36px;font-size:18px;border-radius:30px}
 .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+/* 用户展示页右上角守护按钮（粉色渐变头图上的清晰胶囊） */
+.guard-on{background:#fff;color:var(--primary);border:1px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.guard-off{background:rgba(255,255,255,.22);color:#fff;border:1px solid rgba(255,255,255,.65);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 
 /* Avatar aliases */
 .avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--border-light);overflow:hidden;flex-shrink:0;position:relative}
@@ -713,34 +720,38 @@ html,body{
 /* Tag alias */
 .tp{background:#FFF0F0;color:var(--primary)}
 
-/* Chat message aliases */
-.msg-sy{text-align:center;font-size:13px;color:var(--text-muted);padding:8px 0}
-.msg-b{max-width:75%;padding:10px 14px;border-radius:16px;line-height:1.5;word-break:break-word;font-size:14px;margin-bottom:12px}
-.msg-my{border-radius:var(--radius) var(--radius) 4px var(--radius);background:var(--primary);color:#fff;margin-left:auto}
-.msg-ot{border-radius:var(--radius) var(--radius) var(--radius) 4px;background:var(--bg-white);color:var(--text);box-shadow:var(--shadow);margin-right:auto}
-.msg-img{max-width:200px;max-height:200px;border-radius:8px;cursor:pointer;display:block}
-.time-divider{text-align:center;font-size:12px;color:var(--text-muted);padding:12px 0;opacity:.7}
+/* Chat message aliases — 微信风格 */
+.msg-sy{text-align:center;font-size:13px;color:#B2B2B2;padding:8px 0}
+.msg-b{max-width:66%;padding:10px 14px;border-radius:6px;line-height:1.45;word-break:break-word;font-size:17px;margin-bottom:12px}
+.msg-my{background:var(--primary);color:#fff;border-radius:6px 2px 6px 6px;margin-left:auto}
+.msg-ot{background:#FFFFFF;color:var(--text);border-radius:2px 6px 6px 6px;box-shadow:0 1px 2px rgba(0,0,0,.06);margin-right:auto}
+.msg-img{max-width:200px;max-height:200px;border-radius:6px;cursor:pointer;display:block}
+.time-divider{text-align:center;font-size:13px;color:#B2B2B2;padding:8px 0}
 .msg-my .msg-img{margin-bottom:2px}
 .msg-ot .msg-img{margin-bottom:2px}
+/* 发送状态 / 已读回执小字（气泡内右下） */
+.msg-b .mstate{font-size:11px;margin-top:2px;text-align:right;line-height:1.2}
+.msg-b .mstate.read{color:#8a8a8a}
+.msg-b .mstate.err{color:#e04a3f}
 
-/* Chat detail header + message row with avatar */
-.chat-hdr{height:var(--header-h);flex-shrink:0;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border-light);display:flex;align-items:center;padding:0 8px 0 4px;gap:10px;z-index:50;box-shadow:0 1px 8px rgba(255,94,125,.06);animation:hdrIn .3s ease-out}
+/* Chat detail header + message row with avatar — 微信风格 */
+.chat-hdr{height:var(--header-h);flex-shrink:0;background:rgba(247,247,247,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid #E2E2E2;display:flex;align-items:center;padding:0 8px 0 4px;gap:10px;z-index:50;box-shadow:none;animation:hdrIn .3s ease-out}
 @keyframes hdrIn{from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1}}
-.chat-hdr .bk{position:static;transform:none}
+.chat-hdr .bk{position:static;transform:none;height:100%;line-height:1;font-size:40px;color:var(--text);padding:0 8px}
 .chat-hdr .act{border:none;background:none;font-size:19px;cursor:pointer;padding:7px;border-radius:50%;transition:background .15s,transform .15s;flex-shrink:0;line-height:1}
-.chat-hdr .act:hover{background:var(--primary-bg);transform:scale(1.1)}
+.chat-hdr .act:hover{background:#EDEDED;transform:scale(1.1)}
 .chat-hdr .act:active{transform:scale(.92)}
 .chat-hdr .pavatar{transition:transform .18s}
 .chat-hdr .pavatar:hover{transform:scale(1.07)}
-.chat-hdr .nm{font-size:16px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25;letter-spacing:.2px}
-.chat-hdr .st{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;margin-top:1px}
-.chat-hdr .st.on{color:var(--success);font-weight:500}
-.msg-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:4px;animation:msgIn .28s ease-out}
+.chat-hdr .nm{font-size:16px;font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25;letter-spacing:.2px}
+.chat-hdr .st{font-size:11px;color:#999;display:flex;align-items:center;gap:4px;margin-top:1px}
+.chat-hdr .st.on{color:#07C160;font-weight:500}
+.msg-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;animation:msgIn .28s ease-out}
 @keyframes msgIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
-.msg-row .avatar{width:32px;height:32px;font-size:14px;box-shadow:0 1px 5px rgba(0,0,0,.1);transition:transform .18s;cursor:pointer}
-.msg-row .avatar:hover{transform:scale(1.12)}
-.msg-row .msg-b{margin-bottom:4px;transition:box-shadow .2s}
-.msg-row .msg-ot:hover{box-shadow:0 3px 12px rgba(0,0,0,.1)}
+.msg-row .avatar{width:45px;height:45px;font-size:20px;border-radius:6px;background:#E5E5E5;box-shadow:none;transition:transform .18s;cursor:pointer}
+.msg-row .avatar:hover{transform:scale(1.06)}
+.msg-row .msg-b{margin-bottom:0;transition:box-shadow .2s}
+.msg-row .msg-ot:hover{box-shadow:0 2px 8px rgba(0,0,0,.12)}
 .online-dot{position:absolute;bottom:-1px;right:-1px;width:11px;height:11px;border-radius:50%;background:var(--success);border:2px solid #fff;animation:onlinePulse 2.4s ease-in-out infinite}
 @keyframes onlinePulse{0%,100%{box-shadow:0 0 0 0 rgba(52,199,89,.45)}50%{box-shadow:0 0 0 4px rgba(52,199,89,0)}}
 
@@ -749,8 +760,8 @@ html,body{
 .ci .inp{background:var(--bg-page)}
 
 /* Transition alias (sl -> slide-left) */
-.sl-enter-active{animation:slideLeft .25s ease-out}
-.sl-leave-active{animation:fadeIn .15s ease-in reverse}
+.sl-enter-active{animation:slideLeft .12s ease-out}
+.sl-leave-active{animation:fadeIn .1s ease-in reverse}
 
 /* Heart pop animation alias */
 @keyframes hp{0%{transform:scale(0)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
@@ -763,7 +774,7 @@ html,body{
 <script src="/js/vue.global.js"></script>
 <script src="/js/vue-router.global.js"></script>
 <script src="/js/notification.js"></script>
-<script src="/js/yujian-app.js?v=v20260802"></script>
+<script src="/js/yujian-app.js?v=v20260804a"></script>
 <script>
   // PWA Service Worker 注册（S20）
   if ('serviceWorker' in navigator) {

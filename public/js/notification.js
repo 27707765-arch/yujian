@@ -18,6 +18,35 @@ function _getAudioCtx() {
 }
 
 /**
+ * 解锁音频上下文（解决浏览器自动播放限制：需用户手势后才能播放声音）
+ */
+function unlockAudio() {
+  try {
+    var ctx = _getAudioCtx();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(function() {});
+    }
+  } catch (e) {
+    // 静默失败
+  }
+}
+
+// 首次用户手势时解锁音频，保证后续消息提示音可正常播放
+(function() {
+  if (typeof document === 'undefined') return;
+  var events = ['touchstart', 'touchend', 'click', 'keydown', 'mousedown'];
+  function handler() {
+    unlockAudio();
+    events.forEach(function(ev) {
+      document.removeEventListener(ev, handler);
+    });
+  }
+  events.forEach(function(ev) {
+    document.addEventListener(ev, handler, { passive: true });
+  });
+})();
+
+/**
  * 播放提示音
  * @param {string} type - 音效类型: 'message', 'like', 'match', 'notification', 'error'
  */
