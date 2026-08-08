@@ -824,6 +824,28 @@ async function completeOnboarding(req, res) {
   }
 }
 
+/**
+ * 注销账号（进入14天冷静期）
+ * POST /api/user/deactivate
+ */
+async function deactivate(req, res) {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!user) return error(res, 404, '用户不存在');
+    if (user.status === 0) return error(res, 400, '账号已注销或已禁用');
+    await User.requestDeactivation(id);
+    // 清理登录态（Redis token 由 auth 中间件校验，status=0 后即使 token 有效也应在后续请求被拒）
+    try {
+      const cacheDel = require('../config/redis').cacheDel;
+      if (cacheDel) cacheDel(`user:${id}:profile`).catch(() => {});
+    } catch (e) {}
+    success(res, null, '注销申请已提交，进入14天冷静期');
+  } catch (err) {
+    serverError(res, err, '注销失败');
+  }
+}
+
 module.exports = {
   getUserInfo,
   updateUserInfo,
@@ -847,6 +869,7 @@ module.exports = {
   getSocialCounts,
   searchUsers,
   getOnboardingStatus,
-  completeOnboarding
+  completeOnboarding,
+  deactivate
 };
 

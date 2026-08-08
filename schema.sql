@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) DEFAULT NULL COMMENT '邮箱地址',
     email_verified TINYINT(1) DEFAULT 0 COMMENT '邮箱是否已验证',
     password_hash VARCHAR(255) DEFAULT NULL COMMENT 'bcrypt密码哈希',
+    deactivation_requested_at DATETIME DEFAULT NULL COMMENT '注销申请时间（14天冷静期起点）',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     last_active_at DATETIME DEFAULT NULL COMMENT '最后活跃时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

@@ -44,7 +44,7 @@ const ALLOWED_UPDATE_COLUMNS = new Set([
   'email', 'email_verified', 'password_hash',
   'is_real_name_verified', 'is_face_verified', 'is_education_verified',
   'is_vehicle_verified', 'verification_level', 'verified_badges',
-  'noble_level', 'noble_expire_time'
+  'noble_level', 'noble_expire_time', 'deactivation_requested_at'
 ]);
 
 class User {
@@ -464,6 +464,19 @@ class User {
       console.error('查询活跃用户失败:', err.message);
     }
     return [];
+  }
+
+  /**
+   * 申请注销账号（14天冷静期）
+   * 置 status=0（登录立即被拦截）+ 记录注销申请时间。
+   * @param {number} id - 用户ID
+   * @returns {Promise<Object|null>} - 更新后的用户对象或null
+   */
+  static async requestDeactivation(id) {
+    return this.update(id, {
+      status: 0,
+      deactivation_requested_at: new Date()
+    });
   }
 }
 

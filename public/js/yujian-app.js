@@ -2691,7 +2691,7 @@ var DeactivatePage = {
         var r=await api("/user/deactivate",{method:"POST",body:JSON.stringify({})});
         if(r.code===0){toast(r.message||"已提交注销申请","tok");localStorage.clear();try{ws&&ws.close()}catch(e){}this.$router.replace("/login");}
         else toast(r.message||"注销申请提交失败","terr");
-      }catch(e){toast(e.message||"注销功能筹备中，敬请期待","tinfo")}
+      }catch(e){toast(e.message||"注销申请提交失败，请稍后重试","terr")}
       s.submitting=false;
     }
   },

@@ -105,6 +105,9 @@ router.get('/guarders', userController.getGuarders);
 // 社交关系计数（守护/关注/粉丝/访客）
 router.get('/social-counts', userController.getSocialCounts);
 
+// 注销账号（14天冷静期）
+router.post('/deactivate', userController.deactivate);
+
 // ==================== 新手引导 ====================
 
 // 获取引导完成状态
