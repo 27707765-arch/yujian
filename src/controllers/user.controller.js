@@ -835,6 +835,11 @@ async function deactivate(req, res) {
     if (!user) return error(res, 404, '用户不存在');
     if (user.status === 0) return error(res, 400, '账号已注销或已禁用');
     await User.requestDeactivation(id);
+    // 立即失效 auth 中间件的 status 缓存，使已签发 token 立刻被拒（注销即时生效）
+    try {
+      const authMiddleware = require('../middleware/auth');
+      if (authMiddleware && authMiddleware.invalidateStatusCache) authMiddleware.invalidateStatusCache(id);
+    } catch (e) {}
     // 清理登录态（Redis token 由 auth 中间件校验，status=0 后即使 token 有效也应在后续请求被拒）
     try {
       const cacheDel = require('../config/redis').cacheDel;

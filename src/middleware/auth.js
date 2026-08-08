@@ -66,4 +66,9 @@ async function authMiddleware(req, res, next) {
   }
 }
 
+// 账号状态变更时由外部调用，立即失效缓存（注销/封禁后 token 即时被拒）
+authMiddleware.invalidateStatusCache = function(uid) {
+  if (uid !== undefined && uid !== null) _statusCheckCache.delete(uid);
+};
+
 module.exports = authMiddleware;
