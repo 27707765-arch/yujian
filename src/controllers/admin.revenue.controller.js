@@ -25,25 +25,24 @@ async function getRevenueTrends(req, res) {
   try {
     const { period = 'day', start_date, end_date } = req.query;
 
-    let dateFormat;
     let groupBy;
     switch (period) {
       case 'month':
-        dateFormat = '%Y-%m';
         groupBy = 'DATE_FORMAT(o.created_at, \'%Y-%m\')';
         break;
       case 'week':
-        dateFormat = '%Y-%u';
-        groupBy = 'YEARWEEK(o.created_at, 1)';
+        // 用 ISO 周（年-W周号）展示，分组与 SELECT 同一表达式避免 only_full_group_by 报错
+        groupBy = 'DATE_FORMAT(o.created_at, \'%Y-W%u\')';
         break;
       case 'day':
       default:
-        dateFormat = '%Y-%m-%d';
-        groupBy = 'DATE(o.created_at)';
+        groupBy = 'DATE_FORMAT(o.created_at, \'%Y-%m-%d\')';
         break;
     }
 
-    let query = `SELECT DATE(o.created_at) as date,
+    // 关键修复：SELECT 的 date 字段必须与 GROUP BY 使用同一个表达式，
+    // 否则 only_full_group_by 下报「非聚合列不在 GROUP BY 中」错误。
+    let query = `SELECT ${groupBy} as date,
       COALESCE(SUM(o.amount), 0) as revenue,
       COUNT(o.id) as order_count
       FROM orders o WHERE o.status = 1`;
