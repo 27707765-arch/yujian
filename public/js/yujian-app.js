@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260808d";
+var APP_VERSION = "v20260809a";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
@@ -300,6 +300,8 @@ var HomePage = {
         var convId = convR.data.id;
         var greetText = "Hi~ 很高兴认识你！";
         await api("/chat/messages",{method:"POST",body:JSON.stringify({conversation_id:convId,content:greetText,type:0})});
+        // 打招呼成功：保留在列表中，并标记已有会话（按钮切换为「发消息」）
+        u._has_conversation = true;
         if(window.NotificationUtils){
           window.NotificationUtils.showToast('已向'+(u.nickname||'TA')+'发送打招呼消息','like');
         } else {
@@ -312,7 +314,6 @@ var HomePage = {
           toast(e.message||"打招呼失败","terr");
         }
       }
-      s.users=s.users.filter(function(x){return x.id!==u.id});
     },
     parseTags: function(t){if(!t)return[];if(Array.isArray(t))return t;try{return JSON.parse(t)}catch(e){return[]}}
   },
@@ -320,10 +321,6 @@ var HomePage = {
   // keep-alive 缓存恢复时静默刷新（仅刷新用户列表，避免重复定位）
   activated: function(){if(this.hasLoaded)this.load()},
   template: `<div style="padding:12px 16px">
-  <div style="display:flex;align-items:center;justify-content:space-between;background:var(--w);border-radius:var(--rs);padding:8px 12px;margin-bottom:10px;box-shadow:var(--sh)">
-    <span style="font-size:12px;color:var(--ts)">❤️ 今日 {{quota.likes>=999?'∞':quota.likes}}/{{quota.likes>=999?'∞':20}} · ⭐ {{quota.supers>=999?'∞':quota.supers}}/{{quota.supers>=999?'∞':5}}</span>
-    <span v-if="quota.likes>=999||quota.supers>=999" style="font-size:11px;color:var(--p)">👑 VIP无限</span>
-  </div>
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn bs" :class="tab==='city'?'bp':'bo'" @click="switchTab('city')">{{currentCity?'同城·'+currentCity:'同城'}}</button>
     <button class="btn bs" :class="tab==='nearby'?'bp':'bo'" @click="switchTab('nearby')">{{locDenied?'附近（未开启定位）':'附近'}}</button>
@@ -345,29 +342,29 @@ var HomePage = {
   <div v-else-if="err" class="empty" style="padding:48px 24px"><div style="font-size:48px;margin-bottom:12px">😵</div><div style="color:var(--ts);margin-bottom:16px;font-size:14px">{{errMsg}}</div><button class="btn bp bs" @click="load">重试</button></div>
   <div v-else-if="users.length===0" class="empty"><div class="ei">🔍</div><div class="et">{{tab==='city'?'暂无同城用户':'暂无附近用户'}}</div><div class="ed">换个时间再来或调整筛选条件</div><button class="btn bp bs" @click="load">刷新</button></div>
   <div v-else style="display:flex;flex-direction:column;gap:10px">
-    <div v-for="u in users" :key="u.id" class="card" style="display:flex;align-items:center;padding:12px;cursor:pointer" @click="$router.push('/user/'+u.id)">
-      <div style="width:58px;height:58px;border-radius:50%;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));display:flex;align-items:center;justify-content:center">
-        <img loading="lazy" v-if="u.avatar" :src="u.avatar" style="width:100%;height:100%;object-fit:cover">
-        <span v-else style="font-size:26px">👤</span>
-      </div>
-      <div style="flex:1;min-width:0;margin:0 12px" @click.stop="$router.push('/user/'+u.id)">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <span style="font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{u.nickname||'TA'}}</span>
-          <span style="font-size:13px;color:var(--ts)">{{u.age||'?'}}岁</span>
-          <span v-if="u.is_vip" class="tag tp" style="font-size:11px">VIP</span>
+    <div v-for="u in users" :key="u.id" class="card" style="padding:12px;cursor:pointer" @click="$router.push('/user/'+u.id)">
+      <div style="display:flex;align-items:center">
+        <div style="width:58px;height:58px;border-radius:50%;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,var(--gradient-a),var(--gradient-b));display:flex;align-items:center;justify-content:center">
+          <img loading="lazy" v-if="u.avatar" :src="u.avatar" style="width:100%;height:100%;object-fit:cover">
+          <span v-else style="font-size:26px">👤</span>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tm);margin-bottom:5px">
-          <span v-if="!u._distance_hidden&&u.distance">{{u.distance.toFixed(1)}}km</span>
-          <span v-else-if="tab==='city'">同城</span>
-          <span v-else>附近</span>
-          <span v-if="u.occupation">· {{u.occupation}}</span>
+        <div style="flex:1;min-width:0;margin:0 12px" @click.stop="$router.push('/user/'+u.id)">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{u.nickname||'TA'}}</span>
+            <span style="font-size:13px;color:var(--ts)">{{u.age||'?'}}岁</span>
+            <span v-if="u.is_vip" class="tag tp" style="font-size:11px">VIP</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tm);margin-bottom:5px">
+            <span v-if="!u._distance_hidden&&u.distance">{{u.distance.toFixed(1)}}km</span>
+            <span v-else-if="tab==='city'">同城</span>
+            <span v-else>附近</span>
+            <span v-if="u.occupation">· {{u.occupation}}</span>
+          </div>
+          <div v-if="parseTags(u.tags).length" style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in parseTags(u.tags).slice(0,3)" class="tag tp">{{t}}</span></div>
         </div>
-        <div v-if="parseTags(u.tags).length" style="display:flex;gap:6px;flex-wrap:wrap"><span v-for="t in parseTags(u.tags).slice(0,3)" class="tag tp">{{t}}</span></div>
-      </div>
-      <div style="flex-shrink:0;display:flex;align-items:center;gap:6px">
-        <button @click.stop="skip(u)" title="跳过" style="width:32px;height:32px;border:none;border-radius:50%;background:#f1f1f1;color:#999;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
-        <button @click.stop="superLike(u)" title="超级喜欢" :disabled="!quota.supers" style="width:32px;height:32px;border:none;border-radius:50%;background:#F6D365;color:#8a6d00;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:quota.supers>0?1:.35">⭐</button>
-        <button @click.stop="like(u)" title="喜欢" :disabled="!quota.likes" style="width:38px;height:38px;border:none;border-radius:50%;background:linear-gradient(135deg,#FF5E7D,#FF8E8E);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:quota.likes>0?1:.35">❤</button>
+        <div style="flex-shrink:0;display:flex;align-items:center">
+          <button @click.stop="chatUp(u)" style="padding:4px 8px;border:1px solid #FF6B9D;border-radius:8px;background:transparent;color:#FF6B9D;font-size:10px;font-weight:600;cursor:pointer;transition:opacity .2s">{{u._has_conversation?'发消息':'打个招呼'}}</button>
+        </div>
       </div>
     </div>
   </div>
@@ -606,12 +603,16 @@ var ChatListPage = {
     // 将各会话未读数求和，同步到底部「消息」标签红点
     syncGlobal:function(){if(this.$root)this.$root.unreadCount=this.convs.reduce(function(a,c){return a+(c.unread_count||0)},0)},
     open:function(c){this.$router.push("/chat/"+c.id)},
+    // 点击进入聊天框：长按弹 Sheet / 左滑删除等场景由 onTouchEnd 置 _suppressClick 拦截
+    // （touchend 不再 preventDefault 后合成 click 会正常派发，须在此兜底拦截非「点击」场景）
+    maybeOpen:function(c){var s=this;if(s._suppressClick){s._suppressClick=false;return}s.open(c)},
     // ===== 会话长按 / 滑动操作（统一 touch 处理链）=====
     // touchstart：记录起点 + 起 750ms 长按定时器（弹底部 Sheet）
     onTouchStart:function(e,c){
       var t=e.touches?e.touches[0]:e.changedTouches[0];
       if(!t)return;
       var s=this;
+      s._suppressClick=false; // 每次触摸开始重置点击拦截
       s.touchX=t.clientX;s.touchY=t.clientY;
       s._touchCid=c.id;
       s._longPressed=false;
@@ -639,15 +640,22 @@ var ChatListPage = {
       if(dx<0)c._swipeOffset=Math.max(-140,dx);
       else c._swipeOffset=0;
     },
-    // touchend：取消长按；左滑>80px 触发删除，否则回正
+    // touchend：取消长按；位移超点击阈值视为滑动/滚动（拦截合成 click，避免误入聊天框）。
+    // 左滑>80px 触发删除，否则回正。长按/删除/滑动均为非「点击」场景。
     onTouchEnd:function(e,c){
       var s=this;
       if(s._pressTimer){clearTimeout(s._pressTimer);s._pressTimer=null}
-      if(s._longPressed){s._longPressed=false;return}
+      if(s._longPressed){s._longPressed=false;s._suppressClick=true;return}
       var t=e.changedTouches?e.changedTouches[0]:null;
       var dx=t?t.clientX-s.touchX:0;
-      if(dx<-80){c._swipeOffset=-140;s.delConv(c);}
-      else{c._swipeOffset=0;}
+      var dy=t?t.clientY-s.touchY:0;
+      if(Math.abs(dx)>10||Math.abs(dy)>10){
+        if(dx<-80){c._swipeOffset=-140;s.delConv(c);}
+        else{c._swipeOffset=0;}
+        s._suppressClick=true;
+      }else{
+        c._swipeOffset=0;
+      }
       s._touchCid=null;
     },
     // 删除会话
@@ -741,7 +749,7 @@ var ChatListPage = {
     wsOff("message",this._clWsFn);
     wsOff("online_status",this._clOnlineFn);
   },
-  template: `<div><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div class="flex1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else><div v-if="convs.length===0" class="empty" style="margin-top:8px"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" class="conv-swipe" style="position:relative;overflow:hidden"><div class="conv-actions" style="position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1"><button style="border:none;background:#F6D365;color:#5b4a00;font-size:12px;padding:0 18px;cursor:pointer" @click.stop="delConv(c)">删除</button></div><div class="conv-item" :style="{transform:'translateX('+((c._swipeOffset||0)+'px')+')',transition:c._swipeOffset&&c._swipeOffset!==0?'transform .2s':'transform .2s'}" @touchstart.prevent="onTouchStart($event,c)" @touchmove.prevent="onTouchMove($event,c)" @touchend.prevent="onTouchEnd($event,c)" @touchcancel.prevent="onTouchEnd($event,c)" @click="open(c)"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><div class="conv-name-line"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span v-if="c.is_pinned" class="tag tp" style="font-size:10px;padding:0 4px;margin-left:4px">📌</span></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="conv-time">{{fmtTime(c.last_message_time)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span></div></div></div></div></div><div v-if="sheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300" @click="sheet=null"><div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;padding:12px 16px calc(16px + var(--safe-b))" @click.stop><div style="display:flex;align-items:center;padding:14px 8px;border-bottom:1px solid #f2f2f2;margin-bottom:8px"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="sheet.conv.other_avatar" :src="sheet.conv.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div></div><span style="font-size:16px;font-weight:600;margin-left:12px">{{sheet.conv.other_nickname||'用户'}}</span></div><div v-for="op in [{i:'✔️',l:'标为已读',f:function(){markRead(sheet.conv)}},{i:'📌',l:sheet.conv.is_pinned?'取消置顶':'置顶会话',f:function(){pinConv(sheet.conv)}},{i:'🗑️',l:'删除会话',f:function(){delConv(sheet.conv)}},{i:'🚫',l:'拉黑',f:function(){blockConv(sheet.conv)}}]" :key="op.l" style="display:flex;align-items:center;padding:14px 8px;border-radius:10px;cursor:pointer" @click="op.f"><span style="font-size:18px;margin-right:12px">{{op.i}}</span><span style="font-size:15px">{{op.l}}</span></div><button style="width:100%;margin-top:12px;padding:12px;border:none;background:#f5f5f5;border-radius:12px;font-size:15px;cursor:pointer;color:var(--tm)" @click="sheet=null">取消</button></div></div></div></div></div>`
+  template: `<div><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div class="flex1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else><div v-if="convs.length===0" class="empty" style="margin-top:8px"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" class="conv-swipe" style="position:relative;overflow:hidden"><div class="conv-actions" style="position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1"><button style="border:none;background:#F6D365;color:#5b4a00;font-size:12px;padding:0 18px;cursor:pointer" @click.stop="delConv(c)">删除</button></div><div class="conv-item" :style="{transform:'translateX('+((c._swipeOffset||0)+'px')+')',transition:c._swipeOffset&&c._swipeOffset!==0?'transform .2s':'transform .2s'}" @touchstart.prevent="onTouchStart($event,c)" @touchmove="onTouchMove($event,c)" @touchend="onTouchEnd($event,c)" @touchcancel="onTouchEnd($event,c)" @click="maybeOpen(c)"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><div class="conv-name-line"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span v-if="c.is_pinned" class="tag tp" style="font-size:10px;padding:0 4px;margin-left:4px">📌</span></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="conv-time">{{fmtTime(c.last_message_time)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span></div></div></div></div></div><div v-if="sheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300" @click="sheet=null"><div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;padding:12px 16px calc(16px + var(--safe-b))" @click.stop><div style="display:flex;align-items:center;padding:14px 8px;border-bottom:1px solid #f2f2f2;margin-bottom:8px"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="sheet.conv.other_avatar" :src="sheet.conv.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div></div><span style="font-size:16px;font-weight:600;margin-left:12px">{{sheet.conv.other_nickname||'用户'}}</span></div><div v-for="op in [{i:'✔️',l:'标为已读',f:function(){markRead(sheet.conv)}},{i:'📌',l:sheet.conv.is_pinned?'取消置顶':'置顶会话',f:function(){pinConv(sheet.conv)}},{i:'🗑️',l:'删除会话',f:function(){delConv(sheet.conv)}},{i:'🚫',l:'拉黑',f:function(){blockConv(sheet.conv)}}]" :key="op.l" style="display:flex;align-items:center;padding:14px 8px;border-radius:10px;cursor:pointer" @click="op.f"><span style="font-size:18px;margin-right:12px">{{op.i}}</span><span style="font-size:15px">{{op.l}}</span></div><button style="width:100%;margin-top:12px;padding:12px;border:none;background:#f5f5f5;border-radius:12px;font-size:15px;cursor:pointer;color:var(--tm)" @click="sheet=null">取消</button></div></div></div></div></div>`
 };
 
 

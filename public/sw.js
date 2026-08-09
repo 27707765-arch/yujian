@@ -1,5 +1,5 @@
 // 遇见APP Service Worker - v4 修复缓存和离线支持
-const CACHE_VERSION = 'yujian-v8';
+const CACHE_VERSION = 'yujian-v9';
 const STATIC_PREFIX = '/js/';
 const UPLOAD_PREFIX = '/uploads/';
 
