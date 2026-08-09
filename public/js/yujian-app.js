@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260809b";
+var APP_VERSION = "v20260809c";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
@@ -2808,6 +2808,41 @@ var AppRoot = {
   },
   methods: {
     goBack:function(){this.$router.back()},
+    // ===== 页面级左右滑动切换底部导航 tab =====
+    // 顺序固定：遇见(/home) → 动态(/discover) → 消息(/chat) → 我的(/my)
+    // 左滑→下一个，右滑→上一个；仅底部导航 4 主页面生效。
+    // 排除会话项左滑删除（conv-item）、弹层内部滑动（fixed 祖先）。
+    onPgTouchStart:function(e){
+      var s=this;
+      if(!s.showNav)return;
+      var t=e.touches?e.touches[0]:e.changedTouches[0];
+      if(!t)return;
+      s._swTab={x:t.clientX,y:t.clientY};
+    },
+    onPgTouchEnd:function(e){
+      var s=this;
+      if(!s._swTab||!s.showNav)return;
+      var t=e.changedTouches?e.changedTouches[0]:null;
+      var start=s._swTab;s._swTab=null;
+      if(!t)return;
+      // 会话项滑动（左滑删除）或弹层内滑动：不触发页面切换
+      if(e.target&&e.target.closest&&(e.target.closest(".conv-item")||s._isOverlay(e.target)))return;
+      var dx=t.clientX-start.x,dy=t.clientY-start.y;
+      // 纵向占优视为滚动；横向位移不足 60px 视为点击/轻滑
+      if(Math.abs(dy)>Math.abs(dx)||Math.abs(dx)<60)return;
+      if(dx<0)s.nextTab();else s.prevTab();
+    },
+    // 检查元素祖先链是否有 fixed 定位（弹层如匹配弹窗/图片预览）
+    _isOverlay:function(el){
+      var max=8,n=0;
+      while(el&&el!==document.body&&n<max){
+        try{if(el.getAttribute&&el.getAttribute("style")&&/position:\s*fixed/.test(el.getAttribute("style")))return true}catch(e){}
+        el=el.parentElement;n++;
+      }
+      return false;
+    },
+    nextTab:function(){var s=this;var arr=["/home","/discover","/chat","/my"];var i=arr.indexOf(s.$route.path);if(i<0)return;var n=arr[(i+1)%arr.length];if(n!==s.$route.path)s.$router.push(n)},
+    prevTab:function(){var s=this;var arr=["/home","/discover","/chat","/my"];var i=arr.indexOf(s.$route.path);if(i<0)return;var n=arr[(i-1+arr.length)%arr.length];if(n!==s.$route.path)s.$router.push(n)},
     loadUnreadCount: async function(){
       try{
         var r=await api("/chat/unread-count");
@@ -2980,7 +3015,7 @@ var AppRoot = {
     if(this._installFn)window.removeEventListener("beforeinstallprompt",this._installFn);
     if(this._unreadTimer)clearInterval(this._unreadTimer);
   },
-  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">‹</button><span class="tt">{{pageTitle}}</span></header><div v-if="!online" class="offline-banner">📡 当前离线，部分功能暂不可用</div><div v-if="showInstall" style="display:flex;align-items:center;gap:10px;background:#fff;padding:10px 14px;border-bottom:1px solid var(--border-light);flex-shrink:0;z-index:110"><span style="font-size:22px">📲</span><div style="flex:1;font-size:13px;color:var(--ts)">安装「遇见」到桌面，聊天更方便</div><button @click="dismissInstall" style="border:none;background:none;color:var(--tm);font-size:13px;cursor:pointer">暂不</button><button @click="installApp" style="border:none;background:var(--primary);color:#fff;border-radius:16px;padding:6px 16px;font-size:13px;cursor:pointer">安装</button></div><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><keep-alive include=\"HomePage,DiscoverPage,ChatListPage,MyPage\"><component :is=\"Component\" :key=\"route.fullPath\"/></keep-alive></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z\"/></svg></div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 3l6.4 18.5 3.4-8 8-3.4z\"/></svg></div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z\"/></svg><span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/></svg></div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div v-if="pv.show" class="image-preview-overlay" @click="preview.close()" @touchstart="onPvTouchStart($event)" @touchend="onPvTouchEnd($event)"><img class="image-preview-img" :class="pv.scaled?'scale-2x':''" :src="pv.list[pv.idx]" @click.stop @dblclick="preview.toggleScale()"><button class="image-preview-close" @click="preview.close()">✕</button><span v-if="pv.list.length>1" style="position:fixed;top:50%;left:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.prev()">‹</span><span v-if="pv.list.length>1" style="position:fixed;top:50%;right:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.next()">›</span><span class="image-preview-counter">{{pv.idx+1}}/{{pv.list.length}}</span></div></div>`
+  template: `<div class="app"><header class="hdr" v-if="pageTitle&&!uiState.hideHdr"><button class="bk" v-if="showBack" @click="goBack">‹</button><span class="tt">{{pageTitle}}</span></header><div v-if="!online" class="offline-banner">📡 当前离线，部分功能暂不可用</div><div v-if="showInstall" style="display:flex;align-items:center;gap:10px;background:#fff;padding:10px 14px;border-bottom:1px solid var(--border-light);flex-shrink:0;z-index:110"><span style="font-size:22px">📲</span><div style="flex:1;font-size:13px;color:var(--ts)">安装「遇见」到桌面，聊天更方便</div><button @click="dismissInstall" style="border:none;background:none;color:var(--tm);font-size:13px;cursor:pointer">暂不</button><button @click="installApp" style="border:none;background:var(--primary);color:#fff;border-radius:16px;padding:6px 16px;font-size:13px;cursor:pointer">安装</button></div><main :class=\"['pg',showNav?'pg-nav':'pg-nonav']\" @touchstart="onPgTouchStart($event)" @touchend="onPgTouchEnd($event)"><router-view v-slot=\"{Component,route}\"><transition name=\"sl\" mode=\"out-in\"><keep-alive include=\"HomePage,DiscoverPage,ChatListPage,MyPage\"><component :is=\"Component\" :key=\"route.fullPath\"/></keep-alive></transition></router-view></main><nav class=\"nav\" v-if=\"showNav\"><router-link to=\"/home\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z\"/></svg></div><div class=\"nl\">遇见</div></router-link><router-link to=\"/discover\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 3l6.4 18.5 3.4-8 8-3.4z\"/></svg></div><div class=\"nl\">动态</div></router-link><router-link to=\"/chat\" active-class=\"on\" style=\"position:relative\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z\"/></svg><span v-if=\"unreadCount>0\" class=\"badge\">{{unreadCount>99?'99+':unreadCount}}</span></div><div class=\"nl\">消息</div></router-link><router-link to=\"/my\" active-class=\"on\"><div class=\"ni\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/></svg></div><div class=\"nl\">我的</div></router-link><span style="position:fixed;bottom:2px;right:4px;font-size:8px;color:var(--tm);opacity:.4">{{appVersion}}</span></nav><div v-if="pv.show" class="image-preview-overlay" @click="preview.close()" @touchstart="onPvTouchStart($event)" @touchend="onPvTouchEnd($event)"><img class="image-preview-img" :class="pv.scaled?'scale-2x':''" :src="pv.list[pv.idx]" @click.stop @dblclick="preview.toggleScale()"><button class="image-preview-close" @click="preview.close()">✕</button><span v-if="pv.list.length>1" style="position:fixed;top:50%;left:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.prev()">‹</span><span v-if="pv.list.length>1" style="position:fixed;top:50%;right:10px;transform:translateY(-50%);z-index:10001;color:#fff;font-size:30px;background:rgba(255,255,255,.15);width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;line-height:44px;text-align:center" @click.stop="preview.next()">›</span><span class="image-preview-counter">{{pv.idx+1}}/{{pv.list.length}}</span></div></div>`
 };
 
 var app = Vue.createApp(AppRoot);
