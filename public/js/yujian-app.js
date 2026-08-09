@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260809b";
+var APP_VERSION = "v20260809d";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
