@@ -260,6 +260,40 @@ class Conversation {
   }
 
   /**
+   * 批量软删除会话（仅本端不可见，需校验会话归属）
+   * @param {Array<number>} convIds - 会话ID数组
+   * @param {number} userId - 当前用户ID
+   * @returns {Promise<number>} - 实际删除的会话数
+   */
+  static async batchSoftDelete(convIds, userId) {
+    const ids = (convIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    if (ids.length === 0) return 0;
+    try {
+      if (isDbAvailable()) {
+        const placeholders = ids.map(() => '?').join(',');
+        const [result] = await executeQuery(
+          `UPDATE conversations SET is_deleted_by_user = ?
+           WHERE id IN (${placeholders}) AND (user1_id = ? OR user2_id = ?)`,
+          [userId, ...ids, userId, userId]
+        );
+        return result.affectedRows || 0;
+      }
+    } catch (error) {
+      console.error('批量软删除失败:', error.message);
+    }
+    // 内存降级：仅删除归属当前用户的会话
+    let count = 0;
+    for (const id of ids) {
+      const conv = memoryStore.get(id);
+      if (conv && (conv.user1_id === userId || conv.user2_id === userId)) {
+        memoryStore.delete(id);
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
    * 切换会话置顶状态
    */
   static async togglePin(convId, userId) {

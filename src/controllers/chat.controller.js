@@ -186,6 +186,26 @@ async function deleteConversation(req, res) {
 }
 
 /**
+ * 批量删除会话
+ * POST /api/chat/conversations/batch-delete
+ * body: { conversation_ids: [1,2,3] }
+ */
+async function batchDeleteConversations(req, res) {
+  try {
+    const { id } = req.user;
+    const { conversation_ids } = req.body || {};
+    const ids = (Array.isArray(conversation_ids) ? conversation_ids : [])
+      .map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    if (ids.length === 0) return error(res, 400, '请选择要删除的会话');
+    const count = await Conversation.batchSoftDelete(ids, id);
+    if (count === 0) return error(res, 404, '没有可删除的会话');
+    success(res, { count }, `已删除 ${count} 个会话`);
+  } catch (err) {
+    serverError(res, err, '批量删除会话失败');
+  }
+}
+
+/**
  * 置顶会话
  * PUT /api/chat/conversations/:id/pin
  */
@@ -300,7 +320,8 @@ async function searchMessages(req, res) {
 
 module.exports = {
   getConversations, getMessages, markAsRead, getUnreadCount,
-  createConversation, recallMessage, deleteConversation, pinConversation, sendMessage,
+  createConversation, recallMessage, deleteConversation, batchDeleteConversations,
+  pinConversation, sendMessage,
   getQuickReplies, addQuickReply, deleteQuickReply,
   setBackground, getBackground, searchMessages
 };

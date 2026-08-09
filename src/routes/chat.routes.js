@@ -31,6 +31,9 @@ router.post('/messages/:id/recall', chatController.recallMessage);
 // 删除会话
 router.delete('/conversations/:id', chatController.deleteConversation);
 
+// 批量删除会话（须在 :id 路由之前注册，避免 id 匹配 "batch-delete"）
+router.post('/conversations/batch-delete', chatController.batchDeleteConversations);
+
 // 置顶会话
 router.put('/conversations/:id/pin', chatController.pinConversation);
 

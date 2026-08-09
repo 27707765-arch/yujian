@@ -482,6 +482,7 @@ input,textarea,[contenteditable="true"]{user-select:auto;-webkit-user-select:aut
   border-bottom:1px solid var(--border);background:var(--bg-white);position:relative;z-index:2;
   touch-action:pan-y;-webkit-touch-callout:none
 }
+.conv-item-selected{background:var(--primary-bg)}
 .conv-avatar-wrap{position:relative;flex-shrink:0}
 .conv-avatar{width:48px;height:48px;border-radius:50%;background:var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center}
 .conv-avatar img{width:100%;height:100%;object-fit:cover}
@@ -798,7 +799,7 @@ input,textarea,[contenteditable="true"]{user-select:auto;-webkit-user-select:aut
 <script src="/js/vue.global.js"></script>
 <script src="/js/vue-router.global.js"></script>
 <script src="/js/notification.js"></script>
-<script src="/js/yujian-app.js?v=v20260809d"></script>
+<script src="/js/yujian-app.js?v=v20260809e"></script>
 <script>
   // PWA Service Worker 注册（S20）
   if ('serviceWorker' in navigator) {

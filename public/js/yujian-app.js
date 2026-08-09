@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260809d";
+var APP_VERSION = "v20260809e";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
@@ -597,7 +597,7 @@ var PostDetailPage = {
 
 var ChatListPage = {
   name:"ChatListPage",
-  data: function(){return {convs:[],loading:true,hasLoaded:false,sheet:null,touchX:0,touchY:0,swipeId:null,swipeOffset:0}},
+  data: function(){return {convs:[],loading:true,hasLoaded:false,sheet:null,touchX:0,touchY:0,swipeId:null,swipeOffset:0,multiMode:false,selected:[]}},
   methods: {
     load:async function(){this.loading=true;try{var r=await api("/chat/conversations");this.convs=r.data||[];this.syncGlobal()}catch(e){}this.loading=false;this.hasLoaded=true},
     // 将各会话未读数求和，同步到底部「消息」标签红点
@@ -611,6 +611,7 @@ var ChatListPage = {
     // preventDefault 会同时阻止合成 click 和页面滚动，导致无法点击/滑动。
     // 仅在 onTouchMove 判断为横向左滑时按需 e.preventDefault（避免横滑时浏览器回弹）。
     onTouchStart:function(e,c){
+      if(this.multiMode)return; // 多选模式不处理长按/滑动
       var t=e.touches?e.touches[0]:e.changedTouches[0];
       if(!t)return;
       var s=this;
@@ -626,6 +627,7 @@ var ChatListPage = {
     },
     // touchmove：位移>10 取消长按；横向滑动更新偏移并 preventDefault，纵向滚动不干扰
     onTouchMove:function(e,c){
+      if(this.multiMode)return;
       var t=e.touches?e.touches[0]:e.changedTouches[0];
       if(!t)return;
       var s=this;
@@ -647,6 +649,7 @@ var ChatListPage = {
     // 左滑>80px 触发删除，否则回正。长按/删除/滑动均为非「点击」场景。
     onTouchEnd:function(e,c){
       var s=this;
+      if(s.multiMode){s._touchCid=null;return}
       if(s._pressTimer){clearTimeout(s._pressTimer);s._pressTimer=null}
       if(s._longPressed){s._longPressed=false;s._suppressClick=true;return}
       var t=e.changedTouches?e.changedTouches[0]:null;
@@ -696,6 +699,31 @@ var ChatListPage = {
         if(r.code===0){s.convs=s.convs.filter(function(x){return x.id!==c.id});s.syncGlobal();toast("已拉黑","tok")}
         else toast(r.message||"拉黑失败","terr");
       }).catch(function(e){toast(e.message||"拉黑失败","terr")});
+    },
+    // ===== 批量删除多选模式 =====
+    // 进入/退出多选模式（由长按 Sheet「批量删除聊天」触发）
+    enterMulti:function(){
+      var s=this;s.sheet=null;s.multiMode=true;s.selected=[];
+    },
+    exitMulti:function(){this.multiMode=false;this.selected=[]},
+    // 勾选/取消勾选会话
+    toggleSelect:function(c){
+      var s=this;
+      var i=s.selected.indexOf(c.id);
+      if(i>-1)s.selected.splice(i,1);else s.selected.push(c.id);
+    },
+    isSelected:function(c){return this.selected.indexOf(c.id)>-1},
+    // 批量删除所选会话
+    batchDel:function(){
+      var s=this;
+      if(s.selected.length===0){toast("请先选择要删除的会话","tinfo");return}
+      if(!window.confirm("确定删除选中的 "+s.selected.length+" 个聊天？"))return;
+      api("/chat/conversations/batch-delete",{method:"POST",body:JSON.stringify({conversation_ids:s.selected})}).then(function(r){
+        if(r.code===0){
+          s.convs=s.convs.filter(function(x){return s.selected.indexOf(x.id)===-1});
+          s.exitMulti();s.syncGlobal();toast(r.message||("已删除 "+s.selected.length+" 个会话"),"tok");
+        }else{toast(r.message||"批量删除失败","terr")}
+      }).catch(function(e){toast(e.message||"批量删除失败","terr")});
     },
     fmtTime:function(t){if(!t)return"";var d=new Date(t),now=new Date();var sameDay=d.toDateString()===now.toDateString();if(sameDay)return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);var yes=new Date(now);yes.setDate(yes.getDate()-1);if(d.toDateString()===yes.toDateString())return"昨天";return ("0"+(d.getMonth()+1)).slice(-2)+"/"+("0"+d.getDate()).slice(-2)},
     fmtLastMsg:function(c){if(!c.last_message)return"暂无消息";if(c.last_msg_type===1)return"[图片]";if(c.last_msg_type===2)return"[语音]";if(c.last_msg_type===4)return"[贴纸]";if(c.last_msg_type===99)return c.last_message;return c.last_message},
@@ -752,7 +780,7 @@ var ChatListPage = {
     wsOff("message",this._clWsFn);
     wsOff("online_status",this._clOnlineFn);
   },
-  template: `<div><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div class="flex1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else><div v-if="convs.length===0" class="empty" style="margin-top:8px"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" class="conv-swipe" style="position:relative;overflow:hidden"><div class="conv-actions" style="position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1"><button style="border:none;background:#F6D365;color:#5b4a00;font-size:12px;padding:0 18px;cursor:pointer" @click.stop="delConv(c)">删除</button></div><div class="conv-item" :style="{transform:'translateX('+((c._swipeOffset||0)+'px')+')',transition:c._swipeOffset&&c._swipeOffset!==0?'transform .2s':'transform .2s'}" @touchstart="onTouchStart($event,c)" @touchmove="onTouchMove($event,c)" @touchend="onTouchEnd($event,c)" @touchcancel="onTouchEnd($event,c)" @click="maybeOpen(c)"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><div class="conv-name-line"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span v-if="c.is_pinned" class="tag tp" style="font-size:10px;padding:0 4px;margin-left:4px">📌</span></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="conv-time">{{fmtTime(c.last_message_time)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span></div></div></div></div></div><div v-if="sheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300" @click="sheet=null"><div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;padding:12px 16px calc(16px + var(--safe-b))" @click.stop><div style="display:flex;align-items:center;padding:14px 8px;border-bottom:1px solid #f2f2f2;margin-bottom:8px"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="sheet.conv.other_avatar" :src="sheet.conv.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div></div><span style="font-size:16px;font-weight:600;margin-left:12px">{{sheet.conv.other_nickname||'用户'}}</span></div><div v-for="op in [{i:'✔️',l:'标为已读',f:function(){markRead(sheet.conv)}},{i:'📌',l:sheet.conv.is_pinned?'取消置顶':'置顶会话',f:function(){pinConv(sheet.conv)}},{i:'🗑️',l:'删除会话',f:function(){delConv(sheet.conv)}},{i:'🚫',l:'拉黑',f:function(){blockConv(sheet.conv)}}]" :key="op.l" style="display:flex;align-items:center;padding:14px 8px;border-radius:10px;cursor:pointer" @click="op.f"><span style="font-size:18px;margin-right:12px">{{op.i}}</span><span style="font-size:15px">{{op.l}}</span></div><button style="width:100%;margin-top:12px;padding:12px;border:none;background:#f5f5f5;border-radius:12px;font-size:15px;cursor:pointer;color:var(--tm)" @click="sheet=null">取消</button></div></div></div></div></div>`
+  template: `<div :style="{paddingBottom:multiMode?'64px':'0'}"><div v-if="loading" style="padding:4px 0"><div v-for="n in 4" :key="n" class="skeleton-card"><div style="display:flex;align-items:center;gap:12px"><div class="skeleton skeleton-avatar"></div><div class="flex1"><div class="skeleton skeleton-text"></div><div class="skeleton skeleton-text-short"></div></div></div></div></div><div v-else><div v-if="convs.length===0" class="empty" style="margin-top:8px"><div class="ei">💬</div><div class="et">还没有聊过天</div><div class="ed">在「遇见」中匹配好友，开始聊天吧</div><router-link to="/home" class="btn bp" style="margin-top:16px;text-decoration:none;display:inline-block">去遇见</router-link></div><div v-else><div v-for="c in convs" :key="c.id" class="conv-swipe" style="position:relative;overflow:hidden"><div class="conv-actions" v-if="!multiMode" style="position:absolute;top:0;right:0;bottom:0;display:flex;z-index:1"><button style="border:none;background:#F6D365;color:#5b4a00;font-size:12px;padding:0 18px;cursor:pointer" @click.stop="delConv(c)">删除</button></div><div class="conv-item" :style="{transform:'translateX('+((c._swipeOffset||0)+'px')+')',transition:c._swipeOffset&&c._swipeOffset!==0?'transform .2s':'transform .2s'}" :class="multiMode&&isSelected(c)?'conv-item-selected':''" @touchstart="onTouchStart($event,c)" @touchmove="onTouchMove($event,c)" @touchend="onTouchEnd($event,c)" @touchcancel="onTouchEnd($event,c)" @click="multiMode?toggleSelect(c):maybeOpen(c)"><span v-if="multiMode" :style="{width:'22px',height:'22px',borderRadius:'50%',border:'2px solid var(--b)',flexShrink:'0',display:'flex',alignItems:'center',justifyContent:'center',background:isSelected(c)?'#FF5E7D':'#fff',fontSize:'12px',color:'#fff',marginRight:'2px'}">{{isSelected(c)?'✓':''}}</span><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="c.other_avatar" :src="c.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div><span v-if="c.other_online" class="conv-online-dot"></span></div><div class="conv-info"><div class="conv-top-row"><div class="conv-name-line"><span class="conv-name">{{c.other_nickname||'用户'}}</span><span v-if="c.is_pinned" class="tag tp" style="font-size:10px;padding:0 4px;margin-left:4px">📌</span></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="conv-time">{{fmtTime(c.last_message_time)}}</span><span v-if="c.unread_count>0" class="conv-badge">{{c.unread_count>99?'99+':c.unread_count}}</span></div></div><div class="conv-msg-row"><span class="conv-preview">{{fmtLastMsg(c)}}</span></div></div></div></div></div><div v-if="multiMode" style="position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--b);padding:10px 16px calc(10px + var(--safe-b));display:flex;gap:10px;align-items:center;z-index:280"><div style="flex:1;font-size:14px;color:var(--ts)">已选 <b style="color:var(--p)">{{selected.length}}</b> 项</div><button class="btn bo bs" style="flex-shrink:0" @click="exitMulti">取消</button><button class="btn bp bs" style="flex-shrink:0" :disabled="selected.length===0" @click="batchDel">删除所选</button></div><div v-if="sheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300" @click="sheet=null"><div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;padding:12px 16px calc(16px + var(--safe-b))" @click.stop><div style="display:flex;align-items:center;padding:14px 8px;border-bottom:1px solid #f2f2f2;margin-bottom:8px"><div class="conv-avatar-wrap"><div class="conv-avatar"><img loading="lazy" v-if="sheet.conv.other_avatar" :src="sheet.conv.other_avatar"><span v-else class="conv-avatar-placeholder">👤</span></div></div><span style="font-size:16px;font-weight:600;margin-left:12px">{{sheet.conv.other_nickname||'用户'}}</span></div><div v-for="op in [{i:'📌',l:sheet.conv.is_pinned?'取消置顶':'置顶该聊天',f:function(){pinConv(sheet.conv)}},{i:'🗑️',l:'删除该聊天',f:function(){delConv(sheet.conv)}},{i:'☑️',l:'批量删除聊天',f:function(){enterMulti()}}]" :key="op.l" style="display:flex;align-items:center;padding:14px 8px;border-radius:10px;cursor:pointer" @click="op.f"><span style="font-size:18px;margin-right:12px">{{op.i}}</span><span style="font-size:15px">{{op.l}}</span></div><button style="width:100%;margin-top:12px;padding:12px;border:none;background:#f5f5f5;border-radius:12px;font-size:15px;cursor:pointer;color:var(--tm)" @click="sheet=null">取消</button></div></div></div></div></div>`
 };
 
 
