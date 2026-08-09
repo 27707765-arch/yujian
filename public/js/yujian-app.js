@@ -2,7 +2,7 @@
 
 // ==== 版本号单源（S20） ====
 // index.html 缓存参数 `?v=APP_VERSION`、AppRoot 底部小字、Settings 关于我们 共用此常量
-var APP_VERSION = "v20260809f";
+var APP_VERSION = "v20260809g";
 
 // ==== 工具函数 ====
 var toasts = Vue.reactive([]);
@@ -998,7 +998,13 @@ var ChatDetailPage = {
       self.uploading=false;
     },
     toggleVoiceMode: function(){this.voiceMode=!this.voiceMode;this.showEmojiPanel=false;this.showPlusPanel=false;this.showGiftPanel=false;this.showStickerPanel=false;if(this.voiceMode)this.blurInput();var self=this;Vue.nextTick(function(){self._resizeBottom(true)})},
-    insertEmoji: function(e){this.text+=e},
+    insertEmoji: function(e){
+      // 表情面板刚打开瞬间（收起软键盘的布局滑动动画期间），漂移的 click 会误落到
+      // 表情格子上，造成「点笑脸按钮就自动带出表情」。面板打开 350ms 内的格子点击
+      // 视为漂移吞掉；正常点选表情的操作远慢于此窗口，不受影响。
+      if(this._emojiOpenedAt&&Date.now()-this._emojiOpenedAt<350)return;
+      this.text+=e
+    },
     // 表情键盘退格：删除最后一个完整字符（用 code point 切割，正确删除多字节 emoji）
     deleteEmoji: function(){
       var s=this.text;
@@ -1021,12 +1027,18 @@ var ChatDetailPage = {
     onInputFocus: function(){
       if(this._openingPanel)return;
       this.showEmojiPanel=false;this.showPlusPanel=false;this.showGiftPanel=false;this.showStickerPanel=false;
+      this._emojiOpenedAt=0; // 面板已关闭，清除漂移窗口
       var self=this;
       self._syncKbH();
       Vue.nextTick(function(){self._resizeBottom(true)});
     },
     togglePlus: function(){this.showPlusPanel=!this.showPlusPanel;this.showEmojiPanel=false;this.showGiftPanel=false;this.showStickerPanel=false;if(this.showPlusPanel)this.blurInput();var self=this;Vue.nextTick(function(){self._resizeBottom(true)})},
-    toggleEmoji: function(){this.showEmojiPanel=!this.showEmojiPanel;this.showPlusPanel=false;this.showGiftPanel=false;this.showStickerPanel=false;if(this.showEmojiPanel)this.blurInput();var self=this;Vue.nextTick(function(){self._resizeBottom(true)})},
+    toggleEmoji: function(){
+      this.showEmojiPanel=!this.showEmojiPanel;this.showPlusPanel=false;this.showGiftPanel=false;this.showStickerPanel=false;
+      // 记录面板打开时间戳：用于拦截面板刚打开瞬间由键盘收起/布局滑动引起的漂移 click
+      this._emojiOpenedAt=this.showEmojiPanel?Date.now():0;
+      if(this.showEmojiPanel)this.blurInput();var self=this;Vue.nextTick(function(){self._resizeBottom(true)})
+    },
     startRecording: async function(e){
       var self=this;
       self.recordingCancel=false;self.recStartY=e&&e.changedTouches?e.changedTouches[0].clientY:null;
