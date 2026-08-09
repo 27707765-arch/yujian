@@ -4,7 +4,7 @@
 const express = require('express');
 const reportController = require('../controllers/report.controller');
 const authMiddleware = require('../middleware/auth');
-const { adminAuth } = require('../middleware/adminAuth');
+const { adminAuth, requirePerm } = require('../middleware/adminAuth');
 
 const router = express.Router();
 
@@ -17,7 +17,7 @@ router.post('/submit', reportController.submitReport);
 // 获取举报列表（管理员功能）
 router.get('/list', adminAuth, reportController.getReports);
 
-// 处理举报（管理员功能）
-router.put('/:id/handle', adminAuth, reportController.handleReport);
+// 处理举报（管理员功能，需 report_handle 权限点）
+router.put('/:id/handle', adminAuth, requirePerm('report_handle'), reportController.handleReport);
 
 module.exports = router;

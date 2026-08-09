@@ -18,96 +18,104 @@ const adminConfigController = require('../controllers/admin.config.controller');
 const adminSystemController = require('../controllers/admin.system.controller');
 const adminPushController = require('../controllers/admin.push.controller');
 const authMiddleware = require('../middleware/auth');
-const { adminAuth } = require('../middleware/adminAuth');
+const { adminAuth, requirePerm } = require('../middleware/adminAuth');
 
 const router = express.Router();
 router.use(authMiddleware);
 router.use(adminAuth);
 
-// ==================== 数据看板 ====================
+// ==================== 当前管理员信息（权限初始化） ====================
+router.get('/me', adminSystemController.getMe);
+
+// ==================== 数据看板（所有 admin 可读，含趋势/待审卡片数据） ====================
 router.get('/dashboard', adminController.getDashboard);
 router.get('/dashboard/enhanced', adminController.getDashboardEnhanced);
 
 // ==================== 用户管理 ====================
-router.get('/users', adminController.getUserList);
-router.put('/users/:id', adminController.toggleUserStatus);
+router.get('/users', requirePerm('user_view'), adminController.getUserList);
+router.put('/users/:id', requirePerm('user_ban'), adminController.toggleUserStatus);
 
 // ==================== 动态管理 ====================
 router.get('/posts', adminPostController.getPostList);
 router.get('/posts/:id', adminPostController.getPostDetail);
-router.put('/posts/:id/status', adminPostController.togglePostStatus);
+router.put('/posts/:id/status', requirePerm('content_audit'), adminPostController.togglePostStatus);
 
 // ==================== 举报管理 ====================
 router.get('/reports', adminReportController.getReportList);
-router.put('/reports/:id/handle', adminReportController.handleReport);
+router.put('/reports/:id/handle', requirePerm('report_handle'), adminReportController.handleReport);
 
 // ==================== 订单管理 ====================
-router.get('/orders', adminOrderController.getOrderList);
+router.get('/orders', requirePerm('data_view'), adminOrderController.getOrderList);
 
 // ==================== 礼物管理 ====================
-router.get('/gifts', adminGiftController.getGiftList);
-router.post('/gifts', adminGiftController.createGift);
-router.put('/gifts/:id', adminGiftController.updateGift);
-router.put('/gifts/:id/toggle', adminGiftController.toggleGiftStatus);
+router.get('/gifts', requirePerm('data_view'), adminGiftController.getGiftList);
+router.post('/gifts', requirePerm('data_view'), adminGiftController.createGift);
+router.put('/gifts/:id', requirePerm('data_view'), adminGiftController.updateGift);
+router.put('/gifts/:id/toggle', requirePerm('data_view'), adminGiftController.toggleGiftStatus);
 
 // ==================== 礼物记录 & 交易流水 ====================
-router.get('/gift-records', adminController.getGiftRecords);
-router.get('/transactions', adminController.getTransactionLogs);
+router.get('/gift-records', requirePerm('data_view'), adminController.getGiftRecords);
+router.get('/transactions', requirePerm('data_view'), adminController.getTransactionLogs);
 
 // ==================== 营收统计 ====================
-router.get('/revenue/trends', adminRevenueController.getRevenueTrends);
+router.get('/revenue/trends', requirePerm('data_view'), adminRevenueController.getRevenueTrends);
 
-// ==================== 认证审核 ====================
+// ==================== 认证审核（列表所有 admin 可读，操作需权限） ====================
 router.get('/verifications', adminVerificationController.getVerificationList);
 router.get('/verifications/stats', adminVerificationController.getVerificationStats);
-router.put('/verifications/:id/approve', adminVerificationController.approveVerification);
-router.put('/verifications/:id/reject', adminVerificationController.rejectVerification);
+router.put('/verifications/:id/approve', requirePerm('verification_audit'), adminVerificationController.approveVerification);
+router.put('/verifications/:id/reject', requirePerm('verification_audit'), adminVerificationController.rejectVerification);
 
 // ==================== 用户详情管理 ====================
-router.get('/users/:id', adminUserController.getUserDetail);
-router.get('/users/:id/wallet', adminUserController.getUserWallet);
-router.put('/users/:id/profile', adminUserController.updateUserProfile);
-router.post('/users/:id/reset-password', adminUserController.resetUserPassword);
-router.put('/users/:id/note', adminUserController.updateUserNote);
+router.get('/users/:id', requirePerm('user_view'), adminUserController.getUserDetail);
+router.get('/users/:id/wallet', requirePerm('user_view'), adminUserController.getUserWallet);
+router.get('/users/:id/posts', requirePerm('user_view'), adminUserController.getUserPosts);
+router.get('/users/:id/messages', requirePerm('user_view'), adminUserController.getUserMessages);
+router.get('/users/:id/verifications', requirePerm('user_view'), adminUserController.getUserVerifications);
+router.get('/users/:id/behaviors', requirePerm('user_view'), adminUserController.getUserBehaviors);
+router.get('/users/:id/behaviors/all', requirePerm('user_view'), adminUserController.getUserBehaviorsAll);
+router.put('/users/:id/profile', requirePerm('user_edit'), adminUserController.updateUserProfile);
+router.post('/users/:id/reset-password', requirePerm('user_edit'), adminUserController.resetUserPassword);
+router.put('/users/:id/note', requirePerm('user_edit'), adminUserController.updateUserNote);
 
 // ==================== 内容审核 ====================
 router.get('/sensitive-words', adminContentController.getSensitiveWords);
-router.post('/sensitive-words', adminContentController.createSensitiveWord);
-router.put('/sensitive-words/:id', adminContentController.updateSensitiveWord);
-router.delete('/sensitive-words/:id', adminContentController.deleteSensitiveWord);
-router.post('/sensitive-words/batch-import', adminContentController.batchImportSensitiveWords);
+router.post('/sensitive-words', requirePerm('content_audit'), adminContentController.createSensitiveWord);
+router.put('/sensitive-words/:id', requirePerm('content_audit'), adminContentController.updateSensitiveWord);
+router.delete('/sensitive-words/:id', requirePerm('content_audit'), adminContentController.deleteSensitiveWord);
+router.post('/sensitive-words/batch-import', requirePerm('content_audit'), adminContentController.batchImportSensitiveWords);
 router.get('/audit/queue', adminContentController.getAuditQueue);
-router.put('/audit/:id/approve', adminContentController.approveContent);
-router.put('/audit/:id/reject', adminContentController.rejectContent);
+router.put('/audit/:id/approve', requirePerm('content_audit'), adminContentController.approveContent);
+router.put('/audit/:id/reject', requirePerm('content_audit'), adminContentController.rejectContent);
 router.get('/audit/stats', adminContentController.getAuditStats);
 
 // ==================== 系统配置 ====================
 router.get('/configs', adminConfigController.getConfigs);
-router.put('/configs/:key', adminConfigController.updateConfig);
-router.get('/announcements', adminConfigController.getAnnouncements);
-router.post('/announcements', adminConfigController.createAnnouncement);
-router.put('/announcements/:id', adminConfigController.updateAnnouncement);
-router.delete('/announcements/:id', adminConfigController.deleteAnnouncement);
-router.put('/announcements/:id/publish', adminConfigController.publishAnnouncement);
-router.put('/announcements/:id/offline', adminConfigController.offlineAnnouncement);
+router.put('/configs/:key', requirePerm('admin_manage'), adminConfigController.updateConfig);
+router.get('/announcements', requirePerm('admin_manage'), adminConfigController.getAnnouncements);
+router.post('/announcements', requirePerm('admin_manage'), adminConfigController.createAnnouncement);
+router.put('/announcements/:id', requirePerm('admin_manage'), adminConfigController.updateAnnouncement);
+router.delete('/announcements/:id', requirePerm('admin_manage'), adminConfigController.deleteAnnouncement);
+router.put('/announcements/:id/publish', requirePerm('admin_manage'), adminConfigController.publishAnnouncement);
+router.put('/announcements/:id/offline', requirePerm('admin_manage'), adminConfigController.offlineAnnouncement);
 
 // ==================== 管理员管理 ====================
-router.get('/admins', adminSystemController.getAdminList);
-router.post('/admins', adminSystemController.createAdmin);
-router.put('/admins/:id', adminSystemController.updateAdmin);
-router.delete('/admins/:id', adminSystemController.deleteAdmin);
-router.get('/operation-logs', adminSystemController.getOperationLogs);
+router.get('/admins', requirePerm('admin_manage'), adminSystemController.getAdminList);
+router.post('/admins', requirePerm('admin_manage'), adminSystemController.createAdmin);
+router.put('/admins/:id', requirePerm('admin_manage'), adminSystemController.updateAdmin);
+router.delete('/admins/:id', requirePerm('admin_manage'), adminSystemController.deleteAdmin);
+router.get('/operation-logs', requirePerm('admin_manage'), adminSystemController.getOperationLogs);
 
 // ==================== 推送管理 ====================
-router.post('/push/send', adminPushController.sendPush);
+router.post('/push/send', requirePerm('push_send'), adminPushController.sendPush);
 router.get('/push/history', adminPushController.getPushHistory);
 router.get('/push/templates', adminPushController.getTemplates);
-router.post('/push/templates', adminPushController.createTemplate);
-router.delete('/push/templates/:id', adminPushController.deleteTemplate);
+router.post('/push/templates', requirePerm('push_send'), adminPushController.createTemplate);
+router.delete('/push/templates/:id', requirePerm('push_send'), adminPushController.deleteTemplate);
 
 // ==================== 数据统计 ====================
-router.get('/stats/users/trend', adminPushController.getUserTrend);
-router.get('/stats/revenue/trend', adminPushController.getRevenueTrend);
-router.get('/stats/matches/overview', adminPushController.getMatchStats);
+router.get('/stats/users/trend', requirePerm('data_view'), adminPushController.getUserTrend);
+router.get('/stats/revenue/trend', requirePerm('data_view'), adminPushController.getRevenueTrend);
+router.get('/stats/matches/overview', requirePerm('data_view'), adminPushController.getMatchStats);
 
 module.exports = router;

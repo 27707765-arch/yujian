@@ -297,6 +297,37 @@ async function getDashboardEnhanced(req, res) {
       { total: 0 }
     ).total;
 
+    // 认证待审
+    stats.pending_verifications = safeFirst(
+      await executeQuery("SELECT COUNT(*) as total FROM user_verifications WHERE status = 'pending'"),
+      { total: 0 }
+    ).total;
+
+    // 内容审核待审
+    stats.pending_audits = safeFirst(
+      await executeQuery("SELECT COUNT(*) as total FROM audit_logs WHERE audit_result = 'pending'"),
+      { total: 0 }
+    ).total;
+
+    // 近7日注册趋势（SELECT 与 GROUP BY 同一表达式，避免 only_full_group_by）
+    stats.user_trend7 = safeRows(
+      await executeQuery(
+        "SELECT DATE(created_at) as date, COUNT(*) as cnt FROM users " +
+        "WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) " +
+        "GROUP BY DATE(created_at) ORDER BY date ASC"
+      )
+    );
+
+    // 近7日已支付订单营收趋势
+    stats.revenue_trend7 = safeRows(
+      await executeQuery(
+        "SELECT DATE(o.created_at) as date, COALESCE(SUM(o.amount), 0) as revenue " +
+        "FROM orders o WHERE o.status = 1 " +
+        "AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) " +
+        "GROUP BY DATE(o.created_at) ORDER BY date ASC"
+      )
+    );
+
     success(res, stats);
   } catch (err) {
     serverError(res, err, '获取增强数据看板失败');

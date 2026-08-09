@@ -66,7 +66,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC
 .sidebar-collapse:hover{color:#fff;background:var(--bg-sidebar-hover)}
 
 /* Main */
-.main{flex:1;margin-left:var(--sidebar-width);transition:var(--transition);min-width:0}
+.main{flex:1;margin-left:var(--sidebar-width);transition:var(--transition);min-width:0;position:relative}
 .main.expanded{margin-left:var(--sidebar-collapsed)}
 
 /* Header */
@@ -97,6 +97,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC
   box-shadow:var(--shadow);border:1px solid var(--border-lighter);
   display:flex;align-items:flex-start;gap:14px;transition:var(--transition);cursor:default;
 }
+.stat-card.clickable{cursor:pointer}
+.stat-card.clickable:hover{transform:translateY(-1px);border-color:var(--primary)}
 .stat-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
 .stat-card .card-icon{
   width:44px;height:44px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;
@@ -282,6 +284,97 @@ tbody tr:last-child td{border-bottom:none}
 /* Skeleton loading for dashboard cards */
 .skeleton{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:4px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Link (clickable username) */
+.link{color:var(--primary);cursor:pointer;font-weight:600}
+.link:hover{text-decoration:underline}
+
+/* Permission checkbox grid (admin form) */
+.perm-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.perm-item{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;cursor:pointer;background:#fafafa;transition:var(--transition);user-select:none}
+.perm-item:hover{border-color:var(--primary)}
+.perm-item.checked{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
+.perm-item input{display:none}
+.perm-group-label{font-size:12px;color:var(--text-muted);margin:10px 0 4px;font-weight:600}
+
+/* User detail modal */
+.ud-meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--text-secondary);margin:10px 0 14px}
+.ud-meta span{display:inline-flex;align-items:center;gap:4px}
+.ud-photos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.ud-photos img{width:74px;height:74px;border-radius:6px;object-fit:cover;border:1px solid var(--border-lighter);cursor:pointer;transition:var(--transition)}
+.ud-photos img:hover{border-color:var(--primary);transform:scale(1.03)}
+.msg-line{max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Full-screen user detail overlay */
+.ud-overlay{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1500;background:var(--bg);display:flex;flex-direction:column}
+.ud-header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;border-bottom:1px solid var(--border-lighter);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.ud-header-info{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.ud-header-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid var(--border-lighter)}
+.ud-header-title{font-size:15px;font-weight:600}
+.ud-header-sub{font-size:12px;color:var(--text-muted)}
+.ud-header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ud-tabs{display:flex;padding:0 16px;background:#fff;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0}
+.ud-tabs button{padding:10px 14px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text-secondary);border-bottom:2px solid transparent;transition:var(--transition);white-space:nowrap}
+.ud-tabs button.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.ud-tabs button:hover{color:var(--primary)}
+.ud-body{flex:1;overflow-y:auto;padding:16px}
+
+/* 动态详情卡片 */
+.post-card{background:#fff;border:1px solid var(--border-lighter);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
+.post-card .post-content{white-space:pre-wrap;font-size:14px;line-height:1.6;margin-bottom:10px}
+.post-card .post-imgs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.post-card .post-imgs img{width:84px;height:84px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border-lighter);transition:var(--transition)}
+.post-card .post-imgs img:hover{border-color:var(--primary)}
+.post-card .post-meta{display:flex;gap:14px;font-size:12px;color:var(--text-muted);margin-bottom:8px;flex-wrap:wrap}
+.post-card .post-likers{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--text-secondary);align-items:center;margin-bottom:8px}
+.post-card .post-likers img{width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:2px}
+.post-card .post-comments{border-top:1px solid var(--border-extra-light);padding-top:8px}
+.post-card .comment-item{padding:6px 0;font-size:13px;line-height:1.5}
+.post-card .comment-item .c-nick{font-weight:600;color:var(--text-secondary);margin-right:6px}
+.post-card .comment-item .c-time{font-size:11px;color:var(--text-muted);margin-left:6px}
+.post-card .comment-item .c-reply{margin-left:18px;padding-left:10px;border-left:2px solid var(--border-extra-light);margin-top:4px}
+
+/* 消息分组（手风琴） */
+.msg-group{background:#fff;border:1px solid var(--border-lighter);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+.msg-group-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:var(--transition)}
+.msg-group-head:hover{background:var(--primary-light)}
+.msg-group-head img{width:34px;height:34px;border-radius:50%;object-fit:cover}
+.msg-group-head .mg-info{flex:1;min-width:0}
+.msg-group-head .mg-name{font-size:13px;font-weight:600}
+.msg-group-head .mg-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
+.msg-group-head .mg-arrow{color:var(--text-muted);font-size:12px;transition:var(--transition)}
+.msg-group.open .mg-arrow{transform:rotate(90deg)}
+.msg-group-body{display:none;padding:8px 14px;border-top:1px solid var(--border-extra-light);background:#fafafa}
+.msg-group.open .msg-group-body{display:block}
+.msg-bubble{display:flex;margin:6px 0;gap:8px}
+.msg-bubble .mb-avatar{width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:2px}
+.msg-bubble.sent{justify-content:flex-end}
+.msg-bubble.sent .mb-content{background:var(--primary);color:#fff}
+.msg-bubble.received .mb-content{background:#fff;border:1px solid var(--border-lighter)}
+.msg-bubble .mb-content{max-width:70%;padding:7px 12px;border-radius:10px;font-size:13px;line-height:1.5;word-break:break-word}
+.msg-bubble .mb-content img{max-width:160px;border-radius:6px;cursor:pointer;display:block}
+.msg-bubble .mb-time{font-size:10px;color:var(--text-muted);align-self:flex-end;flex-shrink:0}
+
+/* 行为聚合 */
+.beh-block{margin-bottom:20px}
+.beh-block-title{font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.beh-item{display:flex;align-items:flex-start;gap:10px;background:#fff;border:1px solid var(--border-lighter);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;font-size:13px}
+.beh-item img{width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:1px}
+.beh-item .bi-info{flex:1;min-width:0}
+.beh-item .bi-main{color:var(--text)}
+.beh-item .bi-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
+
+/* Image preview overlay (复刻 app 端，z-index 高于全屏层) */
+.img-preview-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:3000;align-items:center;justify-content:center}
+.img-preview-overlay.show{display:flex}
+.img-preview-img{max-width:92vw;max-height:88vh;object-fit:contain;transition:transform .25s;cursor:zoom-in}
+.img-preview-img.scale-2x{transform:scale(2);cursor:zoom-out}
+.img-preview-close{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:20px;cursor:pointer;z-index:3001;display:flex;align-items:center;justify-content:center}
+.img-preview-nav{position:fixed;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:24px;cursor:pointer;z-index:3001;display:flex;align-items:center;justify-content:center}
+.img-preview-nav.prev{left:16px}
+.img-preview-nav.next{right:16px}
+.img-preview-counter{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:#fff;font-size:14px;z-index:3001}
+
 </style>
 </head>
 <body>
@@ -348,6 +441,23 @@ tbody tr:last-child td{border-bottom:none}
       </div>
     </header>
     <div class="content" id="content-area"></div>
+    <div class="ud-overlay" id="ud-overlay" style="display:none">
+      <div class="ud-header">
+        <button class="btn btn-default btn-sm" onclick="closeUserDetailFull()">← 返回</button>
+        <div class="ud-header-info" id="ud-header-info"></div>
+        <div class="ud-header-actions" id="ud-header-actions"></div>
+      </div>
+      <div class="ud-tabs" id="ud-tabs">
+        <button class="active" onclick="udTab('overview')">总览</button>
+        <button onclick="udTab('photos')">相册</button>
+        <button onclick="udTab('posts')">动态</button>
+        <button onclick="udTab('messages')">消息</button>
+        <button onclick="udTab('wallet')">钱包</button>
+        <button onclick="udTab('verifications')">认证</button>
+        <button onclick="udTab('behaviors')">行为</button>
+      </div>
+      <div class="ud-body" id="ud-body"></div>
+    </div>
   </div>
 </div>
 
@@ -371,6 +481,15 @@ tbody tr:last-child td{border-bottom:none}
   <div class="modal" id="modal-content"></div>
 </div>
 
+<!-- Image Preview Overlay -->
+<div class="img-preview-overlay" id="img-preview" onclick="closePreview()">
+  <img class="img-preview-img" id="img-preview-img" src="" alt="预览" onclick="event.stopPropagation();toggleScalePreview()">
+  <button class="img-preview-close" onclick="event.stopPropagation();closePreview()">✕</button>
+  <button class="img-preview-nav prev" id="img-preview-prev" onclick="event.stopPropagation();prevPreview()">‹</button>
+  <button class="img-preview-nav next" id="img-preview-next" onclick="event.stopPropagation();nextPreview()">›</button>
+  <span class="img-preview-counter" id="img-preview-counter"></span>
+</div>
+
 <script>
 // ============================================================
 //  State
@@ -382,8 +501,36 @@ const S = {
   pageSize: 20,
   refreshTimer: null,
   sidebarCollapsed: false,
-  filters: {}
+  filters: {},
+  perms: [],          // 当前管理员权限点（来自 /api/admin/me）
+  role: 'user',       // 当前管理员角色
+  rolePermissions: {},// 角色默认权限模板（来自 /api/admin/me）
+  permCatalog: [],    // 权限中文目录（来自 /api/admin/me）
+  me: null            // 当前管理员完整信息
 };
+
+// 页面 → 所需权限点映射（super_admin 全部可见）
+const PAGE_PERMS = {
+  users: 'user_view', posts: 'content_audit', reports: 'report_handle',
+  orders: 'data_view', gifts: 'data_view', 'gift-records': 'data_view',
+  transactions: 'data_view', revenue: 'data_view', audit: 'content_audit',
+  'sensitive-words': 'content_audit', announcements: 'admin_manage',
+  configs: 'admin_manage', admins: 'admin_manage', push: 'push_send',
+  verifications: 'verification_audit'
+};
+
+// 权限目录兜底（/me 获取失败时保证权限勾选 UI 可用）
+const FALLBACK_CATALOG = [
+  {key:'user_view',label:'查看用户',group:'用户管理'},
+  {key:'user_edit',label:'修改用户资料/重置密码/备注',group:'用户管理'},
+  {key:'user_ban',label:'封禁/解封用户',group:'用户管理'},
+  {key:'content_audit',label:'内容审核/敏感词/动态管理',group:'内容管理'},
+  {key:'report_handle',label:'处理举报',group:'内容管理'},
+  {key:'verification_audit',label:'认证审核',group:'内容管理'},
+  {key:'data_view',label:'查看数据/订单/礼物/流水',group:'数据运营'},
+  {key:'push_send',label:'发送推送',group:'数据运营'},
+  {key:'admin_manage',label:'管理员/公告/系统配置',group:'系统管理'}
+];
 
 const PAGE_NAMES = {
   dashboard:'仪表盘',users:'用户管理',posts:'动态管理',reports:'举报管理',
@@ -439,7 +586,50 @@ function showApp(){
   document.getElementById('app-layout').style.display = 'flex';
   document.getElementById('header-user').textContent = S.adminUser?.nickname || '管理员';
   document.getElementById('header-avatar').textContent = (S.adminUser?.nickname || '管')[0];
-  navigate('dashboard');
+  fetchAdminMe();
+}
+
+// ============================================================ 权限初始化 ============================================================
+async function fetchAdminMe(){
+  try {
+    const me = (await api('GET','/api/admin/me')).data;
+    S.me = me;
+    S.role = me.admin?.admin_role || 'user';
+    S.perms = (me.admin?.permissions && Array.isArray(me.admin.permissions)) ? me.admin.permissions : ['*'];
+    S.rolePermissions = me.role_permissions || {};
+    S.permCatalog = me.permission_catalog || [];
+    // 同步 header 用户信息
+    if (me.user?.nickname) {
+      S.adminUser = Object.assign({}, S.adminUser, { nickname: me.user.nickname, role: S.role, permissions: S.perms });
+      localStorage.setItem('ad_user', JSON.stringify(S.adminUser));
+      document.getElementById('header-user').textContent = me.user.nickname;
+      document.getElementById('header-avatar').textContent = me.user.nickname[0];
+    }
+  } catch(e){
+    // 获取权限失败（DB 降级等）→ 放开全部，保证可用
+    S.perms = ['*'];
+    S.role = 'admin';
+    S.permCatalog = S.permCatalog.length ? S.permCatalog : FALLBACK_CATALOG;
+    if (!Object.keys(S.rolePermissions).length) S.rolePermissions = {};
+  }
+  renderSidebar();
+  // 若当前页无权限，回落到仪表盘
+  const need = PAGE_PERMS[S.page];
+  if (need && !hasPerm(need)) { navigate('dashboard'); return; }
+  navigate(S.page);
+}
+
+function hasPerm(perm){
+  return S.role === 'super_admin' || S.perms.includes('*') || S.perms.includes(perm);
+}
+
+function renderSidebar(){
+  const isSuper = S.role === 'super_admin' || S.perms.includes('*');
+  document.querySelectorAll('#sidebar-nav a[data-page]').forEach(a=>{
+    const page = a.getAttribute('data-page');
+    const need = PAGE_PERMS[page];
+    a.style.display = (isSuper || !need || hasPerm(need)) ? '' : 'none';
+  });
 }
 
 function setLoginError(msg){
@@ -530,6 +720,9 @@ async function api(method, path, body){
 // ============================================================ Navigation ============================================================
 function navigate(page){
   if (S.refreshTimer) { clearInterval(S.refreshTimer); S.refreshTimer = null; }
+  // 权限守卫：无权限页面回落到仪表盘
+  const need = PAGE_PERMS[page];
+  if (need && !hasPerm(need)) { page = 'dashboard'; }
   S.page = page;
   S.filters = {};
   document.querySelectorAll('#sidebar-nav a').forEach(a=>a.classList.remove('active'));
@@ -656,17 +849,21 @@ async function loadDashboard(silent){
     const d = (await api('GET','/api/admin/dashboard/enhanced')).data;
     const now = fmtTime(new Date().toISOString());
     const cards = [
-      {icon:'👥',color:'#e8f0fe',label:'总用户数',value:d.total_users||0,sub:`今日新增 ${d.today_new_users||0}`},
+      {icon:'👥',color:'#e8f0fe',label:'总用户数',value:d.total_users||0,sub:`今日新增 ${d.today_new_users||0}`,page:'users'},
       {icon:'🟢',color:'#e8f8ef',label:'今日活跃',value:d.today_active_users||0,sub:`在线 ${d.online_users||0}`},
-      {icon:'📝',color:'#fef3e2',label:'总动态',value:d.total_posts||0,sub:`今日 +${d.today_posts||0} · 已删 ${d.deleted_posts||0}`},
-      {icon:'🚩',color:'#fde8e8',label:'待处理举报',value:d.pending_reports||0,sub:`总计 ${d.total_reports||0} · 已处理 ${d.handled_reports||0}`},
-      {icon:'💰',color:'#e8f8ef',label:'总营收',value:fmtMoney(d.total_revenue),sub:`今日 ${fmtMoney(d.today_revenue)}`},
-      {icon:'📅',color:'#e8f0fe',label:'本周营收',value:fmtMoney(d.week_revenue),sub:`本月 ${fmtMoney(d.month_revenue)}`},
-      {icon:'💬',color:'#f0f2f5',label:'今日消息',value:d.today_messages||0,sub:`总计 ${d.total_messages||0}`},
+      {icon:'📝',color:'#fef3e2',label:'总动态',value:d.total_posts||0,sub:`今日 +${d.today_posts||0} · 已删 ${d.deleted_posts||0}`,page:'posts'},
+      {icon:'🚩',color:'#fde8e8',label:'待处理举报',value:d.pending_reports||0,sub:`总计 ${d.total_reports||0} · 已处理 ${d.handled_reports||0}`,page:'reports'},
+      {icon:'✅',color:'#e8f8ef',label:'认证待审',value:d.pending_verifications||0,sub:'实名/学历/车辆认证',page:'verifications'},
+      {icon:'🛡️',color:'#f0f2f5',label:'内容待审',value:d.pending_audits||0,sub:'动态/评论/资料审核',page:'audit'},
+      {icon:'💰',color:'#e8f8ef',label:'总营收',value:fmtMoney(d.total_revenue),sub:`今日 ${fmtMoney(d.today_revenue)}`,page:'revenue'},
+      {icon:'📅',color:'#e8f0fe',label:'本周营收',value:fmtMoney(d.week_revenue),sub:`本月 ${fmtMoney(d.month_revenue)}`,page:'revenue'},
+      {icon:'💬',color:'#f0f2f5',label:'今日消息',value:d.today_messages||0,sub:`总计 ${d.total_messages||0}`,page:'transactions'},
       {icon:'💕',color:'#fde8e8',label:'今日匹配',value:d.today_matches||0,sub:`总计 ${d.total_matches||0}`},
-      {icon:'🎁',color:'#fef3e2',label:'今日礼物',value:d.today_gifts||0,sub:`价值 ${d.today_gift_value||0} 金币`},
+      {icon:'🎁',color:'#fef3e2',label:'今日礼物',value:d.today_gifts||0,sub:`价值 ${d.today_gift_value||0} 金币`,page:'gift-records'},
       {icon:'💭',color:'#e8f0fe',label:'今日评论',value:d.today_comments||0,sub:`总计 ${d.total_comments||0}`},
     ];
+    // 仅渲染有权限的页面卡片（超级权限可见全部）
+    const visibleCards = cards.filter(c=>!c.page || hasPerm(PAGE_PERMS[c.page]||c.page));
     let isPaused = !S.refreshTimer;
     area.innerHTML = `
       <div class="refresh-bar">
@@ -675,11 +872,11 @@ async function loadDashboard(silent){
         <button class="btn btn-text btn-sm" onclick="loadDashboard()">🔄 刷新</button>
         <button class="btn btn-text btn-sm" id="btn-toggle-refresh" onclick="toggleAutoRefresh()">${isPaused?'▶ 恢复':'⏸ 暂停'}</button>
         <span class="spacer"></span>
-        <span style="font-size:11px">每30秒自动刷新</span>
+        <span style="font-size:11px">每30秒自动刷新 · 点击卡片直达对应模块</span>
       </div>
       <div class="stat-grid">
-        ${cards.map(c=>`
-          <div class="stat-card">
+        ${visibleCards.map(c=>`
+          <div class="stat-card${c.page?' clickable':''}" ${c.page?`onclick="goToPage('${c.page}')" title="点击进入 ${PAGE_NAMES[c.page]||c.page}"`:''}>
             <div class="card-icon" style="background:${c.color}">${c.icon}</div>
             <div class="card-info">
               <div class="card-label">${c.label}</div>
@@ -688,6 +885,38 @@ async function loadDashboard(silent){
             </div>
           </div>
         `).join('')}
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-header"><h4>📈 近7日注册趋势</h4><span style="font-size:12px;color:var(--text-muted)">每日新增用户</span></div>
+        <div class="bar-chart">
+          ${(d.user_trend7||[]).length===0?'<div style="width:100%;text-align:center;color:var(--text-muted);padding:40px">暂无数据</div>':(()=>{
+            const maxV = Math.max(...d.user_trend7.map(t=>Number(t.cnt||0)),1);
+            return d.user_trend7.map(t=>{
+              const hPx = Math.max((Number(t.cnt||0)/maxV)*140,2);
+              return `<div class="bar-item" title="${t.date}: ${t.cnt}人">
+                <div class="bar-value">${t.cnt}</div>
+                <div class="bar-fill" style="height:${hPx}px;background:${Number(t.cnt||0)===0?'var(--text-placeholder)':'var(--primary)'}"></div>
+                <div class="bar-label">${String(t.date||'').slice(5)}</div>
+              </div>`;
+            }).join('');
+          })()}
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-header"><h4>📈 近7日营收趋势</h4><span style="font-size:12px;color:var(--text-muted)">单位: 元</span></div>
+        <div class="bar-chart">
+          ${(d.revenue_trend7||[]).length===0?'<div style="width:100%;text-align:center;color:var(--text-muted);padding:40px">暂无数据</div>':(()=>{
+            const maxV = Math.max(...d.revenue_trend7.map(t=>Number(t.revenue||0)),1);
+            return d.revenue_trend7.map(t=>{
+              const hPx = Math.max((Number(t.revenue||0)/maxV)*140,2);
+              return `<div class="bar-item" title="${t.date}: ${fmtMoney(t.revenue)}">
+                <div class="bar-value">${fmtMoney(t.revenue)}</div>
+                <div class="bar-fill" style="height:${hPx}px;background:${Number(t.revenue||0)===0?'var(--text-placeholder)':'var(--primary)'}"></div>
+                <div class="bar-label">${String(t.date||'').slice(5)}</div>
+              </div>`;
+            }).join('');
+          })()}
+        </div>
       </div>
     `;
     // 更新举报徽标
@@ -704,6 +933,8 @@ async function loadDashboard(silent){
     if (!silent) area.innerHTML = `<div class="empty-row"><td>加载失败: ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderDashboard()">重试</button></td></div>`;
   }
 }
+
+function goToPage(p){ navigate(p); }
 
 function toggleAutoRefresh(){
   if (S.refreshTimer) {
@@ -743,12 +974,15 @@ async function loadUsers(){
             <thead><tr><th>ID</th><th>手机号</th><th>昵称</th><th>性别</th><th>VIP</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
             <tbody>${users.length===0?'<tr class="empty-row"><td colspan="8">暂无数据</td></tr>':users.map(u=>`
               <tr>
-                <td>${u.id}</td><td>${u.phone||'-'}</td><td><strong>${esc(u.nickname||'')}</strong></td>
+                <td>${u.id}</td><td>${u.phone||'-'}</td><td><strong class="link" onclick="openUserDetail(${u.id})" title="查看详情">${esc(u.nickname||'')}</strong></td>
                 <td>${u.gender==='male'?'男':u.gender==='female'?'女':u.gender||'-'}</td>
                 <td>${u.is_vip?'<span class="tag tag-success">VIP'+u.vip_level+'</span>':'<span class="tag tag-default">普通</span>'}</td>
                 <td><span class="tag ${u.status===1?'tag-success':'tag-danger'}">${u.status===1?'正常':'已封禁'}</span></td>
                 <td>${fmtTime(u.created_at)}</td>
-                <td>${u.status===1?`<button class="btn btn-danger btn-xs" onclick="toggleUser(${u.id},'ban')">封禁</button>`:`<button class="btn btn-success btn-xs" onclick="toggleUser(${u.id},'unban')">解封</button>`}</td>
+                <td>
+                  <button class="btn btn-text btn-xs" onclick="openUserDetail(${u.id})">详情</button>
+                  ${u.status===1?`<button class="btn btn-danger btn-xs" onclick="toggleUser(${u.id},'ban')">封禁</button>`:`<button class="btn btn-success btn-xs" onclick="toggleUser(${u.id},'unban')">解封</button>`}
+                </td>
               </tr>`).join('')}</tbody>
           </table></div>
           ${buildPagination(S.filters.offset,total,S.pageSize,'userPage')}
@@ -762,6 +996,413 @@ async function toggleUser(id,action){
   const label = action==='ban'?'封禁':'解封';
   showConfirm(`确定要<b>${label}</b>该用户吗？`,async()=>{
     try{ await api('PUT','/api/admin/users/'+id,{action}); toast('用户已'+label,'success'); loadUsers(); }
+    catch(e){ toast(e.message,'error'); }
+  },label);
+}
+
+// ============================================================ 用户详情（全屏覆盖层） ============================================================
+function openUserDetail(id){ openUserDetailFull(id); }
+
+function openUserDetailFull(id){
+  S.ud = { id, loaded: {} }; // 记录已加载 tab，避免重复请求
+  document.getElementById('ud-overlay').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  // 重置 tab 高亮
+  document.querySelectorAll('#ud-tabs button').forEach((b,i)=>b.classList.toggle('active',i===0));
+  document.getElementById('ud-header-info').innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+  document.getElementById('ud-header-actions').innerHTML = '';
+  document.getElementById('ud-body').innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  loadUserDetail(id);
+}
+
+function closeUserDetailFull(){
+  document.getElementById('ud-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  S.ud = null;
+}
+
+function genderText(g){
+  return g==='male'?'男':g==='female'?'女':(g===1?'男':g===0?'女':'-');
+}
+function normalizeImg(u){
+  if (!u || typeof u !== 'string') return u;
+  if (u.startsWith('http') || u.startsWith('data:') || u.startsWith('/uploads/')) return u;
+  if (u.startsWith('/')) return '/uploads/' + u.slice(1);
+  return u;
+}
+
+// 生成 openPreview 的 onclick 属性（安全编码，避免双引号嵌套截断属性）
+function imgPreviewAttr(urls, idx){
+  const safe = (urls||[]).filter(Boolean).map(normalizeImg).map(u=>esc(u));
+  return 'openPreview(' + JSON.stringify(safe).replace(/"/g, '&quot;') + ',' + (idx||0) + ')';
+}
+
+async function loadUserDetail(id){
+  try {
+    const detail = (await api('GET','/api/admin/users/'+id)).data;
+    const u = detail.user || {};
+    const verified = [];
+    if (u.is_real_name_verified) verified.push('实名');
+    if (u.is_face_verified) verified.push('人脸');
+    if (u.is_education_verified) verified.push('学历');
+    if (u.is_vehicle_verified) verified.push('车辆');
+    // 头像
+    const avatar = normalizeImg(u.avatar);
+    document.getElementById('ud-header-info').innerHTML = `
+      ${avatar?`<img class="ud-header-avatar" src="${esc(avatar)}" onclick="${imgPreviewAttr([avatar],0)}">`:'<span class="ud-header-avatar" style="display:flex;align-items:center;justify-content:center;background:var(--primary-light);color:var(--primary)">👤</span>'}
+      <span class="ud-header-title">${esc(u.nickname||'用户'+id)}</span>
+      <span class="ud-header-sub">ID:${id}</span>
+      <span class="ud-header-sub">📱 ${u.phone||'-'}</span>
+      <span class="ud-header-sub">⚧ ${genderText(u.gender)}</span>
+      <span class="ud-header-sub">🎂 ${u.age||'-'}岁</span>
+      <span class="ud-header-sub">${u.is_vip?'💎 VIP'+u.vip_level:'👤 普通'}</span>
+      <span class="ud-header-sub">${u.status===1?'🟢 正常':'🔴 已封禁'}</span>
+      ${verified.length?`<span class="ud-header-sub">✅ ${verified.join('/')}</span>`:''}
+      <span class="ud-header-sub">📍 ${esc(u.city||u.location||'-')}</span>
+    `;
+    document.getElementById('ud-header-actions').innerHTML = `
+      ${hasPerm('user_edit')?`<button class="btn btn-default btn-sm" onclick="udResetPwd(${id})">🔑 重置密码</button>
+      <button class="btn btn-default btn-sm" onclick="udEditProfile(${id})">✏️ 修改资料</button>
+      <button class="btn btn-default btn-sm" onclick="udEditNote(${id})">📝 备注</button>`:''}
+      ${hasPerm('user_ban')?(u.status===1?`<button class="btn btn-danger btn-sm" onclick="udToggleStatus(${id},'ban')">🚫 封禁</button>`:`<button class="btn btn-success btn-sm" onclick="udToggleStatus(${id},'unban')">✅ 解封</button>`):''}
+    `;
+    // 保留 detail 数据供 tabs 使用
+    S.ud.detail = detail;
+    udTab('overview');
+  } catch(e){
+    document.getElementById('ud-header-info').innerHTML = `<div class="loading-center">❌ ${esc(e.message)}</div>`;
+  }
+}
+
+// ============================================================ 图片预览 ============================================================
+const pv = { list: [], idx: 0, scaled: false };
+function openPreview(list, idx){
+  const urls = (list||[]).filter(Boolean).map(normalizeImg);
+  if (!urls.length) return;
+  pv.list = urls;
+  pv.idx = Math.min(Math.max(idx||0,0), urls.length-1);
+  pv.scaled = false;
+  updatePreview();
+  document.getElementById('img-preview').classList.add('show');
+  document.getElementById('img-preview-prev').style.display = urls.length>1 ? '' : 'none';
+  document.getElementById('img-preview-next').style.display = urls.length>1 ? '' : 'none';
+  document.getElementById('img-preview').addEventListener('touchstart', pvTStart, {once:true});
+}
+function updatePreview(){
+  const img = document.getElementById('img-preview-img');
+  img.src = pv.list[pv.idx];
+  img.classList.toggle('scale-2x', pv.scaled);
+  document.getElementById('img-preview-counter').textContent = (pv.idx+1)+'/'+pv.list.length;
+}
+function closePreview(){
+  document.getElementById('img-preview').classList.remove('show');
+  pv.list = []; pv.idx = 0; pv.scaled = false;
+}
+function prevPreview(){ pv.idx = (pv.idx-1+pv.list.length)%pv.list.length; pv.scaled=false; updatePreview(); }
+function nextPreview(){ pv.idx = (pv.idx+1)%pv.list.length; pv.scaled=false; updatePreview(); }
+function toggleScalePreview(){ pv.scaled = !pv.scaled; updatePreview(); }
+let pvTouchX = 0;
+function pvTStart(e){ pvTouchX = e.touches[0].clientX; document.getElementById('img-preview').addEventListener('touchmove', pvTEnd, {once:true}); }
+function pvTEnd(e){
+  const dx = e.changedTouches[0].clientX - pvTouchX;
+  if (Math.abs(dx)>60){ if(dx<0)nextPreview(); else prevPreview(); }
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape' && document.getElementById('img-preview').classList.contains('show')) closePreview(); });
+
+// ============================================================ 用户详情 Tabs ============================================================
+async function udTab(tab){
+  if (!S.ud) return;
+  document.querySelectorAll('#ud-tabs button').forEach(b=>b.classList.remove('active'));
+  const btn = [...document.querySelectorAll('#ud-tabs button')].find(b=>b.textContent.includes(tab==='overview'?'总览':tab==='photos'?'相册':tab==='posts'?'动态':tab==='messages'?'消息':tab==='wallet'?'钱包':tab==='verifications'?'认证':'行为'));
+  if (btn) btn.classList.add('active');
+  const body = document.getElementById('ud-body');
+  const id = S.ud.id;
+  if (S.ud.loaded[tab]) { body.innerHTML = S.ud.loaded[tab]; return; }
+  body.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
+  try {
+    let html = '';
+    if (tab === 'overview') {
+      const d = S.ud.detail;
+      const st = d.stats || {};
+      html = `<div class="summary-row">
+        <div class="summary-item">💕 发出喜欢: <strong>${st.likeCount||0}</strong></div>
+        <div class="summary-item">💘 收到喜欢: <strong>${st.likeReceivedCount||0}</strong></div>
+        <div class="summary-item">💑 匹配: <strong>${st.matchCount||0}</strong>（今日 ${st.matchToday||0}）</div>
+        <div class="summary-item">💬 消息: <strong>${st.msgCount||0}</strong></div>
+        <div class="summary-item">📝 动态: <strong>${st.postCount||0}</strong></div>
+        <div class="summary-item">👀 被浏览: <strong>${st.viewCount||0}</strong></div>
+        <div class="summary-item">👣 发出浏览: <strong>${st.viewSentCount||0}</strong></div>
+        <div class="summary-item">🎁 收礼: <strong>${st.giftReceivedCount||0}</strong></div>
+        <div class="summary-item">🎯 滑动行为: <strong>${st.behaviorCount||0}</strong></div>
+      </div>
+      ${d.adminNote&&d.adminNote.note?`<div style="background:#fef3e2;border:1px solid #f0d9a8;padding:10px 12px;border-radius:6px;font-size:13px;margin-top:8px"><b>📝 管理员备注:</b> ${esc(d.adminNote.note)}</div>`:''}
+      <p style="font-size:12px;color:var(--text-muted);margin-top:8px">注册时间: ${fmtTime(d.user.created_at)} · 最后活跃: ${fmtTime(d.user.last_active_at)}</p>`;
+    } else if (tab === 'photos') {
+      const photos = S.ud.detail.photos || [];
+      html = photos.length===0?'<div class="empty-row">暂无相册照片</div>':
+        `<div class="ud-photos">${photos.map((p,i)=>`<img src="${esc(normalizeImg(p.url))}" title="${fmtTime(p.created_at)}" onclick="${imgPreviewAttr(photos.map(x=>x.url),i)}">`).join('')}</div>`;
+    } else if (tab === 'posts') {
+      const posts = (await api('GET','/api/admin/users/'+id+'/posts')).data || [];
+      html = posts.length===0?'<div class="empty-row">暂无动态</div>':posts.map(p=>renderPostCard(p)).join('');
+    } else if (tab === 'messages') {
+      const msgs = (await api('GET','/api/admin/users/'+id+'/messages')).data || [];
+      html = msgs.length===0?'<div class="empty-row">暂无消息记录</div>':renderMsgGroups(msgs, id);
+    } else if (tab === 'wallet') {
+      const w = (await api('GET','/api/admin/users/'+id+'/wallet')).data;
+      const wallet = w.wallet || null;
+      const txs = w.transactions || [];
+      const withdraws = w.withdraws || [];
+      html = wallet===null?'<div class="empty-row">该用户尚未开通钱包</div>':
+        `<div class="summary-row">
+          <div class="summary-item">💰 余额: <strong>${wallet.balance||0}</strong></div>
+          <div class="summary-item">⬆️ 累计充值: <strong>${wallet.total_recharge||0}</strong></div>
+          <div class="summary-item">⬇️ 累计消费: <strong>${wallet.total_spent||0}</strong></div>
+          <div class="summary-item">🎁 累计收入: <strong>${wallet.total_earned||0}</strong></div>
+        </div>
+        ${withdraws.length?`<div class="section-card"><div class="section-header"><h4>💸 提现记录</h4></div>
+        <div class="section-body"><div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>单号</th><th>金额</th><th>状态</th><th>账户</th><th>时间</th></tr></thead>
+          <tbody>${withdraws.map(wd=>`<tr><td>${wd.id}</td><td style="font-size:11px">${esc(wd.order_no||'-')}</td><td><strong>${wd.amount}</strong></td><td><span class="tag ${wd.status===1?'tag-success':wd.status===0?'tag-warning':'tag-danger'}">${esc(wd.status_label||'未知')}</span></td><td>${esc(wd.account||'-')}</td><td>${fmtTime(wd.created_at)}</td></tr>`).join('')}</tbody>
+        </table></div></div></div>`:''}
+        <div class="section-card"><div class="section-header"><h4>📋 交易流水</h4></div>
+        <div class="section-body"><div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>类型</th><th>金额</th><th>余额</th><th>描述</th><th>时间</th></tr></thead>
+          <tbody>${txs.length===0?'<tr class="empty-row"><td colspan="6">暂无流水</td></tr>':txs.map(t=>`<tr>
+            <td>${t.id}</td><td>${esc(t.type_label||t.type)}</td>
+            <td style="color:${t.amount>=0?'var(--success)':'var(--danger)'};font-weight:600">${t.amount>=0?'+':''}${t.amount}</td>
+            <td>${t.balance_after||'-'}</td><td class="msg-line">${esc(t.description||'')}</td><td>${fmtTime(t.created_at)}</td>
+          </tr>`).join('')}
+          </tbody></table></div></div></div>`;
+    } else if (tab === 'verifications') {
+      const vfs = (await api('GET','/api/admin/users/'+id+'/verifications')).data || [];
+      const typeName = {real_name:'实名',face:'人脸',education:'学历',vehicle:'车辆',income:'收入'};
+      html = vfs.length===0?'<div class="empty-row">暂无认证记录</div>':
+        `<div class="table-wrap"><table><thead><tr><th>ID</th><th>类型</th><th>状态</th><th>姓名</th><th>提交时间</th><th>拒绝原因</th></tr></thead><tbody>
+        ${vfs.map(v=>`<tr>
+          <td>${v.id}</td><td>${typeName[v.verification_type]||v.verification_type}</td>
+          <td><span class="tag ${v.status==='pending'?'tag-warning':v.status==='approved'?'tag-success':'tag-danger'}">${v.status==='pending'?'待审':v.status==='approved'?'通过':'拒绝'}</span></td>
+          <td>${esc(v.real_name||v.school_name||v.car_brand||'-')}</td>
+          <td>${fmtTime(v.created_at)}</td><td class="msg-line">${esc(v.rejected_reason||'-')}</td>
+        </tr>`).join('')}
+        </tbody></table></div>`;
+    } else if (tab === 'behaviors') {
+      const b = (await api('GET','/api/admin/users/'+id+'/behaviors/all')).data || {};
+      html = renderBehaviors(b);
+    }
+    body.innerHTML = html;
+    S.ud.loaded[tab] = html;
+  } catch(e){
+    body.innerHTML = `<div class="loading-center">❌ ${esc(e.message)}</div>`;
+  }
+}
+
+// 动态卡片渲染（内容全文 + 图片预览 + 点赞用户 + 评论）
+function renderPostCard(p){
+  const imgs = (p.images||[]).map(normalizeImg).filter(Boolean);
+  const imgHtml = imgs.length?`<div class="post-imgs">${imgs.map((u,i)=>`<img src="${esc(u)}" onclick="${imgPreviewAttr(imgs,i)}">`).join('')}</div>`:'';
+  const likeUsers = (p.likes||[]).map(l=>l).slice(0,10);
+  const likeMore = (p.likes||[]).length - likeUsers.length;
+  const likersHtml = (p.likes||[]).length?`<div class="post-likers">👍 <strong>${p.like_count_detail||p.like_count||0}</strong> 位点赞:
+    ${likeUsers.map(l=>`<span>${l.avatar?`<img src="${esc(normalizeImg(l.avatar))}" title="${esc(l.nickname||'用户'+l.user_id)}">`:''}${esc(l.nickname||'用户'+l.user_id)}</span>`).join('')}
+    ${likeMore>0?`<span>+${likeMore}</span>`:''}
+  </div>`:`<div class="post-likers">👍 ${p.like_count_detail||p.like_count||0} 位点赞</div>`;
+  const commentsHtml = renderComments(p.comments||[]);
+  return `<div class="post-card">
+    <div class="post-meta">
+      <span>📝 动态 #${p.id}</span>
+      <span>${p.status===1?'<span class="tag tag-success">正常</span>':'<span class="tag tag-default">已删除</span>'}</span>
+      <span>👍 ${p.like_count_detail||p.like_count||0}</span>
+      <span>💬 ${p.comment_count_detail||p.comment_count||0}</span>
+      ${p.view_count!==undefined?`<span>👀 ${p.view_count}</span>`:''}
+      <span>🕐 ${fmtTime(p.created_at)}</span>
+    </div>
+    ${p.content?`<div class="post-content">${esc(p.content)}</div>`:''}
+    ${imgHtml}
+    ${likersHtml}
+    <div class="post-comments">${commentsHtml}</div>
+  </div>`;
+}
+
+function renderComments(comments){
+  if (!comments.length) return '<div style="font-size:12px;color:var(--text-muted)">暂无评论</div>';
+  return comments.map(c=>`
+    <div class="comment-item">
+      <span class="c-nick">${esc(c.nickname||'用户'+c.user_id)}</span>
+      <span>${esc(c.content)}</span><span class="c-time">${fmtTime(c.created_at)}</span>
+      ${(c.replies||[]).map(r=>`<div class="c-reply"><span class="c-nick">${esc(r.nickname||'用户'+r.user_id)}</span>回复@${esc(c.nickname||'')}：${esc(r.content)}<span class="c-time">${fmtTime(r.created_at)}</span></div>`).join('')}
+    </div>`).join('');
+}
+
+// 消息按对端分组（手风琴）
+function renderMsgGroups(msgs, uid){
+  // 按 peer_id 分组
+  const groups = {};
+  msgs.forEach(m=>{
+    const pid = m.peer_id;
+    if (!groups[pid]) groups[pid] = { peer_id: pid, peer_nickname: m.peer_nickname||('用户'+pid), peer_avatar: m.peer_avatar, items: [] };
+    groups[pid].items.push(m);
+  });
+  // 组按最后消息时间倒序
+  const list = Object.values(groups).sort((a,b)=>new Date(b.items[0].created_at)-new Date(a.items[0].created_at));
+  if (!S.ud.msgOpen) S.ud.msgOpen = {};
+  return `<div class="msg-groups">
+    ${list.map(g=>{
+      const isOpen = S.ud.msgOpen[g.peer_id];
+      return `<div class="msg-group${isOpen?' open':''}" id="mg_${g.peer_id}">
+        <div class="msg-group-head" onclick="toggleMsgGroup(${g.peer_id})">
+          ${g.peer_avatar?`<img src="${esc(normalizeImg(g.peer_avatar))}">`:'<span style="width:34px;height:34px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center">👤</span>'}
+          <div class="mg-info">
+            <div class="mg-name">${esc(g.peer_nickname)} <span class="tag tag-primary" style="font-size:10px">${g.items.length}条</span></div>
+            <div class="mg-sub">${fmtTime(g.items[0].created_at)}</div>
+          </div>
+          <span class="mg-arrow">›</span>
+        </div>
+        <div class="msg-group-body">${renderMsgBubbles(g.items)}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function toggleMsgGroup(peerId){
+  S.ud.msgOpen[peerId] = !S.ud.msgOpen[peerId];
+  const el = document.getElementById('mg_'+peerId);
+  if (el) el.classList.toggle('open', S.ud.msgOpen[peerId]);
+}
+
+function renderMsgBubbles(items){
+  return items.map(m=>{
+    const avatar = normalizeImg(m.peer_avatar);
+    const content = m.is_recalled ? '<span style="color:var(--text-muted)">[已撤回]</span>'
+      : (m.type===1 ? `<img src="${esc(normalizeImg(m.content))}" onclick="${imgPreviewAttr([m.content],0)}">`
+        : (m.type===6 ? `🎁 ${esc(m.content||'礼物消息')}`
+          : esc(trunc(m.content||'',120))));
+    const avHtml = m.direction==='received' && avatar ? `<img class="mb-avatar" src="${esc(avatar)}">` : '<span class="mb-avatar" style="display:none"></span>';
+    return `<div class="msg-bubble ${m.direction}">
+      ${avHtml}
+      <div class="mb-content">${content}</div>
+      <span class="mb-time">${fmtTime(m.created_at)}</span>
+    </div>`;
+  }).join('');
+}
+
+// 行为聚合渲染（按行为方式一级分类，每类内分发出/收到）
+function renderBehaviors(b){
+  const typeMeta = {
+    view_profile:{i:'👀',l:'查看主页'}, like_user:{i:'💕',l:'喜欢用户'},
+    like_post:{i:'👍',l:'点赞动态'}, comment_post:{i:'💬',l:'评论动态'},
+    message_send:{i:'💬',l:'消息'}, message_recv:{i:'💬',l:'消息'},
+    match:{i:'💑',l:'匹配成功'}, slide:{i:'🎯',l:'滑动操作'},
+    gift_send:{i:'🎁',l:'送出礼物'}, gift_recv:{i:'🎁',l:'收到礼物'}
+  };
+  const slideName = (b.slide_labels||{});
+  // 合并发出+收到，按行为方式(type)分组
+  const all = [...(b.sent||[]), ...(b.received||[])];
+  if (!all.length) return '<div class="empty-row">暂无行为记录</div>';
+  const byType = {};
+  all.forEach(x=>{ const k=x.type||'other'; (byType[k]=byType[k]||[]).push(x); });
+
+  function behItem(x){
+    const isSlide = x.type==='slide';
+    const dirTag = x.direction==='sent'
+      ? '<span class="tag tag-primary">发出</span>'
+      : '<span class="tag tag-warning">收到</span>';
+    return `<div class="beh-item">
+      ${x.peer&&x.peer.avatar?`<img src="${esc(normalizeImg(x.peer.avatar))}">`:'<span style="width:24px;height:24px;border-radius:50%;background:var(--primary-light);display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">👤</span>'}
+      <div class="bi-info">
+        <div class="bi-main">
+          ${dirTag}
+          ${x.peer?` <strong>${esc(x.peer.nickname||'用户'+x.peer.id)}</strong>`:''}
+          ${isSlide&&slideName[x.action]?` <span class="tag tag-primary">${slideName[x.action]}</span>`:''}
+          ${x.post?` · 动态#${x.post.id}「${esc(trunc(x.post.content||'',20))}」`:''}
+          ${x.comment_content?` · 评论: ${esc(trunc(x.comment_content,30))}`:''}
+          ${x.message_preview?` · ${esc(trunc(x.message_preview,30))}`:''}
+        </div>
+        <div class="bi-sub">${fmtTime(x.created_at)}</div>
+      </div>
+    </div>`;
+  }
+
+  let html = '';
+  for (const [type, items] of Object.entries(byType)){
+    const meta = typeMeta[type] || {i:'•',l:type};
+    const sentItems = items.filter(x=>x.direction==='sent');
+    const recvItems = items.filter(x=>x.direction==='received');
+    html += `<div class="section-card" style="margin-bottom:12px">
+      <div class="section-header"><h4>${meta.i} ${meta.l} <span class="tag tag-default" style="font-weight:400">${items.length}次</span></h4></div>
+      <div class="section-body" style="padding:10px 14px">
+        ${sentItems.length?`<div class="beh-block-title" style="margin-top:0">📤 发出 ${sentItems.length}</div>`:''}
+        ${sentItems.map(behItem).join('')}
+        ${recvItems.length?`<div class="beh-block-title">📥 收到 ${recvItems.length}</div>`:''}
+        ${recvItems.map(behItem).join('')}
+      </div>
+    </div>`;
+  }
+  return html;
+}
+
+async function udResetPwd(id){
+  showConfirm('确定要<b>重置该用户密码</b>吗？', async()=>{
+    try {
+      const d = (await api('POST','/api/admin/users/'+id+'/reset-password')).data;
+      toast('密码已重置','success');
+      showModal(`<h3>🔑 新密码</h3>
+        <p style="font-size:14px;text-align:center;padding:20px 0">新密码: <strong style="font-size:20px;color:var(--primary)">${esc(d.newPassword)}</strong></p>
+        <p style="font-size:12px;color:var(--text-muted);text-align:center">请妥善保存，仅显示一次</p>
+        <div class="modal-footer"><button class="btn btn-primary" onclick="closeModal()">我知道了</button></div>`);
+    } catch(e){ toast(e.message,'error'); }
+  },'重置密码');
+}
+
+function udEditProfile(id){
+  const u = S.ud.detail.user || {};
+  showModal(`
+    <h3>✏️ 修改用户资料</h3>
+    <div class="form-row">
+      <div class="form-item"><label>昵称</label><input id="udNick" value="${esc(u.nickname||'')}"></div>
+      <div class="form-item"><label>年龄</label><input id="udAge" type="number" value="${u.age||''}"></div>
+    </div>
+    <div class="form-item"><label>性别</label><select id="udGender">
+      <option value="male" ${u.gender==='male'||u.gender===1?'selected':''}>男</option>
+      <option value="female" ${u.gender==='female'||u.gender===0?'selected':''}>女</option>
+    </select></div>
+    <div class="form-item"><label>简介</label><textarea id="udBio" rows="3">${esc(u.bio||'')}</textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="udSaveProfile(${id})">💾 保存</button>
+    </div>
+  `);
+}
+async function udSaveProfile(id){
+  const body = {
+    nickname: document.getElementById('udNick').value.trim(),
+    age: Number(document.getElementById('udAge').value)||null,
+    gender: document.getElementById('udGender').value,
+    bio: document.getElementById('udBio').value.trim()
+  };
+  try { await api('PUT','/api/admin/users/'+id+'/profile',body); toast('资料已更新','success'); closeModal(); openUserDetailFull(id); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+function udEditNote(id){
+  const note = (S.ud.detail.adminNote&&S.ud.detail.adminNote.note)||'';
+  showModal(`
+    <h3>📝 管理员备注</h3>
+    <div class="form-item"><textarea id="udNote" rows="4" placeholder="给该用户添加内部备注（用户不可见）">${esc(note)}</textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-default" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="udSaveNote(${id})">💾 保存</button>
+    </div>
+  `);
+}
+async function udSaveNote(id){
+  try { await api('PUT','/api/admin/users/'+id+'/note',{note:document.getElementById('udNote').value.trim()}); toast('备注已更新','success'); closeModal(); openUserDetailFull(id); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+async function udToggleStatus(id,action){
+  const label = action==='ban'?'封禁':'解封';
+  showConfirm(`确定要<b>${label}</b>该用户吗？`, async()=>{
+    try { await api('PUT','/api/admin/users/'+id,{action}); toast('用户已'+label,'success'); closeModal(); closeUserDetailFull(); if(S.page==='users') loadUsers(); }
     catch(e){ toast(e.message,'error'); }
   },label);
 }
@@ -817,7 +1458,10 @@ async function viewPost(id){
   try {
     const d = (await api('GET','/api/admin/posts/'+id)).data;
     let imgs = '';
-    if (d.images&&d.images.length) imgs = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">'+d.images.map(i=>`<img src="${i}" style="max-width:120px;max-height:120px;border-radius:4px;object-fit:cover">`).join('')+'</div>';
+    if (d.images&&d.images.length) {
+      const urls = d.images.map(normalizeImg).filter(Boolean);
+      imgs = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">'+urls.map((u,i)=>`<img src="${esc(u)}" style="max-width:120px;max-height:120px;border-radius:4px;object-fit:cover;cursor:pointer" onclick="${imgPreviewAttr(urls,i)}">`).join('')+'</div>';
+    }
     showModal(`
       <h3>📝 动态详情 #${d.id}</h3>
       <p style="font-size:13px"><strong>作者:</strong> ${esc(d.nickname||'用户'+d.user_id)} (ID:${d.user_id}) · <span class="tag ${d.status===1?'tag-success':'tag-default'}">${d.status===1?'正常':'已删除'}</span></p>
@@ -1397,22 +2041,37 @@ async function loadAdmins(){
   const area = document.getElementById('content-area');
   area.innerHTML = '<div class="loading-center"><div class="spinner"></div>加载中...</div>';
   try {
-    const [a,logs]=await Promise.all([api('GET','/api/admin/admins'),api('GET','/api/admin/operation-logs?limit=30')]);
-    const list=a.data||[]; const logList=logs.data||[];
+    // 列表与日志分开请求：日志无权限时仅日志区降级，不影响列表
+    let list = [];
+    let logList = [];
+    try { list = (await api('GET','/api/admin/admins')).data || []; }
+    catch(e){ list = []; toast('加载管理员列表失败: '+e.message,'error'); }
+    S._adminsCache = list; // 供 adminForm 编辑时读取该行数据
+    try { logList = (await api('GET','/api/admin/operation-logs?limit=30')).data || []; }
+    catch(e){ logList = []; /* 无权限时日志区显示"无权限" */ }
+    // 归一化 permissions（可能是字符串）
+    list.forEach(u => {
+      if (typeof u.permissions === 'string') {
+        try { u.permissions = JSON.parse(u.permissions); } catch(e){ u.permissions = null; }
+      }
+    });
+    const canManage = hasPerm('admin_manage');
     let h = `
-      <div class="toolbar"><button class="btn btn-primary btn-sm" onclick="adminForm(0)">＋ 新增管理员</button></div>
+      ${canManage?`<div class="toolbar"><button class="btn btn-primary btn-sm" onclick="adminForm(0)">＋ 新增管理员</button></div>`:''}
       <div class="section-card"><div class="section-header"><h4>👨‍💼 管理员列表</h4></div>
       <div class="section-body"><div class="table-wrap"><table>
-        <thead><tr><th>ID</th><th>昵称</th><th>手机号</th><th>角色</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
-        <tbody>${list.length===0?'<tr class="empty-row"><td colspan="7">暂无管理员</td></tr>':list.map(u=>`
+        <thead><tr><th>ID</th><th>昵称</th><th>手机号</th><th>角色</th><th>权限</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody>${list.length===0?'<tr class="empty-row"><td colspan="8">暂无管理员</td></tr>':list.map(u=>`
           <tr>
             <td>${u.id}</td><td>${esc(u.nickname||'-')}</td><td>${esc(u.phone||'-')}</td>
             <td><span class="badge-${u.admin_role==='super_admin'?'danger':u.admin_role==='admin'?'warning':'default'}">${esc(u.admin_role||'-')}</span></td>
+            <td style="max-width:220px">${renderPermTags(u)}</td>
             <td>${u.is_active?`<span class="badge-success">启用</span>`:`<span class="badge-danger">停用</span>`}</td>
             <td>${fmtTime(u.created_at)}</td>
             <td>
-              ${u.admin_role!=='super_admin'?`<button class="btn btn-text btn-xs" onclick="adminToggle(${u.id},${u.is_active?0:1})">${u.is_active?'停用':'启用'}</button>
-              <button class="btn btn-text btn-xs" onclick="showConfirm('确定删除该管理员？',()=>adminDel(${u.id}))">🗑️</button>`:'—'}
+              ${canManage && u.admin_role!=='super_admin'?`<button class="btn btn-text btn-xs" onclick="adminForm(${u.id})">✏️ 编辑</button>
+              <button class="btn btn-text btn-xs" onclick="adminToggle(${u.id},${u.is_active?0:1})">${u.is_active?'停用':'启用'}</button>
+              <button class="btn btn-text btn-xs" onclick="showConfirm('确定删除该管理员？',()=>adminDel(${u.id}))">🗑️</button>`:u.admin_role==='super_admin'?'<span style="color:var(--text-muted);font-size:12px">超级管理员</span>':''}
             </td>
           </tr>`).join('')}
         </tbody>
@@ -1420,7 +2079,7 @@ async function loadAdmins(){
       <div class="section-card"><div class="section-header"><h4>📋 最近操作日志</h4></div>
       <div class="section-body"><div class="table-wrap"><table>
         <thead><tr><th>管理员ID</th><th>操作</th><th>目标</th><th>IP</th><th>时间</th></tr></thead>
-        <tbody>${logList.length===0?'<tr class="empty-row"><td colspan="5">暂无日志</td></tr>':logList.map(l=>`
+        <tbody>${logList.length===0?'<tr class="empty-row"><td colspan="5">'+(canManage?'暂无日志':'无权限查看操作日志')+'</td></tr>':logList.map(l=>`
           <tr><td>${l.admin_id||'-'}</td><td>${esc(l.action||'-')}</td><td>${esc((l.target_type||'')+' '+(l.target_id||''))}</td><td>${esc(l.ip||'-')}</td><td>${fmtTime(l.created_at)}</td></tr>
         `).join('')}
         </tbody>
@@ -1428,25 +2087,105 @@ async function loadAdmins(){
     area.innerHTML = h;
   } catch(e){ area.innerHTML = `<div class="loading-center">❌ ${esc(e.message)} <button class="btn btn-text btn-sm" onclick="renderAdmins()">重试</button></div>`; }
 }
+
+function renderPermTags(u){
+  if (u.admin_role === 'super_admin') return '<span class="tag tag-danger">全部权限</span>';
+  const perms = u.permissions || [];
+  if (!perms.length) return '<span class="tag tag-default">角色默认</span>';
+  return perms.map(p=>p==='*'?'<span class="tag tag-danger">全部</span>':`<span class="tag tag-primary">${esc(p)}</span>`).join(' ');
+}
+
+let _permCache = null; // 权限目录缓存
+async function ensurePermData(){
+  if (_permCache) return _permCache;
+  _permCache = { catalog: S.permCatalog, roles: S.rolePermissions };
+  return _permCache;
+}
+
 function adminForm(id){
+  ensurePermData().then(({catalog, roles}) => {
+    const isEdit = !!id;
+    const admins = S._adminsCache || [];
+    const u = isEdit ? admins.find(x=>x.id===id) : null;
+    const role = u ? (u.admin_role||'admin') : 'admin';
+    const perms = u && u.permissions ? u.permissions : (roles[role]||[]).slice();
+    renderAdminForm(isEdit, u, role, perms, catalog, roles);
+  });
+}
+
+function renderAdminForm(isEdit, u, role, perms, catalog, roles){
+  // 权限目录按 group 分组
+  const groups = {};
+  (catalog||[]).forEach(c=>{ (groups[c.group]=groups[c.group]||[]).push(c); });
   showModal(`
-    <h3>新增管理员</h3>
-    <div class="form-item"><label>用户ID *</label><input id="admUid" type="number" placeholder="用户ID"></div>
-    <div class="form-item"><label>角色</label><select id="admRole">
-      ${['admin','operator','auditor','cs'].map(r=>`<option value="${r}">${r}</option>`).join('')}
+    <h3>${isEdit?'编辑管理员':'新增管理员'}</h3>
+    ${isEdit?'':`<div class="form-item"><label>用户ID *</label><input id="admUid" type="number" placeholder="用户ID"></div>`}
+    <div class="form-item"><label>角色</label><select id="admRole" onchange="onRoleChange()">
+      ${['super_admin','admin','operator','auditor','cs'].filter(r=>!isEdit||u.admin_role==='super_admin'?true:r!=='super_admin').map(r=>`<option value="${r}" ${role===r?'selected':''}>${r}</option>`).join('')}
     </select></div>
+    <div class="form-item"><label>权限配置</label>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">切换角色自动填充默认权限，可手动勾选覆盖</div>
+      <div class="perm-grid" id="permGrid">${renderPermGrid(perms, groups)}</div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-default" onclick="closeModal()">取消</button>
-      <button class="btn btn-primary" onclick="saveAdmin()">💾 保存</button>
+      <button class="btn btn-primary" onclick="saveAdmin(${isEdit?u.id:0})">💾 保存</button>
     </div>
   `);
 }
-async function saveAdmin(){
-  const user_id=Number(document.getElementById('admUid').value);
-  const admin_role=document.getElementById('admRole').value;
-  if(!user_id){toast('请填写用户ID','error');return;}
-  try{await api('POST','/api/admin/admins',{user_id,admin_role});toast('管理员已创建','success');closeModal();loadAdmins();}
-  catch(e){toast(e.message,'error');}
+
+function renderPermGrid(perms, groups){
+  if (!groups || !Object.keys(groups).length) return '<div style="font-size:12px;color:var(--text-muted)">无权限目录</div>';
+  let h = '';
+  for (const [group, items] of Object.entries(groups)) {
+    h += `<div class="perm-group-label">${esc(group)}</div><div style="display:flex;flex-wrap:wrap;gap:8px">`;
+    for (const it of items) {
+      const checked = perms.includes('*') || perms.includes(it.key);
+      h += `<label class="perm-item${checked?' checked':''}" onclick="togglePerm(this)">
+        <input type="checkbox" ${checked?'checked':''} value="${it.key}"> ${esc(it.label)}
+      </label>`;
+    }
+    h += '</div>';
+  }
+  return h;
+}
+
+// 勾选切换（点 label 翻转 checkbox）
+function togglePerm(el){
+  const box = el.querySelector('input');
+  box.checked = !box.checked;
+  el.classList.toggle('checked', box.checked);
+}
+
+function onRoleChange(){
+  const role = document.getElementById('admRole').value;
+  const defaultPerms = (S.rolePermissions[role]||[]).slice();
+  // 重新渲染勾选区（默认权限预填）
+  const grid = document.getElementById('permGrid');
+  if (grid) grid.innerHTML = renderPermGrid(defaultPerms, permCatalogToGroups());
+}
+
+function permCatalogToGroups(){
+  const groups = {};
+  (S.permCatalog||[]).forEach(c=>{ (groups[c.group]=groups[c.group]||[]).push(c); });
+  return groups;
+}
+
+async function saveAdmin(id){
+  const admin_role = document.getElementById('admRole').value;
+  const perms = [...document.querySelectorAll('#permGrid input:checked')].map(i=>i.value);
+  // '*' 单独处理：勾选了超集则存通配
+  const finalPerms = perms;
+  if (id) {
+    // 编辑
+    try{ await api('PUT','/api/admin/admins/'+id,{admin_role, permissions:finalPerms}); toast('管理员已更新','success'); closeModal(); loadAdmins(); }
+    catch(e){ toast(e.message,'error'); }
+  } else {
+    const user_id = Number(document.getElementById('admUid').value);
+    if(!user_id){ toast('请填写用户ID','error'); return; }
+    try{ await api('POST','/api/admin/admins',{user_id, admin_role, permissions:finalPerms}); toast('管理员已创建','success'); closeModal(); loadAdmins(); }
+    catch(e){ toast(e.message,'error'); }
+  }
 }
 async function adminToggle(id,isActive){
   try{await api('PUT','/api/admin/admins/'+id,{is_active:isActive});toast(isActive?'已启用':'已停用','success');loadAdmins();}

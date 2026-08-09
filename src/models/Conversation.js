@@ -152,9 +152,9 @@ class Conversation {
            FROM conversations c
            LEFT JOIN users u1 ON c.user1_id = u1.id
            LEFT JOIN users u2 ON c.user2_id = u2.id
-           WHERE (c.user1_id = ? OR c.user2_id = ?) AND c.status = 1
+           WHERE (c.user1_id = ? OR c.user2_id = ?) AND (c.is_deleted_by_user IS NULL OR c.is_deleted_by_user != ?)
            ORDER BY c.is_pinned DESC, c.last_message_time IS NULL ASC, c.last_message_time DESC`,
-          [user_id, user_id, user_id, user_id, user_id, user_id, user_id, user_id]
+          [user_id, user_id, user_id, user_id, user_id, user_id, user_id, user_id, user_id]
         );
         // 按当前用户实时计算未读数：仅统计「别人发给我的未读」，自己发出的消息不计入
         // （避免会话级 unread_count 单值把发送方的消息也计成自己的未读红点）
@@ -248,7 +248,7 @@ class Conversation {
     try {
       if (isDbAvailable()) {
         const [result] = await executeQuery(
-          'UPDATE conversations SET is_deleted_by_user = ?, status = 0 WHERE id = ?',
+          'UPDATE conversations SET is_deleted_by_user = ? WHERE id = ?',
           [userId, convId]
         );
         return result.affectedRows > 0;
